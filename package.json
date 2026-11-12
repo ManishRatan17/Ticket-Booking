@@ -1,0 +1,23 @@
+{
+  "name": "flash-sale-ticketing",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Full-stack template: Express API + React (Vite) client",
+  "workspaces": [
+    "server",
+    "client"
+  ],
+  "scripts": {
+    "dev": "concurrently -n server,client -c blue,magenta \"npm run dev -w server\" \"npm run dev -w client\"",
+    "build": "npm run build -w client",
+    "start": "npm start -w server",
+    "test": "npm test -w server",
+    "lint": "npm run lint -w client"
+  },
+  "engines": {
+    "node": ">=20.6"
+  },
+  "devDependencies": {
+    "concurrently": "^10.0.7"
+  }
+}
