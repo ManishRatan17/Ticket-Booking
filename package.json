@@ -13,6 +13,7 @@
     "start": "npm start -w server",
     "test": "npm test -w server",
     "migrate": "npm run migrate -w server",
+    "demo:race": "npm run demo:race -w server",
     "lint": "npm run lint -w client"
   },
   "engines": {
