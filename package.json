@@ -21,5 +21,8 @@
   },
   "devDependencies": {
     "concurrently": "^10.0.7"
+  },
+  "allowScripts": {
+    "argon2": false
   }
 }
