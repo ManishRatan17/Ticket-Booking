@@ -19,9 +19,12 @@ TicketBooking/
 
 ## Getting started
 
+Requires Node.js 20.6+ and Docker Desktop.
+
 ```sh
+docker compose up -d                 # start PostgreSQL + Redis
 npm install
-cp server/.env.example server/.env   # optional
+cp server/.env.example server/.env
 npm run dev
 ```
 

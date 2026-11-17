@@ -1,0 +1,41 @@
+# Local development infrastructure: PostgreSQL (permanent record) + Redis (fast working memory).
+# Start:  docker compose up -d      Stop:  docker compose down
+# The Node server and React client still run on your machine with `npm run dev`.
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: ticketing-postgres
+    environment:
+      # Local development credentials only. Never reuse these anywhere real.
+      POSTGRES_USER: ticketing
+      POSTGRES_PASSWORD: ticketing
+      POSTGRES_DB: ticketing
+    ports:
+      - "5432:5432" # host:container
+    volumes:
+      - pgdata:/var/lib/postgresql/data # keep data when the container is removed
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ticketing -d ticketing"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: ticketing-redis
+    # --appendonly yes: log every write to disk so a restart loses less data.
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "6379:6379"
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  pgdata:
+  redisdata:
