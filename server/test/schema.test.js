@@ -75,6 +75,51 @@ test('an order cannot have an unknown status', () =>
     );
   }));
 
+// ---- Migration 002: auth tables ----
+
+test('a user cannot have an unknown role', () =>
+  inRolledBackTransaction(async (client) => {
+    const { userId } = await seed(client);
+    await assert.rejects(
+      client.query(`UPDATE users SET role = 'superuser' WHERE id = $1`, [userId]),
+      { code: CHECK_VIOLATION },
+    );
+  }));
+
+test('an email with capital letters is refused by the database', () =>
+  inRolledBackTransaction(async (client) => {
+    await assert.rejects(
+      client.query(`INSERT INTO users (email, password_hash) VALUES ('Ann@Example.com', 'x')`),
+      { code: CHECK_VIOLATION },
+    );
+  }));
+
+test('deleting a user also deletes their sessions and refresh tokens (CASCADE)', () =>
+  inRolledBackTransaction(async (client) => {
+    const user = await client.query(
+      `INSERT INTO users (email, password_hash) VALUES ('cascade@example.com', 'x') RETURNING id`,
+    );
+    const userId = user.rows[0].id;
+    const session = await client.query(
+      `INSERT INTO sessions (user_id, expires_at) VALUES ($1, now() + interval '30 days') RETURNING id`,
+      [userId],
+    );
+    await client.query(
+      `INSERT INTO refresh_tokens (session_id, token_hash, expires_at)
+       VALUES ($1, 'hash-1', now() + interval '7 days')`,
+      [session.rows[0].id],
+    );
+
+    await client.query('DELETE FROM users WHERE id = $1', [userId]);
+
+    const left = await client.query(
+      'SELECT (SELECT count(*) FROM sessions WHERE user_id = $1) AS sessions, ' +
+        '(SELECT count(*) FROM refresh_tokens WHERE session_id = $2) AS tokens',
+      [userId, session.rows[0].id],
+    );
+    assert.deepEqual(left.rows[0], { sessions: '0', tokens: '0' });
+  }));
+
 test('the same webhook cannot be recorded twice', () =>
   inRolledBackTransaction(async (client) => {
     const record = () =>
