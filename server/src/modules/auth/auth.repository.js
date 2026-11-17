@@ -27,3 +27,22 @@ export async function createUser({ email, passwordHash }) {
   );
   return toUser(rows[0]);
 }
+
+// The ONLY query that reads password_hash. Used by login, nowhere else.
+export async function findUserForLogin(email) {
+  const { rows } = await pool.query(
+    `SELECT ${PUBLIC_USER_COLUMNS}, password_hash FROM users WHERE email = $1`,
+    [email],
+  );
+  if (rows.length === 0) return null;
+  return { ...toUser(rows[0]), passwordHash: rows[0].password_hash };
+}
+
+export async function findUserById(id) {
+  const { rows } = await pool.query(`SELECT ${PUBLIC_USER_COLUMNS} FROM users WHERE id = $1`, [id]);
+  return rows.length === 0 ? null : toUser(rows[0]);
+}
+
+export async function updatePasswordHash(id, passwordHash) {
+  await pool.query('UPDATE users SET password_hash = $2 WHERE id = $1', [id, passwordHash]);
+}

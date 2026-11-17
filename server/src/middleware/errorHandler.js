@@ -13,6 +13,8 @@ export function notFound(req, res, next) {
 export function errorHandler(err, req, res, next) {
   // 1. Errors we threw on purpose: safe to show to the client.
   if (err instanceof AppError) {
+    // The HTTP standard says a 401 must tell the client HOW to authenticate.
+    if (err.status === 401) res.set('WWW-Authenticate', 'Bearer');
     return res.status(err.status).json({
       error: { code: err.code, message: err.message, details: err.details },
     });
