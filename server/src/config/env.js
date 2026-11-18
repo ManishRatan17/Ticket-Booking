@@ -38,4 +38,20 @@ export const env = {
     refreshTtlSeconds: 7 * DAY, // sliding: each refresh issues a fresh 7-day token
     reuseGraceSeconds: 10, // a token reused this soon is probably a second tab, not an attacker
   },
+  // Where the browser is sent after Google sign-in (the React app).
+  clientUrl: process.env.CLIENT_URL || 'http://localhost:5173',
+  // "Continue with Google". OPTIONAL: without a client id/secret the Google routes answer 503.
+  // The URL settings default to Google's real endpoints; tests point them at a fake provider.
+  google: {
+    clientId: process.env.GOOGLE_CLIENT_ID || null,
+    clientSecret: process.env.GOOGLE_CLIENT_SECRET || null,
+    redirectUri: process.env.GOOGLE_REDIRECT_URI || 'http://localhost:5173/api/auth/google/callback',
+    authUrl: process.env.GOOGLE_AUTH_URL || 'https://accounts.google.com/o/oauth2/v2/auth',
+    tokenUrl: process.env.GOOGLE_TOKEN_URL || 'https://oauth2.googleapis.com/token',
+    jwksUrl: process.env.GOOGLE_JWKS_URL || 'https://www.googleapis.com/oauth2/v3/certs',
+    // Google's documentation says ID tokens use either of these two issuer values.
+    issuers: process.env.GOOGLE_ISSUER
+      ? [process.env.GOOGLE_ISSUER]
+      : ['https://accounts.google.com', 'accounts.google.com'],
+  },
 };

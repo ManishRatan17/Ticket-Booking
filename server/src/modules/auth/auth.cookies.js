@@ -24,3 +24,31 @@ export function clearRefreshCookie(res) {
 export function readRefreshCookie(req) {
   return req.cookies?.[COOKIE_NAME];
 }
+
+// ---- Google sign-in in progress ----
+// SameSite=LAX, not Strict: the callback is a navigation coming FROM accounts.google.com.
+// A Strict cookie is not sent on navigations started by another site, so every sign-in
+// would fail. Lax allows exactly this case (top-level GET navigation) and still blocks
+// cross-site POSTs, images, iframes and fetches.
+const OAUTH_COOKIE_NAME = 'oauth_tx';
+
+function oauthCookieOptions() {
+  return {
+    httpOnly: true,
+    secure: env.isProduction,
+    sameSite: 'lax',
+    path: '/api/auth/google', // covers /api/auth/google and /api/auth/google/callback only
+  };
+}
+
+export function setOAuthCookie(res, txId, maxAgeSeconds) {
+  res.cookie(OAUTH_COOKIE_NAME, txId, { ...oauthCookieOptions(), maxAge: maxAgeSeconds * 1000 });
+}
+
+export function clearOAuthCookie(res) {
+  res.clearCookie(OAUTH_COOKIE_NAME, oauthCookieOptions());
+}
+
+export function readOAuthCookie(req) {
+  return req.cookies?.[OAUTH_COOKIE_NAME];
+}

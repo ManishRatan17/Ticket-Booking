@@ -1,6 +1,17 @@
 // HTTP layer: read validated input from the request, call the service, send the response.
+import { env } from '../../config/env.js';
+import { AppError } from '../../lib/errors.js';
 import * as authService from './auth.service.js';
-import { setRefreshCookie, clearRefreshCookie, readRefreshCookie } from './auth.cookies.js';
+import { isGoogleConfigured, createAuthRequest } from './google.js';
+import { saveTransaction, takeTransaction, OAUTH_TX_TTL_SECONDS } from './oauth-transactions.js';
+import {
+  setRefreshCookie,
+  clearRefreshCookie,
+  readRefreshCookie,
+  setOAuthCookie,
+  clearOAuthCookie,
+  readOAuthCookie,
+} from './auth.cookies.js';
 
 export async function register(req, res) {
   const user = await authService.register(req.validated.body);
@@ -27,6 +38,47 @@ export async function refresh(req, res) {
     // and clearing it would log the user out.
     if (err.code !== 'REFRESH_CONFLICT') clearRefreshCookie(res);
     throw err; // the error handler sends the response
+  }
+}
+
+// Step ①: the "Continue with Google" button links here. We remember the secrets of this
+// attempt, then send the browser to Google's sign-in page.
+export async function googleStart(req, res) {
+  if (!isGoogleConfigured()) {
+    throw new AppError(503, 'GOOGLE_NOT_CONFIGURED', 'Google sign-in is not configured');
+  }
+  const { url, state, nonce, codeVerifier } = createAuthRequest();
+  const txId = await saveTransaction({ state, nonce, codeVerifier });
+  setOAuthCookie(res, txId, OAUTH_TX_TTL_SECONDS);
+  res.redirect(url); // 302 → accounts.google.com
+}
+
+// Google sends the browser back here. This is a page navigation, not an API call from
+// JavaScript, so every outcome REDIRECTS back to the React app rather than returning JSON.
+// Tokens are never put in the URL: the result travels in the httpOnly refresh cookie,
+// and the app then calls POST /api/auth/refresh to get an access token.
+export async function googleCallback(req, res) {
+  const { code, state, error } = req.validated.query;
+  const txId = readOAuthCookie(req);
+  clearOAuthCookie(res); // used once, whatever happens next
+
+  const backToApp = (params) => res.redirect(`${env.clientUrl}/?${new URLSearchParams(params)}`);
+
+  if (error) {
+    await takeTransaction(txId); // user pressed "Cancel" at Google: throw the attempt away
+    return backToApp({ login: 'cancelled' });
+  }
+
+  try {
+    const { refresh } = await authService.loginWithGoogle(
+      { code, state, txId },
+      { userAgent: req.get('user-agent'), ip: req.ip },
+    );
+    setRefreshCookie(res, refresh);
+    backToApp({ login: 'google' });
+  } catch (err) {
+    if (!(err instanceof AppError)) console.error(err); // a real bug: log it on the server
+    backToApp({ login: 'failed', reason: err instanceof AppError ? err.code : 'INTERNAL_ERROR' });
   }
 }
 

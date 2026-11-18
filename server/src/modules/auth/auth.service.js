@@ -1,5 +1,5 @@
 // Business logic for auth. Knows the RULES; knows nothing about HTTP (no req/res here).
-import { randomBytes } from 'node:crypto';
+import { randomBytes, timingSafeEqual } from 'node:crypto';
 import { env } from '../../config/env.js';
 import { withTransaction } from '../../config/db.js';
 import { AppError } from '../../lib/errors.js';
@@ -8,6 +8,9 @@ import { hashPassword, verifyPassword, needsRehash } from './password.js';
 import { signAccessToken, generateRefreshToken, hashToken } from './tokens.js';
 import * as authRepository from './auth.repository.js';
 import * as sessionsRepository from './sessions.repository.js';
+import * as identitiesRepository from './identities.repository.js';
+import { isGoogleConfigured, exchangeCode, verifyIdToken } from './google.js';
+import { takeTransaction } from './oauth-transactions.js';
 
 export async function register({ email, password }) {
   const passwordHash = await hashPassword(password);
@@ -157,6 +160,102 @@ export async function refresh(refreshToken) {
     default:
       throw new AppError(401, 'INVALID_REFRESH_TOKEN', 'Refresh token is invalid');
   }
+}
+
+// ---------------------------------------------------------------------------
+// Continue with Google
+// ---------------------------------------------------------------------------
+
+function sameString(a, b) {
+  const x = Buffer.from(String(a));
+  const y = Buffer.from(String(b));
+  return x.length === y.length && timingSafeEqual(x, y);
+}
+
+// Turns a verified Google profile into one of OUR users. Four cases:
+//   1. this Google account is already linked         → that user
+//   2. new Google account, email unknown              → create a user (no password)
+//   3. email belongs to an account with VERIFIED email → link to it
+//   4. email belongs to an UNVERIFIED password account → "verified email wins":
+//      link it, remove the password, end all its sessions (it may be a squatter's)
+async function findOrCreateGoogleUser({ sub, email }) {
+  return withTransaction(async (client) => {
+    const linked = await identitiesRepository.findUserByIdentity(client, 'google', sub);
+    if (linked) {
+      await identitiesRepository.touchIdentity(client, 'google', sub);
+      return linked; // case 1
+    }
+
+    const existing = await identitiesRepository.findUserByEmailForUpdate(client, email);
+    let user;
+    if (!existing) {
+      user = await identitiesRepository.createVerifiedUser(client, email); // case 2
+    } else if (existing.emailVerifiedAt) {
+      user = existing; // case 3
+    } else {
+      await identitiesRepository.removePasswordAndMarkVerified(client, existing.id); // case 4
+      await sessionsRepository.revokeAllUserSessions(client, existing.id, 'account_linked');
+      user = existing;
+    }
+
+    await identitiesRepository.insertIdentity(client, {
+      userId: user.id,
+      provider: 'google',
+      providerUserId: sub,
+      email,
+    });
+    await identitiesRepository.markEmailVerified(client, user.id);
+    const { emailVerifiedAt: _, ...publicUser } = user;
+    return publicUser;
+  });
+}
+
+// The callback: Google sent the browser back with ?code=...&state=...
+// `txId` comes from the oauth_tx cookie set when this browser started the sign-in.
+export async function loginWithGoogle({ code, state, txId }, device = {}) {
+  if (!isGoogleConfigured()) {
+    throw new AppError(503, 'GOOGLE_NOT_CONFIGURED', 'Google sign-in is not configured');
+  }
+
+  // Single use: GETDEL means a replayed callback finds nothing.
+  // Missing cookie = this browser never started a sign-in (e.g. a link from an attacker).
+  const tx = await takeTransaction(txId);
+  if (!tx) {
+    throw new AppError(400, 'OAUTH_TX_INVALID', 'Sign-in expired or was already used; please start again');
+  }
+  // The state Google echoed back must be the one THIS browser was given.
+  if (!state || !sameString(state, tx.state)) {
+    throw new AppError(400, 'OAUTH_STATE_MISMATCH', 'Sign-in could not be verified; please start again');
+  }
+  if (!code) {
+    throw new AppError(400, 'OAUTH_CODE_MISSING', 'Google did not return a code');
+  }
+
+  const idToken = await exchangeCode({ code, codeVerifier: tx.codeVerifier });
+  const profile = await verifyIdToken(idToken, tx.nonce);
+
+  // If two sign-ins for the same new email race, one INSERT hits a UNIQUE constraint.
+  // Running the whole decision again then finds the row the other request created.
+  let user;
+  for (let attempt = 1; ; attempt++) {
+    try {
+      user = await findOrCreateGoogleUser(profile);
+      break;
+    } catch (err) {
+      // Our user already has a DIFFERENT Google account linked (same email, different "sub").
+      if (isUniqueViolation(err, 'user_identities_user_id_provider_key')) {
+        throw new AppError(409, 'GOOGLE_ACCOUNT_CONFLICT', 'This email is linked to a different Google account');
+      }
+      const raced =
+        isUniqueViolation(err, 'users_email_key') ||
+        isUniqueViolation(err, 'user_identities_provider_provider_user_id_key');
+      if (!raced || attempt === 2) throw err;
+    }
+  }
+
+  // From here on it's an ordinary session — the same refresh rotation as a password login.
+  const { refresh } = await startSession(user.id, device);
+  return { user, refresh };
 }
 
 // The token says who you were at login; the DATABASE says who you are now.

@@ -23,6 +23,14 @@ export const loginSchema = z.object({
   password: z.string().min(1, 'Password is required').max(128, 'Password must be at most 128 characters'),
 });
 
+// What Google appends to our callback URL. Google also adds other params (scope, authuser…);
+// those are stripped. Length limits stop absurd inputs from reaching Redis or Google.
+export const googleCallbackQuerySchema = z.object({
+  code: z.string().max(2048).optional(),
+  state: z.string().max(512).optional(),
+  error: z.string().max(256).optional(), // e.g. "access_denied" when the user clicks Cancel
+});
+
 export const registerSchema = z
   .object({
     email: emailSchema,

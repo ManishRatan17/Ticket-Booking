@@ -77,6 +77,15 @@ export async function touchSession(client, sessionId) {
   await client.query('UPDATE sessions SET last_used_at = now() WHERE id = $1', [sessionId]);
 }
 
+// Ends every active session of a user (e.g. after linking Google to a squatted account).
+export async function revokeAllUserSessions(client, userId, reason) {
+  await client.query(
+    `UPDATE sessions SET revoked_at = now(), revoke_reason = $2
+      WHERE user_id = $1 AND revoked_at IS NULL`,
+    [userId, reason],
+  );
+}
+
 // "AND revoked_at IS NULL": revoking twice keeps the FIRST time and reason (idempotent).
 export async function revokeSession(client, sessionId, reason) {
   await client.query(

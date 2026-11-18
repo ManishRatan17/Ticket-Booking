@@ -3,10 +3,10 @@ import { pool } from '../../config/db.js';
 
 // Columns that are safe to send to clients. We list them explicitly instead of SELECT *,
 // so a sensitive column added later (like password_hash) can never leak by accident.
-const PUBLIC_USER_COLUMNS = 'id, email, role, created_at';
+export const PUBLIC_USER_COLUMNS = 'id, email, role, created_at';
 
 // Turns a database row (snake_case) into the object the rest of the app uses (camelCase).
-function toUser(row) {
+export function toUser(row) {
   return {
     // pg returns BIGINT as a string, because JS numbers can't hold every 64-bit integer.
     // User ids will never get near 2^53, so converting to a number is safe.
