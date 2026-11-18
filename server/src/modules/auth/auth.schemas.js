@@ -23,6 +23,17 @@ export const loginSchema = z.object({
   password: z.string().min(1, 'Password is required').max(128, 'Password must be at most 128 characters'),
 });
 
+export const forgotPasswordSchema = z.object({
+  email: emailSchema,
+});
+
+// The token is 43 characters of base64url. Same password rules as registration
+// (the "not your email" rule is checked in the service, where the email is known).
+export const resetPasswordSchema = z.object({
+  token: z.string().regex(/^[A-Za-z0-9_-]{43}$/, 'Invalid reset token'),
+  password: passwordSchema,
+});
+
 // DELETE /sessions/:id — session ids are UUIDs; anything else is rejected before any SQL runs.
 export const sessionIdParamsSchema = z.object({
   id: z.uuid('Invalid session id'),

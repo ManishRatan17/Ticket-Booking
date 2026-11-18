@@ -7,6 +7,8 @@ import {
   loginSchema,
   googleCallbackQuerySchema,
   sessionIdParamsSchema,
+  forgotPasswordSchema,
+  resetPasswordSchema,
 } from './auth.schemas.js';
 import * as authController from './auth.controller.js';
 import {
@@ -15,6 +17,9 @@ import {
   registerPerIp,
   refreshPerIp,
   googleStartPerIp,
+  forgotPerIp,
+  forgotPerEmail,
+  resetPerIp,
 } from './auth.rate-limits.js';
 
 const router = Router();
@@ -26,6 +31,16 @@ router.post('/login', loginPerIp, validate({ body: loginSchema }), loginAttempts
 router.post('/refresh', refreshPerIp, authController.refresh); // authenticated by the refresh cookie
 router.post('/logout', authController.logout); // also by the refresh cookie: works after the JWT expired
 router.get('/me', authenticate, authController.me);
+
+// Forgot / reset password
+router.post(
+  '/forgot-password',
+  forgotPerIp,
+  validate({ body: forgotPasswordSchema }),
+  forgotPerEmail,
+  authController.forgotPassword,
+);
+router.post('/reset-password', resetPerIp, validate({ body: resetPasswordSchema }), authController.resetPassword);
 
 // Session management ("where am I logged in?")
 router.post('/logout-all', authenticate, authController.logoutAll);

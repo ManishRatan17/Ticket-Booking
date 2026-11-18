@@ -5,7 +5,9 @@ import { pool, withTransaction } from '../../config/db.js';
 import { AppError } from '../../lib/errors.js';
 import { isUniqueViolation } from '../../lib/db-errors.js';
 import { hashPassword, verifyPassword, needsRehash } from './password.js';
-import { signAccessToken, generateRefreshToken, hashToken } from './tokens.js';
+import { signAccessToken, generateRefreshToken, generateSecureToken, hashToken } from './tokens.js';
+import { sendMail } from '../../lib/mailer.js';
+import * as passwordResetRepository from './password-reset.repository.js';
 import * as authRepository from './auth.repository.js';
 import * as sessionsRepository from './sessions.repository.js';
 import * as identitiesRepository from './identities.repository.js';
@@ -288,6 +290,83 @@ export async function revokeOwnSession(userId, sessionId) {
     revocation.revokeOwnSession(client, { sessionId, userId }, 'logout'),
   );
   if (!revoked) throw new AppError(404, 'SESSION_NOT_FOUND', 'No active session with this id');
+}
+
+// ---------------------------------------------------------------------------
+// Password reset ("forgot password")
+// ---------------------------------------------------------------------------
+
+const RESET_TOKEN_TTL_MS = 15 * 60 * 1000; // a reset link works for 15 minutes
+
+// Always returns the SAME way, immediately, whether or not the email has an account.
+// The real work (lookup, token, email) runs WITHOUT the response waiting for it:
+// otherwise "account exists" (slow: database writes + sending mail) and "no account"
+// (fast) would be told apart by timing — the A3 timing attack, in a new place.
+export function requestPasswordReset(email) {
+  sendResetEmailIfAccountExists(email).catch((err) =>
+    console.error('[password-reset] could not send reset email:', err.message),
+  );
+  // ⚠️ If the server crashed right now, this email would be lost. A production system
+  // would put it on a job queue (BullMQ, Phase 3) that retries until it's delivered.
+}
+
+async function sendResetEmailIfAccountExists(email) {
+  const user = await authRepository.findUserByEmail(email);
+  if (!user) return; // nothing to do — and nothing in the response reveals that
+
+  const token = generateSecureToken();
+  await withTransaction(async (client) => {
+    await passwordResetRepository.cancelUnusedResetTokens(client, user.id); // only the newest link works
+    await passwordResetRepository.insertResetToken(client, {
+      userId: user.id,
+      tokenHash: hashToken(token),
+      expiresAt: new Date(Date.now() + RESET_TOKEN_TTL_MS),
+    });
+  });
+
+  // The token goes in the #fragment, NOT a ?query: browsers never send the fragment to any
+  // server, so it can't end up in server logs, proxy logs or Referer headers.
+  const link = `${env.clientUrl}/reset-password#token=${token}`;
+  await sendMail({
+    to: user.email,
+    subject: 'Reset your password',
+    text:
+      `Someone (hopefully you) asked to reset the password for ${user.email}.\n\n` +
+      `Choose a new password here (the link works once, for 15 minutes):\n${link}\n\n` +
+      `If it wasn't you, ignore this email: your password stays the same.`,
+  });
+}
+
+export async function resetPassword({ token, password }) {
+  // Hash BEFORE the transaction: argon2 is slow on purpose, and a transaction should never
+  // hold a database connection (and row locks) while doing slow work.
+  const passwordHash = await hashPassword(password);
+
+  const user = await withTransaction(async (client) => {
+    const claimed = await passwordResetRepository.claimResetToken(client, hashToken(token));
+    if (!claimed) return null;
+
+    if (password.trim().toLowerCase() === claimed.email) {
+      // THROWING inside the transaction rolls back the claim, so the link still works and the
+      // user can pick a better password. (The opposite of refresh-token reuse in A4, where we
+      // RETURNED instead of throwing because that write had to be kept.)
+      throw new AppError(400, 'VALIDATION_ERROR', 'Request validation failed', [
+        { field: 'body.password', message: 'Password must not be the same as your email' },
+      ]);
+    }
+
+    await passwordResetRepository.setPassword(client, claimed.id, passwordHash);
+    await passwordResetRepository.cancelUnusedResetTokens(client, claimed.id); // other links die too
+    // Whoever knew the OLD password (maybe an attacker — that's often WHY people reset)
+    // is logged out everywhere, immediately.
+    await revocation.revokeAllUserSessions(client, claimed.id, 'password_reset');
+    return claimed;
+  });
+
+  if (!user) {
+    // One message for unknown, expired and already-used links: no need to say which.
+    throw new AppError(400, 'RESET_TOKEN_INVALID', 'This reset link is invalid or has expired. Please request a new one.');
+  }
 }
 
 // The token says who you were at login; the DATABASE says who you are now.

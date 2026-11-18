@@ -53,10 +53,13 @@ export async function verifyAccessToken(token) {
   return { id, role: payload.role, sessionId: payload.sid };
 }
 
-// 32 random bytes = 256 bits: impossible to guess. base64url makes it cookie-safe text.
-export function generateRefreshToken() {
+// 32 random bytes = 256 bits: impossible to guess. base64url makes it safe in cookies and URLs.
+// Used for refresh tokens AND password-reset tokens.
+export function generateSecureToken() {
   return randomBytes(32).toString('base64url');
 }
+
+export const generateRefreshToken = generateSecureToken;
 
 // SHA-256 (fast) is right here — NOT argon2 — because the input is random, not a human password:
 // there is nothing to brute-force. And the same input always gives the same hash,

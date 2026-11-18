@@ -38,6 +38,11 @@ export async function findUserForLogin(email) {
   return { ...toUser(rows[0]), passwordHash: rows[0].password_hash };
 }
 
+export async function findUserByEmail(email) {
+  const { rows } = await pool.query(`SELECT ${PUBLIC_USER_COLUMNS} FROM users WHERE email = $1`, [email]);
+  return rows.length === 0 ? null : toUser(rows[0]);
+}
+
 export async function findUserById(id) {
   const { rows } = await pool.query(`SELECT ${PUBLIC_USER_COLUMNS} FROM users WHERE id = $1`, [id]);
   return rows.length === 0 ? null : toUser(rows[0]);

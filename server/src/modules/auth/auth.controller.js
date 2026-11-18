@@ -110,6 +110,18 @@ export async function deleteSession(req, res) {
   res.status(204).end();
 }
 
+// Same answer for every email, on purpose (see requestPasswordReset).
+export function forgotPassword(req, res) {
+  authService.requestPasswordReset(req.validated.body.email);
+  res.json({ message: 'If an account exists for this email, we have sent a link to reset the password.' });
+}
+
+export async function resetPassword(req, res) {
+  await authService.resetPassword(req.validated.body);
+  clearAuthCookies(res); // every session just ended; log in again with the new password
+  res.status(204).end();
+}
+
 export async function me(req, res) {
   const user = await authService.getMe(req.user.id); // req.user was set by authenticate
   res.json({ user });

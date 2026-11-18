@@ -154,6 +154,14 @@ test('Google start: 20 per minute per IP, then 429', async () => {
   assert.equal(last.status, 429);
 });
 
+test('forgot password: 3 per hour per email — answered the same for unknown emails', async () => {
+  const unknown = `${RUN}-nobody-forgot@example.com`;
+  const statuses = [];
+  for (let i = 0; i < 4; i++) statuses.push((await post('/api/auth/forgot-password', newIp(), { email: unknown })).status);
+  // 4 different IPs, so only the per-EMAIL limit can explain the 429.
+  assert.deepEqual(statuses, [200, 200, 200, 429]);
+});
+
 test('allowed requests carry the remaining budget in RateLimit-* headers', async () => {
   const ip = newIp();
   const first = await post('/api/auth/register', ip, { email: 'not-an-email', password: 'x' });

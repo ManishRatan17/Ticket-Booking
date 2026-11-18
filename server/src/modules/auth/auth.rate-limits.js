@@ -26,5 +26,18 @@ export const registerPerIp = rateLimit({ name: 'register-ip', limit: 5, windowSe
 // Generous: every open tab refreshes every 15 minutes. This only stops floods.
 export const refreshPerIp = rateLimit({ name: 'refresh-ip', limit: 60, windowSeconds: MINUTE, key: byIp });
 
+// Forgot password sends EMAIL: without limits it's a free spam cannon aimed at any inbox.
+// The per-email limit answers 429 for EVERY address alike, so it reveals nothing.
+export const forgotPerIp = rateLimit({ name: 'forgot-ip', limit: 5, windowSeconds: 60 * MINUTE, key: byIp });
+export const forgotPerEmail = rateLimit({
+  name: 'forgot-email',
+  limit: 3,
+  windowSeconds: 60 * MINUTE,
+  key: (req) => req.validated.body.email,
+});
+
+// Guessing a 256-bit token is hopeless, but each attempt runs argon2: cap the CPU cost.
+export const resetPerIp = rateLimit({ name: 'reset-ip', limit: 10, windowSeconds: 15 * MINUTE, key: byIp });
+
 // Each start creates a Redis entry (oauth-transactions.js): don't let anyone fill Redis.
 export const googleStartPerIp = rateLimit({ name: 'google-start-ip', limit: 20, windowSeconds: MINUTE, key: byIp });
