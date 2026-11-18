@@ -1,96 +1,40 @@
-import { useEffect, useState } from 'react'
+// The app's pages and who may see them. Everything about HOW we talk to the server lives
+// in src/api/; everything about WHO is signed in lives in src/auth/.
+import { BrowserRouter, Route, Routes } from 'react-router-dom'
 import './App.css'
-
-// Only ONE refresh request at a time. In development, React StrictMode runs effects twice;
-// two parallel refreshes with the same cookie would collide on the server (409 REFRESH_CONFLICT,
-// the "two tabs" case from step A4). Sharing one in-flight promise avoids that.
-let refreshInFlight = null
-function refreshSession() {
-  refreshInFlight ??= fetch('/api/auth/refresh', { method: 'POST' })
-    .then((res) => (res.ok ? res.json() : null))
-    .finally(() => {
-      refreshInFlight = null
-    })
-  return refreshInFlight
-}
-
-// What the server's Google callback put in the URL (?login=...&reason=...).
-function readLoginResult() {
-  const params = new URLSearchParams(window.location.search)
-  const login = params.get('login')
-  if (!login) return null
-  window.history.replaceState(null, '', window.location.pathname) // tidy the address bar
-  if (login === 'failed') return `Google sign-in failed (${params.get('reason')})`
-  if (login === 'cancelled') return 'Google sign-in was cancelled'
-  return null
-}
+import { AuthProvider } from './auth/AuthProvider.jsx'
+import { GuestOnly } from './auth/guards.jsx'
+import { Layout } from './components/Layout.jsx'
+import { HomePage } from './pages/HomePage.jsx'
+import { LoginPage } from './pages/LoginPage.jsx'
+import { RegisterPage } from './pages/RegisterPage.jsx'
+import { ForgotPasswordPage } from './pages/ForgotPasswordPage.jsx'
+import { ResetPasswordPage } from './pages/ResetPasswordPage.jsx'
+import { NotFoundPage } from './pages/NotFoundPage.jsx'
 
 function App() {
-  const [health, setHealth] = useState(null)
-  const [error, setError] = useState(null)
-  const [user, setUser] = useState(null)
-  const [message] = useState(readLoginResult)
-
-  useEffect(() => {
-    fetch('/api/health')
-      .then((res) => {
-        if (!res.ok) throw new Error(`HTTP ${res.status}`)
-        return res.json()
-      })
-      .then(setHealth)
-      .catch((err) => setError(err.message))
-  }, [])
-
-  // On page load: ask the server who we are. Both tokens are httpOnly cookies the browser
-  // sends by itself — this code never sees them. If the access cookie has expired,
-  // refresh once (the refresh cookie gets new ones) and ask again.
-  useEffect(() => {
-    const getMe = () => fetch('/api/auth/me')
-    getMe()
-      .then(async (res) => {
-        if (res.status === 401 && (await refreshSession())) res = await getMe()
-        if (res.ok) setUser((await res.json()).user)
-      })
-      .catch(() => {})
-  }, [])
-
   return (
-    <main className="app">
-      <h1>Flash-Sale Tickets</h1>
-      <p className="status">
-        API status:{' '}
-        {error ? (
-          <span className="err">unreachable ({error})</span>
-        ) : health ? (
-          <span className="ok">{health.status}</span>
-        ) : (
-          'checking…'
-        )}
-      </p>
+    <BrowserRouter>
+      <AuthProvider>
+        <Routes>
+          <Route element={<Layout />}>
+            <Route index element={<HomePage />} />
 
-      {message && <p className="notice">{message}</p>}
+            {/* Only for signed-out visitors */}
+            <Route element={<GuestOnly />}>
+              <Route path="login" element={<LoginPage />} />
+              <Route path="register" element={<RegisterPage />} />
+              <Route path="forgot-password" element={<ForgotPasswordPage />} />
+            </Route>
 
-      {user ? (
-        <p>
-          Signed in as <strong>{user.email}</strong>{' '}
-          <button
-            type="button"
-            onClick={async () => {
-              // The refresh cookie tells the server which session to end.
-              await fetch('/api/auth/logout', { method: 'POST' })
-              setUser(null)
-            }}
-          >
-            Log out
-          </button>
-        </p>
-      ) : (
-        // A plain link, not fetch(): the whole browser must travel to Google and back.
-        <a className="google-button" href="/api/auth/google">
-          Continue with Google
-        </a>
-      )}
-    </main>
+            {/* Reachable either way: the link comes from an email */}
+            <Route path="reset-password" element={<ResetPasswordPage />} />
+
+            <Route path="*" element={<NotFoundPage />} />
+          </Route>
+        </Routes>
+      </AuthProvider>
+    </BrowserRouter>
   )
 }
 

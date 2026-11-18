@@ -1,0 +1,40 @@
+// Turns server error CODES into text for people. The server's `message` is the fallback;
+// codes listed here get wording that fits the screen they appear on.
+import { ApiError } from '../api/client.js'
+
+const MESSAGES = {
+  INVALID_CREDENTIALS: 'Email or password is incorrect.',
+  EMAIL_TAKEN: 'An account with this email already exists. Try logging in instead.',
+  RESET_TOKEN_INVALID: 'This reset link is invalid, already used or expired. Request a new one below.',
+  SESSION_REVOKED: 'You were signed out. Please log in again.',
+  SESSION_EXPIRED: 'Your session expired. Please log in again.',
+  REFRESH_TOKEN_REUSED: 'For your security you were signed out. Please log in again.',
+  CSRF_REJECTED: 'This request was blocked for security reasons. Reload the page and try again.',
+  AUTH_UNAVAILABLE: 'Sign-in is temporarily unavailable. Please try again in a moment.',
+  // Reasons the server's Google callback can send back in ?reason=
+  OAUTH_TX_INVALID: 'Google sign-in expired or was already used. Please try again.',
+  OAUTH_STATE_MISMATCH: 'Google sign-in could not be verified. Please try again.',
+  GOOGLE_NOT_CONFIGURED: 'Google sign-in is not set up on this server yet.',
+  GOOGLE_EMAIL_UNVERIFIED: 'Your Google account email is not verified, so it cannot be used here.',
+  GOOGLE_ACCOUNT_CONFLICT: 'This email is already linked to a different Google account.',
+  GOOGLE_UNAVAILABLE: 'Could not reach Google. Please try again.',
+}
+
+// Any error → one sentence for the user.
+export function errorMessage(err) {
+  if (typeof err === 'string') return MESSAGES[err] ?? 'Something went wrong. Please try again.'
+  if (!(err instanceof ApiError)) return 'Could not reach the server. Check your connection and try again.'
+  return MESSAGES[err.code] ?? err.message
+}
+
+// The server's per-field validation errors → { email: '…', password: '…' } for the form.
+// ("body.password" → "password")
+export function fieldErrors(err) {
+  const result = {}
+  if (!(err instanceof ApiError) || !Array.isArray(err.details)) return result
+  for (const { field, message } of err.details) {
+    const name = field?.split('.').pop()
+    if (name && !result[name]) result[name] = message
+  }
+  return result
+}
