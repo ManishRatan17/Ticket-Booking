@@ -25,6 +25,13 @@ const DAY = 24 * 60 * 60; // seconds
 export const env = {
   isProduction: process.env.NODE_ENV === 'production',
   port: Number(process.env.PORT) || 5000,
+  cookies: {
+    // Secure = browsers send the cookie over HTTPS only. Chrome, Edge and Firefox treat
+    // http://localhost as secure, so this works in development. COOKIE_SECURE=false is an
+    // escape hatch for local tools that refuse Secure cookies on plain http.
+    // It can NEVER be turned off in production.
+    secure: process.env.NODE_ENV === 'production' || process.env.COOKIE_SECURE !== 'false',
+  },
   databaseUrl: required('DATABASE_URL'),
   redisUrl: required('REDIS_URL'),
   jwt: {

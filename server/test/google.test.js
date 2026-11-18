@@ -3,6 +3,7 @@ import { test, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { startFakeGoogle } from '../test-support/fake-google.js';
+import { readSetCookie, cookieHeader } from '../test-support/cookies.js';
 
 const CLIENT_ID = 'test-client.apps.googleusercontent.com';
 const CLIENT_SECRET = 'test-client-secret';
@@ -46,10 +47,7 @@ after(async () => {
 
 // ---------- helpers ----------
 
-function getCookie(res, name) {
-  const raw = res.headers.getSetCookie().find((c) => c.startsWith(`${name}=`));
-  return raw ? { raw, value: decodeURIComponent(raw.split(';')[0].slice(name.length + 1)) } : null;
-}
+const getCookie = readSetCookie;
 
 // Step ①: the browser opens /api/auth/google. redirect: 'manual' lets us inspect the 302.
 async function startSignIn() {
@@ -69,6 +67,7 @@ async function callback(query, txValue) {
     location,
     params: Object.fromEntries(location.searchParams),
     refresh: getCookie(res, 'refresh_token'),
+    access: getCookie(res, 'access_token'),
   };
 }
 
@@ -79,14 +78,14 @@ async function signInWithGoogle({ sub = newSub(), email = newEmail(), claims = {
   return { ...(await callback({ code, state }, start.tx.value)), sub, email };
 }
 
-// Uses the refresh cookie the way the React app will: refresh → access token → /me.
+// Proves a refresh cookie is live: refresh → new access cookie → /me.
 async function whoAmI(refreshToken) {
   const r = await fetch(`${baseUrl}/api/auth/refresh`, {
     method: 'POST',
-    headers: { Cookie: `refresh_token=${encodeURIComponent(refreshToken)}` },
+    headers: { Cookie: cookieHeader({ refresh_token: refreshToken }) },
   });
-  const { accessToken } = await r.json();
-  const me = await fetch(`${baseUrl}/api/auth/me`, { headers: { Authorization: `Bearer ${accessToken}` } });
+  const accessToken = getCookie(r, 'access_token').value;
+  const me = await fetch(`${baseUrl}/api/auth/me`, { headers: { Cookie: cookieHeader({ access_token: accessToken }) } });
   return (await me.json()).user;
 }
 
@@ -131,7 +130,9 @@ test('new Google user: account created without a password, signed in via the ref
   assert.equal(result.location.origin, CLIENT_URL);
   assert.deepEqual(result.params, { login: 'google' });
   assert.ok(result.refresh, 'no refresh cookie');
+  assert.ok(result.access, 'no access cookie');
   assert.ok(!result.location.href.includes(result.refresh.value), 'token leaked into the redirect URL');
+  assert.ok(!result.location.href.includes(result.access.value), 'token leaked into the redirect URL');
 
   const me = await whoAmI(result.refresh.value);
   assert.equal(me.email, result.email);

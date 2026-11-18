@@ -10,6 +10,7 @@ import { env } from '../src/config/env.js';
 import { pool } from '../src/config/db.js';
 import { runMigrations } from '../src/db/migrate.js';
 import { closeConnections } from '../src/config/connections.js';
+import { readSetCookie, cookieHeader, cookieFlags } from '../test-support/cookies.js';
 
 const RUN = `test-login-${randomUUID().slice(0, 8)}`;
 let counter = 0;
@@ -30,15 +31,23 @@ after(async () => {
   await closeConnections();
 });
 
+// `token` is sent the way a browser would: as the access_token cookie.
 async function call(method, path, { body, token } = {}) {
   const headers = { 'Content-Type': 'application/json' };
-  if (token) headers.Authorization = `Bearer ${token}`;
+  if (token) headers.Cookie = cookieHeader({ access_token: token });
   const res = await fetch(`${baseUrl}${path}`, {
     method,
     headers,
     body: body ? JSON.stringify(body) : undefined,
   });
-  return { status: res.status, headers: res.headers, body: await res.json() };
+  const accessCookie = readSetCookie(res, 'access_token');
+  return {
+    status: res.status,
+    headers: res.headers,
+    body: await res.json(),
+    accessCookie,
+    accessToken: accessCookie?.value,
+  };
 }
 
 async function registeredUser() {
@@ -67,18 +76,17 @@ function craftToken(claims, { key = secretKey, exp } = {}) {
 
 test('login: 200 with a correctly built HS256 access token', async () => {
   const { email, id } = await registeredUser();
-  const { status, body } = await call('POST', '/api/auth/login', {
+  const { status, body, accessToken } = await call('POST', '/api/auth/login', {
     body: { email: email.toUpperCase(), password: PASSWORD },
   });
 
   assert.equal(status, 200);
-  assert.equal(body.tokenType, 'Bearer');
   assert.equal(body.expiresIn, 900);
   assert.deepEqual(Object.keys(body.user).sort(), ['createdAt', 'email', 'id', 'role']);
 
   // A JWT's header and payload are readable by ANYONE, no secret needed:
-  const header = decodeProtectedHeader(body.accessToken);
-  const payload = decodeJwt(body.accessToken);
+  const header = decodeProtectedHeader(accessToken);
+  const payload = decodeJwt(accessToken);
   assert.equal(header.alg, 'HS256');
   assert.equal(payload.sub, String(id));
   assert.equal(payload.role, 'user');
@@ -86,6 +94,22 @@ test('login: 200 with a correctly built HS256 access token', async () => {
   assert.equal(payload.aud, 'flash-sale-web');
   assert.equal(payload.exp - payload.iat, 900);
   assert.ok(!JSON.stringify(payload).includes('argon2'), 'hash leaked into token');
+});
+
+test('login: the access token is ONLY in an httpOnly, Secure, SameSite=Strict cookie', async () => {
+  const { email } = await registeredUser();
+  const { body, accessCookie } = await call('POST', '/api/auth/login', { body: { email, password: PASSWORD } });
+
+  // Nothing token-shaped in the JSON: JavaScript (and so XSS) never sees it.
+  assert.deepEqual(Object.keys(body).sort(), ['expiresIn', 'user']);
+  assert.ok(!JSON.stringify(body).includes(accessCookie.value));
+
+  const flags = cookieFlags(accessCookie.raw);
+  assert.ok(flags.includes('httponly'));
+  assert.ok(flags.includes('secure'));
+  assert.ok(flags.includes('samesite=strict'));
+  assert.ok(flags.includes('path=/api'));
+  assert.ok(flags.includes('max-age=900'), 'cookie should live exactly as long as the JWT');
 });
 
 test('login: wrong password and unknown email give IDENTICAL 401 responses', async () => {
@@ -149,7 +173,7 @@ test('login: missing password → 400', async () => {
 test('/me with a valid token: 200 with fresh user data from the database', async () => {
   const { email, id } = await registeredUser();
   const login = await call('POST', '/api/auth/login', { body: { email, password: PASSWORD } });
-  const { status, body } = await call('GET', '/api/auth/me', { token: login.body.accessToken });
+  const { status, body } = await call('GET', '/api/auth/me', { token: login.accessToken });
 
   assert.equal(status, 200);
   assert.equal(body.user.id, id);
@@ -160,7 +184,7 @@ test('/me without a token: 401 AUTH_REQUIRED with WWW-Authenticate header', asyn
   const { status, headers, body } = await call('GET', '/api/auth/me');
   assert.equal(status, 401);
   assert.equal(body.error.code, 'AUTH_REQUIRED');
-  assert.equal(headers.get('www-authenticate'), 'Bearer');
+  assert.equal(headers.get('www-authenticate'), 'Cookie realm="flash-sale-api"');
 });
 
 // Every one of these must be rejected with the given code.
@@ -203,10 +227,13 @@ for (const [name, makeToken, code] of badTokens) {
   });
 }
 
-test('/me rejects "Basic" auth scheme', async () => {
-  const res = await fetch(`${baseUrl}/api/auth/me`, { headers: { Authorization: 'Basic abc123' } });
+test('a VALID token sent as "Authorization: Bearer" is ignored: cookies are the only way in', async () => {
+  const { email } = await registeredUser();
+  const { accessToken } = await call('POST', '/api/auth/login', { body: { email, password: PASSWORD } });
+
+  const res = await fetch(`${baseUrl}/api/auth/me`, { headers: { Authorization: `Bearer ${accessToken}` } });
   assert.equal(res.status, 401);
-  assert.equal((await res.json()).error.code, 'INVALID_TOKEN');
+  assert.equal((await res.json()).error.code, 'AUTH_REQUIRED');
 });
 
 test('/me with a valid token for a deleted user → 401', async () => {
@@ -214,7 +241,7 @@ test('/me with a valid token for a deleted user → 401', async () => {
   const login = await call('POST', '/api/auth/login', { body: { email, password: PASSWORD } });
   await pool.query('DELETE FROM users WHERE id = $1', [id]);
 
-  const { status } = await call('GET', '/api/auth/me', { token: login.body.accessToken });
+  const { status } = await call('GET', '/api/auth/me', { token: login.accessToken });
   assert.equal(status, 401);
 });
 

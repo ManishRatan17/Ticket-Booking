@@ -8,6 +8,7 @@ import { pool } from '../src/config/db.js';
 import { runMigrations } from '../src/db/migrate.js';
 import { closeConnections } from '../src/config/connections.js';
 import { hashToken } from '../src/modules/auth/tokens.js';
+import { readSetCookie, cookieHeader } from '../test-support/cookies.js';
 
 const RUN = `test-refresh-${randomUUID().slice(0, 8)}`;
 let counter = 0;
@@ -27,22 +28,21 @@ after(async () => {
   await closeConnections();
 });
 
-// Pulls "refresh_token=<value>; Path=...; ..." out of the Set-Cookie headers.
-function refreshCookie(res) {
-  const raw = res.headers.getSetCookie().find((c) => c.startsWith('refresh_token='));
-  if (!raw) return null;
-  return { raw, value: decodeURIComponent(raw.split(';')[0].slice('refresh_token='.length)) };
-}
-
+// `cookie` = a refresh token to send. The response's new tokens come from Set-Cookie.
 async function post(path, { body, cookie } = {}) {
   const headers = { 'Content-Type': 'application/json' };
-  if (cookie) headers.Cookie = `refresh_token=${encodeURIComponent(cookie)}`;
+  if (cookie) headers.Cookie = cookieHeader({ refresh_token: cookie });
   const res = await fetch(`${baseUrl}${path}`, {
     method: 'POST',
     headers,
     body: body ? JSON.stringify(body) : undefined,
   });
-  return { status: res.status, body: await res.json(), cookie: refreshCookie(res) };
+  return {
+    status: res.status,
+    body: await res.json(),
+    cookie: readSetCookie(res, 'refresh_token'),
+    accessToken: readSetCookie(res, 'access_token')?.value,
+  };
 }
 
 // Registers + logs in a fresh user. Returns its refresh token, access token and session id.
@@ -54,8 +54,8 @@ async function loggedInUser() {
     email,
     refreshToken: login.cookie.value,
     cookieHeader: login.cookie.raw,
-    accessToken: login.body.accessToken,
-    sessionId: decodeJwt(login.body.accessToken).sid,
+    accessToken: login.accessToken,
+    sessionId: decodeJwt(login.accessToken).sid,
   };
 }
 
@@ -75,7 +75,7 @@ test('login: refresh cookie has the right security flags, and is NOT in the JSON
   assert.ok(flags.includes('httponly'));
   assert.ok(flags.includes('samesite=strict'));
   assert.ok(flags.includes('path=/api/auth'));
-  assert.ok(!flags.includes('secure'), 'Secure is for production only');
+  assert.ok(flags.includes('secure'), 'Secure is on by default (Step C)');
   assert.ok(flags.some((f) => f.startsWith('expires=')));
   assert.ok(!JSON.stringify(user).includes('"refresh"'), 'refresh token leaked into the body');
 });
@@ -113,9 +113,10 @@ test('refresh: new access token AND new refresh token; old one marked used and l
   const res = await refresh(user.refreshToken);
 
   assert.equal(res.status, 200);
-  assert.ok(res.body.accessToken);
+  assert.ok(res.accessToken, 'no new access_token cookie');
+  assert.deepEqual(res.body, { expiresIn: 900 }, 'no tokens in the JSON body');
   assert.notEqual(res.cookie.value, user.refreshToken, 'refresh token was not rotated');
-  assert.equal(decodeJwt(res.body.accessToken).sid, user.sessionId, 'same session continues');
+  assert.equal(decodeJwt(res.accessToken).sid, user.sessionId, 'same session continues');
 
   const { rows } = await pool.query(
     `SELECT old.used_at, old.replaced_by, new.id AS new_id
@@ -129,8 +130,8 @@ test('refresh: new access token AND new refresh token; old one marked used and l
 
 test('refresh: the new access token works on /me', async () => {
   const user = await loggedInUser();
-  const { body } = await refresh(user.refreshToken);
-  const me = await fetch(`${baseUrl}/api/auth/me`, { headers: { Authorization: `Bearer ${body.accessToken}` } });
+  const { accessToken } = await refresh(user.refreshToken);
+  const me = await fetch(`${baseUrl}/api/auth/me`, { headers: { Cookie: cookieHeader({ access_token: accessToken }) } });
   assert.equal(me.status, 200);
 });
 

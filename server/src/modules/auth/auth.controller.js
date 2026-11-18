@@ -5,13 +5,20 @@ import * as authService from './auth.service.js';
 import { isGoogleConfigured, createAuthRequest } from './google.js';
 import { saveTransaction, takeTransaction, OAUTH_TX_TTL_SECONDS } from './oauth-transactions.js';
 import {
+  setAccessCookie,
   setRefreshCookie,
-  clearRefreshCookie,
+  clearAuthCookies,
   readRefreshCookie,
   setOAuthCookie,
   clearOAuthCookie,
   readOAuthCookie,
 } from './auth.cookies.js';
+
+// Both tokens → httpOnly cookies. Nothing token-shaped is ever put in a response body.
+function setAuthCookies(res, { accessToken, refresh }) {
+  setAccessCookie(res, accessToken);
+  setRefreshCookie(res, refresh);
+}
 
 export async function register(req, res) {
   const user = await authService.register(req.validated.body);
@@ -19,24 +26,24 @@ export async function register(req, res) {
 }
 
 export async function login(req, res) {
-  const { refresh, ...body } = await authService.login(req.validated.body, {
+  const { user, expiresIn, ...tokens } = await authService.login(req.validated.body, {
     userAgent: req.get('user-agent'),
     ip: req.ip,
   });
-  setRefreshCookie(res, refresh); // refresh token → httpOnly cookie, NOT the JSON body
-  res.json(body); // 200 OK
+  setAuthCookies(res, tokens);
+  res.json({ user, expiresIn }); // 200 OK
 }
 
 export async function refresh(req, res) {
   try {
-    const { refresh: next, ...body } = await authService.refresh(readRefreshCookie(req));
-    setRefreshCookie(res, next);
-    res.json(body);
+    const { expiresIn, ...tokens } = await authService.refresh(readRefreshCookie(req));
+    setAuthCookies(res, tokens);
+    res.json({ expiresIn });
   } catch (err) {
-    // A dead token should be removed from the browser. But NOT on a 409 conflict:
-    // the other tab's response has just stored the NEW token in this same cookie,
-    // and clearing it would log the user out.
-    if (err.code !== 'REFRESH_CONFLICT') clearRefreshCookie(res);
+    // A dead session's cookies should be removed from the browser. But NOT on a 409 conflict:
+    // the other tab's response has just stored the NEW tokens in these same cookies,
+    // and clearing them would log the user out.
+    if (err.code !== 'REFRESH_CONFLICT') clearAuthCookies(res);
     throw err; // the error handler sends the response
   }
 }
@@ -55,8 +62,7 @@ export async function googleStart(req, res) {
 
 // Google sends the browser back here. This is a page navigation, not an API call from
 // JavaScript, so every outcome REDIRECTS back to the React app rather than returning JSON.
-// Tokens are never put in the URL: the result travels in the httpOnly refresh cookie,
-// and the app then calls POST /api/auth/refresh to get an access token.
+// Tokens are never put in the URL: they travel in the httpOnly cookies set on this redirect.
 export async function googleCallback(req, res) {
   const { code, state, error } = req.validated.query;
   const txId = readOAuthCookie(req);
@@ -70,11 +76,11 @@ export async function googleCallback(req, res) {
   }
 
   try {
-    const { refresh } = await authService.loginWithGoogle(
+    const { user: _, ...tokens } = await authService.loginWithGoogle(
       { code, state, txId },
       { userAgent: req.get('user-agent'), ip: req.ip },
     );
-    setRefreshCookie(res, refresh);
+    setAuthCookies(res, tokens);
     backToApp({ login: 'google' });
   } catch (err) {
     if (!(err instanceof AppError)) console.error(err); // a real bug: log it on the server
@@ -85,13 +91,13 @@ export async function googleCallback(req, res) {
 // 204 No Content: success, nothing to send back.
 export async function logout(req, res) {
   await authService.logout(readRefreshCookie(req));
-  clearRefreshCookie(res);
+  clearAuthCookies(res);
   res.status(204).end();
 }
 
 export async function logoutAll(req, res) {
   await authService.logoutAll(req.user.id);
-  clearRefreshCookie(res);
+  clearAuthCookies(res);
   res.status(204).end();
 }
 

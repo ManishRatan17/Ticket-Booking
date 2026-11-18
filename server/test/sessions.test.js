@@ -11,6 +11,7 @@ import { runMigrations } from '../src/db/migrate.js';
 import { closeConnections } from '../src/config/connections.js';
 import { hashToken } from '../src/modules/auth/tokens.js';
 import { rebuildRevokedSessions } from '../src/modules/auth/revocation.js';
+import { readSetCookie, cookieHeader } from '../test-support/cookies.js';
 
 const RUN = `test-sessions-${randomUUID().slice(0, 8)}`;
 let counter = 0;
@@ -32,15 +33,11 @@ after(async () => {
 
 // ---------- helpers ----------
 
-function refreshCookieOf(res) {
-  const raw = res.headers.getSetCookie().find((c) => c.startsWith('refresh_token='));
-  return raw ? decodeURIComponent(raw.split(';')[0].slice('refresh_token='.length)) : null;
-}
-
+// `token` = access token, `cookie` = refresh token; both sent as cookies, like a browser.
 async function api(method, path, { token, cookie, body } = {}) {
   const headers = {};
-  if (token) headers.Authorization = `Bearer ${token}`;
-  if (cookie) headers.Cookie = `refresh_token=${encodeURIComponent(cookie)}`;
+  const cookies = cookieHeader({ access_token: token, refresh_token: cookie });
+  if (cookies) headers.Cookie = cookies;
   if (body) headers['Content-Type'] = 'application/json';
   const res = await fetch(`${baseUrl}${path}`, { method, headers, body: body && JSON.stringify(body) });
   const text = await res.text();
@@ -60,8 +57,9 @@ async function login(email, userAgent = 'test-device') {
     headers: { 'Content-Type': 'application/json', 'User-Agent': userAgent },
     body: JSON.stringify({ email, password: PASSWORD }),
   });
-  const { accessToken } = await res.json();
-  return { accessToken, refreshToken: refreshCookieOf(res), sessionId: decodeJwt(accessToken).sid };
+  const accessToken = readSetCookie(res, 'access_token').value;
+  const refreshToken = readSetCookie(res, 'refresh_token').value;
+  return { accessToken, refreshToken, sessionId: decodeJwt(accessToken).sid };
 }
 
 const me = (accessToken) => api('GET', '/api/auth/me', { token: accessToken });
@@ -74,7 +72,8 @@ test('logout: access token rejected IMMEDIATELY, refresh token dead, cookie clea
 
   const out = await api('POST', '/api/auth/logout', { cookie: device.refreshToken });
   assert.equal(out.status, 204);
-  assert.ok(out.setCookie.some((c) => c.startsWith('refresh_token=;')), 'cookie not cleared');
+  assert.ok(out.setCookie.some((c) => c.startsWith('refresh_token=;')), 'refresh cookie not cleared');
+  assert.ok(out.setCookie.some((c) => c.startsWith('access_token=;')), 'access cookie not cleared');
 
   // The JWT itself is still perfectly valid (signature, expiry) — but the session is over.
   const after = await me(device.accessToken);

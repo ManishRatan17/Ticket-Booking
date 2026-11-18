@@ -41,16 +41,17 @@ function App() {
       .catch((err) => setError(err.message))
   }, [])
 
-  // On page load: if the browser has a refresh cookie (e.g. just back from Google),
-  // trade it for an access token, then ask the server who we are.
+  // On page load: ask the server who we are. Both tokens are httpOnly cookies the browser
+  // sends by itself — this code never sees them. If the access cookie has expired,
+  // refresh once (the refresh cookie gets new ones) and ask again.
   useEffect(() => {
-    refreshSession().then(async (session) => {
-      if (!session) return
-      const res = await fetch('/api/auth/me', {
-        headers: { Authorization: `Bearer ${session.accessToken}` },
+    const getMe = () => fetch('/api/auth/me')
+    getMe()
+      .then(async (res) => {
+        if (res.status === 401 && (await refreshSession())) res = await getMe()
+        if (res.ok) setUser((await res.json()).user)
       })
-      if (res.ok) setUser((await res.json()).user)
-    })
+      .catch(() => {})
   }, [])
 
   return (

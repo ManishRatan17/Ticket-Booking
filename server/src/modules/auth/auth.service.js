@@ -65,7 +65,8 @@ async function startSession(userId, { userAgent, ip }) {
   return { sessionId, refresh };
 }
 
-// `refresh` is returned separately so the controller can put it in a cookie, not the JSON body.
+// Returns { user, expiresIn, accessToken, refresh }. The controller puts BOTH tokens in
+// httpOnly cookies and sends only { user, expiresIn } as JSON.
 // `device` = { userAgent, ip } of the request, stored on the session for the device list.
 export async function login({ email, password }, device = {}) {
   const user = await authRepository.findUserForLogin(email);
@@ -88,10 +89,9 @@ export async function login({ email, password }, device = {}) {
   const { passwordHash: _, ...publicUser } = user; // drop the hash before it goes anywhere
   const { sessionId, refresh } = await startSession(user.id, device);
   return {
-    accessToken: await signAccessToken(publicUser, sessionId),
-    tokenType: 'Bearer',
-    expiresIn: env.jwt.accessTtlSeconds,
     user: publicUser,
+    expiresIn: env.jwt.accessTtlSeconds,
+    accessToken: await signAccessToken(publicUser, sessionId),
     refresh,
   };
 }
@@ -142,9 +142,8 @@ export async function refresh(refreshToken) {
   switch (result.outcome) {
     case 'ok':
       return {
-        accessToken: await signAccessToken(result.user, result.sessionId),
-        tokenType: 'Bearer',
         expiresIn: env.jwt.accessTtlSeconds,
+        accessToken: await signAccessToken(result.user, result.sessionId),
         refresh: result.refresh,
       };
     case 'conflict':
@@ -255,8 +254,8 @@ export async function loginWithGoogle({ code, state, txId }, device = {}) {
   }
 
   // From here on it's an ordinary session — the same refresh rotation as a password login.
-  const { refresh } = await startSession(user.id, device);
-  return { user, refresh };
+  const { sessionId, refresh } = await startSession(user.id, device);
+  return { user, accessToken: await signAccessToken(user, sessionId), refresh };
 }
 
 // ---------------------------------------------------------------------------

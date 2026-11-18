@@ -8,6 +8,7 @@ import { createApp } from '../src/app.js';
 import { pool } from '../src/config/db.js';
 import { runMigrations } from '../src/db/migrate.js';
 import { closeConnections } from '../src/config/connections.js';
+import { readSetCookie, cookieHeader } from '../test-support/cookies.js';
 
 const RUN = `test-admin-${randomUUID().slice(0, 8)}`;
 let counter = 0;
@@ -29,18 +30,19 @@ after(async () => {
 
 // ---------- helpers ----------
 
+// `token` = access token, `cookie` = refresh token; both sent as cookies, like a browser.
 async function api(method, path, { token, cookie, body } = {}) {
   const headers = {};
-  if (token) headers.Authorization = `Bearer ${token}`;
-  if (cookie) headers.Cookie = `refresh_token=${encodeURIComponent(cookie)}`;
+  const cookies = cookieHeader({ access_token: token, refresh_token: cookie });
+  if (cookies) headers.Cookie = cookies;
   if (body) headers['Content-Type'] = 'application/json';
   const res = await fetch(`${baseUrl}${path}`, { method, headers, body: body && JSON.stringify(body) });
   const text = await res.text();
-  const raw = res.headers.getSetCookie().find((c) => c.startsWith('refresh_token='));
   return {
     status: res.status,
     body: text ? JSON.parse(text) : null,
-    refreshToken: raw ? decodeURIComponent(raw.split(';')[0].slice('refresh_token='.length)) : null,
+    accessToken: readSetCookie(res, 'access_token')?.value ?? null,
+    refreshToken: readSetCookie(res, 'refresh_token')?.value ?? null,
   };
 }
 
@@ -55,7 +57,7 @@ async function newUser({ admin = false } = {}) {
 
 async function login(email) {
   const res = await api('POST', '/api/auth/login', { body: { email, password: PASSWORD } });
-  return { accessToken: res.body.accessToken, refreshToken: res.refreshToken };
+  return { accessToken: res.accessToken, refreshToken: res.refreshToken };
 }
 
 const setRole = (actor, targetId, role) =>
@@ -145,8 +147,8 @@ test('promotion takes effect at the next refresh (no need to revoke anything)', 
 
   // Refresh reads the role from the DATABASE, so the new token says "admin".
   const refreshed = await api('POST', '/api/auth/refresh', { cookie: user.refreshToken });
-  assert.equal(decodeJwt(refreshed.body.accessToken).role, 'admin');
-  assert.equal((await api('GET', '/api/admin/users', { token: refreshed.body.accessToken })).status, 200);
+  assert.equal(decodeJwt(refreshed.accessToken).role, 'admin');
+  assert.equal((await api('GET', '/api/admin/users', { token: refreshed.accessToken })).status, 200);
 });
 
 test('demotion is INSTANT: all of the demoted admin\'s sessions die at once', async () => {

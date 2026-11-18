@@ -6,6 +6,7 @@ import authRouter from './modules/auth/auth.routes.js';
 import adminRouter from './modules/admin/admin.routes.js';
 import { authenticate } from './middleware/authenticate.js';
 import { requireRole } from './middleware/authorize.js';
+import { rejectCrossSiteRequests } from './middleware/csrf.js';
 import { notFound, errorHandler } from './middleware/errorHandler.js';
 
 export function createApp() {
@@ -14,7 +15,8 @@ export function createApp() {
   // Middleware runs top to bottom for every request.
   app.use(helmet()); // security-related HTTP response headers
   app.use(express.json({ limit: '10kb' })); // parse JSON bodies; refuse anything bigger than 10 KB
-  app.use(cookieParser()); // read cookies into req.cookies (refresh tokens will live in a cookie)
+  app.use(cookieParser()); // read cookies into req.cookies (both tokens live in cookies)
+  app.use(rejectCrossSiteRequests); // CSRF guard: cookies are sent automatically, so check who's asking
 
   app.use('/api/health', healthRouter);
   app.use('/api/auth', authRouter);
