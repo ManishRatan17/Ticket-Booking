@@ -20,7 +20,10 @@ function requiredSecret(name, minBytes = 32) {
   return value;
 }
 
+const DAY = 24 * 60 * 60; // seconds
+
 export const env = {
+  isProduction: process.env.NODE_ENV === 'production',
   port: Number(process.env.PORT) || 5000,
   databaseUrl: required('DATABASE_URL'),
   redisUrl: required('REDIS_URL'),
@@ -29,5 +32,10 @@ export const env = {
     accessTtlSeconds: 15 * 60, // access tokens live 15 minutes
     issuer: 'flash-sale-api', // who created the token
     audience: 'flash-sale-web', // who the token is meant for
+  },
+  session: {
+    ttlSeconds: 30 * DAY, // absolute: password needed again after this, however active you are
+    refreshTtlSeconds: 7 * DAY, // sliding: each refresh issues a fresh 7-day token
+    reuseGraceSeconds: 10, // a token reused this soon is probably a second tab, not an attacker
   },
 };

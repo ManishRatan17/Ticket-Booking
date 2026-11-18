@@ -15,6 +15,29 @@ pool.on('error', (err) => {
   console.error('[postgres] idle client error:', err.message);
 });
 
+// Runs fn(client) inside BEGIN ... COMMIT on ONE borrowed connection.
+// If fn throws, everything it did is rolled back. The connection is always returned.
+//
+//   const id = await withTransaction(async (client) => { ...client.query(...)... return id; });
+//
+// ⚠️ Throwing inside fn UNDOES its writes. If a write must be kept even though the request
+// fails (e.g. revoking a session after detecting token theft), RETURN a result from fn and
+// throw AFTER the transaction has committed.
+export async function withTransaction(fn) {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const result = await fn(client);
+    await client.query('COMMIT');
+    return result;
+  } catch (err) {
+    await client.query('ROLLBACK').catch(() => {}); // don't hide the original error
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
 export async function checkPostgres() {
   await pool.query('SELECT 1');
 }

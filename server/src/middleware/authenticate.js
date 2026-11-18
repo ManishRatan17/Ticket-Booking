@@ -3,7 +3,7 @@
 //   router.get('/me', authenticate, controller.me);
 //
 // Expects the header   Authorization: Bearer <access token>
-// On success sets req.user = { id, role }.
+// On success sets req.user = { id, role, sessionId }.
 import { AppError } from '../lib/errors.js';
 import { verifyAccessToken } from '../modules/auth/tokens.js';
 
