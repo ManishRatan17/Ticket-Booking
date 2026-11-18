@@ -1,7 +1,7 @@
 // Business logic for auth. Knows the RULES; knows nothing about HTTP (no req/res here).
 import { randomBytes, timingSafeEqual } from 'node:crypto';
 import { env } from '../../config/env.js';
-import { withTransaction } from '../../config/db.js';
+import { pool, withTransaction } from '../../config/db.js';
 import { AppError } from '../../lib/errors.js';
 import { isUniqueViolation } from '../../lib/db-errors.js';
 import { hashPassword, verifyPassword, needsRehash } from './password.js';
@@ -9,6 +9,7 @@ import { signAccessToken, generateRefreshToken, hashToken } from './tokens.js';
 import * as authRepository from './auth.repository.js';
 import * as sessionsRepository from './sessions.repository.js';
 import * as identitiesRepository from './identities.repository.js';
+import * as revocation from './revocation.js';
 import { isGoogleConfigured, exchangeCode, verifyIdToken } from './google.js';
 import { takeTransaction } from './oauth-transactions.js';
 
@@ -133,7 +134,7 @@ export async function refresh(refreshToken) {
     }
 
     // Used long ago and presented again: someone has a copy of this token.
-    await sessionsRepository.revokeSession(client, existing.sessionId, 'token_reuse');
+    await revocation.revokeSession(client, existing.sessionId, 'token_reuse');
     return { outcome: 'reused', sessionId: existing.sessionId };
   });
 
@@ -194,7 +195,7 @@ async function findOrCreateGoogleUser({ sub, email }) {
       user = existing; // case 3
     } else {
       await identitiesRepository.removePasswordAndMarkVerified(client, existing.id); // case 4
-      await sessionsRepository.revokeAllUserSessions(client, existing.id, 'account_linked');
+      await revocation.revokeAllUserSessions(client, existing.id, 'account_linked');
       user = existing;
     }
 
@@ -256,6 +257,38 @@ export async function loginWithGoogle({ code, state, txId }, device = {}) {
   // From here on it's an ordinary session — the same refresh rotation as a password login.
   const { refresh } = await startSession(user.id, device);
   return { user, refresh };
+}
+
+// ---------------------------------------------------------------------------
+// Logout and session management
+// ---------------------------------------------------------------------------
+
+// Identified by the refresh cookie, so it works even when the access token has expired.
+// Never fails: no cookie, an unknown token or an already-ended session all just mean
+// "you're logged out" — and that is already true.
+export async function logout(refreshToken) {
+  if (!refreshToken) return;
+  await withTransaction(async (client) => {
+    const sessionId = await sessionsRepository.findSessionIdByRefreshToken(client, hashToken(refreshToken));
+    if (sessionId) await revocation.revokeSession(client, sessionId, 'logout');
+  });
+}
+
+export async function logoutAll(userId) {
+  return withTransaction((client) => revocation.revokeAllUserSessions(client, userId, 'logout_all'));
+}
+
+export async function listSessions({ id: userId, sessionId: currentSessionId }) {
+  const sessions = await sessionsRepository.listActiveSessions(pool, userId);
+  return sessions.map((s) => ({ ...s, current: s.id === currentSessionId }));
+}
+
+// 404 — not 403 — when the session isn't yours: a 403 would confirm that it exists.
+export async function revokeOwnSession(userId, sessionId) {
+  const revoked = await withTransaction((client) =>
+    revocation.revokeOwnSession(client, { sessionId, userId }, 'logout'),
+  );
+  if (!revoked) throw new AppError(404, 'SESSION_NOT_FOUND', 'No active session with this id');
 }
 
 // The token says who you were at login; the DATABASE says who you are now.

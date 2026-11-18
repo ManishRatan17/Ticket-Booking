@@ -71,7 +71,17 @@ function App() {
 
       {user ? (
         <p>
-          Signed in as <strong>{user.email}</strong>
+          Signed in as <strong>{user.email}</strong>{' '}
+          <button
+            type="button"
+            onClick={async () => {
+              // The refresh cookie tells the server which session to end.
+              await fetch('/api/auth/logout', { method: 'POST' })
+              setUser(null)
+            }}
+          >
+            Log out
+          </button>
         </p>
       ) : (
         // A plain link, not fetch(): the whole browser must travel to Google and back.

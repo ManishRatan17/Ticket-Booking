@@ -82,6 +82,28 @@ export async function googleCallback(req, res) {
   }
 }
 
+// 204 No Content: success, nothing to send back.
+export async function logout(req, res) {
+  await authService.logout(readRefreshCookie(req));
+  clearRefreshCookie(res);
+  res.status(204).end();
+}
+
+export async function logoutAll(req, res) {
+  await authService.logoutAll(req.user.id);
+  clearRefreshCookie(res);
+  res.status(204).end();
+}
+
+export async function listSessions(req, res) {
+  res.json({ sessions: await authService.listSessions(req.user) });
+}
+
+export async function deleteSession(req, res) {
+  await authService.revokeOwnSession(req.user.id, req.validated.params.id);
+  res.status(204).end();
+}
+
 export async function me(req, res) {
   const user = await authService.getMe(req.user.id); // req.user was set by authenticate
   res.json({ user });

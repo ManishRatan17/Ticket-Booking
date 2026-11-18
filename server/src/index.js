@@ -1,6 +1,11 @@
 import { env } from './config/env.js';
 import { createApp } from './app.js';
 import { closeConnections } from './config/connections.js';
+import { keepRevocationsInSync } from './modules/auth/revocation.js';
+
+// Copy recently revoked sessions from Postgres into Redis now, and again whenever
+// Redis reconnects (it may have restarted empty).
+keepRevocationsInSync();
 
 const server = createApp().listen(env.port, () => {
   console.log(`API listening on http://localhost:${env.port}`);

@@ -77,20 +77,67 @@ export async function touchSession(client, sessionId) {
   await client.query('UPDATE sessions SET last_used_at = now() WHERE id = $1', [sessionId]);
 }
 
-// Ends every active session of a user (e.g. after linking Google to a squatted account).
-export async function revokeAllUserSessions(client, userId, reason) {
-  await client.query(
-    `UPDATE sessions SET revoked_at = now(), revoke_reason = $2
-      WHERE user_id = $1 AND revoked_at IS NULL`,
-    [userId, reason],
-  );
-}
+// ---- Revoking ----
+// ⚠️ Don't call these directly: use revocation.js, which also updates Redis.
+// Each returns the ids it ACTUALLY revoked. "AND revoked_at IS NULL" means revoking
+// twice keeps the FIRST time and reason, and the second call returns [] (idempotent).
 
-// "AND revoked_at IS NULL": revoking twice keeps the FIRST time and reason (idempotent).
 export async function revokeSession(client, sessionId, reason) {
-  await client.query(
+  const { rows } = await client.query(
     `UPDATE sessions SET revoked_at = now(), revoke_reason = $2
-      WHERE id = $1 AND revoked_at IS NULL`,
+      WHERE id = $1 AND revoked_at IS NULL
+     RETURNING id`,
     [sessionId, reason],
   );
+  return rows.map((r) => r.id);
+}
+
+export async function revokeAllUserSessions(client, userId, reason) {
+  const { rows } = await client.query(
+    `UPDATE sessions SET revoked_at = now(), revoke_reason = $2
+      WHERE user_id = $1 AND revoked_at IS NULL
+     RETURNING id`,
+    [userId, reason],
+  );
+  return rows.map((r) => r.id);
+}
+
+// The ownership check is IN the query: someone else's session simply matches no row.
+export async function revokeOwnSession(client, { sessionId, userId }, reason) {
+  const { rows } = await client.query(
+    `UPDATE sessions SET revoked_at = now(), revoke_reason = $3
+      WHERE id = $1 AND user_id = $2 AND revoked_at IS NULL
+     RETURNING id`,
+    [sessionId, userId, reason],
+  );
+  return rows.map((r) => r.id);
+}
+
+// ---- Reading ----
+
+// Which session does this refresh token (used or not) belong to? Used by logout.
+export async function findSessionIdByRefreshToken(client, tokenHash) {
+  const { rows } = await client.query('SELECT session_id FROM refresh_tokens WHERE token_hash = $1', [
+    tokenHash,
+  ]);
+  return rows[0]?.session_id ?? null;
+}
+
+// Active sessions only: not revoked and not past their 30-day limit. Most recent first.
+export async function listActiveSessions(client, userId) {
+  const { rows } = await client.query(
+    `SELECT id, user_agent, ip, created_at, last_used_at, expires_at
+       FROM sessions
+      WHERE user_id = $1 AND revoked_at IS NULL AND expires_at > now()
+      ORDER BY last_used_at DESC`,
+    [userId],
+  );
+  return rows.map((r) => ({
+    id: r.id,
+    userAgent: r.user_agent,
+    ip: r.ip,
+    createdAt: r.created_at,
+    lastUsedAt: r.last_used_at,
+    expiresAt: r.expires_at,
+  }));
 }

@@ -6,6 +6,7 @@ services:
   postgres:
     image: postgres:16-alpine
     container_name: ticketing-postgres
+    restart: unless-stopped # come back after Docker or the PC restarts
     environment:
       # Local development credentials only. Never reuse these anywhere real.
       POSTGRES_USER: ticketing
@@ -24,6 +25,7 @@ services:
   redis:
     image: redis:7-alpine
     container_name: ticketing-redis
+    restart: unless-stopped
     # --appendonly yes: log every write to disk so a restart loses less data.
     command: ["redis-server", "--appendonly", "yes"]
     ports:

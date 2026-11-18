@@ -23,6 +23,11 @@ export const loginSchema = z.object({
   password: z.string().min(1, 'Password is required').max(128, 'Password must be at most 128 characters'),
 });
 
+// DELETE /sessions/:id — session ids are UUIDs; anything else is rejected before any SQL runs.
+export const sessionIdParamsSchema = z.object({
+  id: z.uuid('Invalid session id'),
+});
+
 // What Google appends to our callback URL. Google also adds other params (scope, authuser…);
 // those are stripped. Length limits stop absurd inputs from reaching Redis or Google.
 export const googleCallbackQuerySchema = z.object({
