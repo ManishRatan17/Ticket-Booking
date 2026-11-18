@@ -22,6 +22,8 @@ function NavBar() {
       <nav>
         {status === 'signed-in' ? (
           <>
+            {/* Only a convenience: hiding the link is not what protects the admin API */}
+            {user.role === 'admin' && <NavLink to="/admin/users">Admin</NavLink>}
             <NavLink to="/account" title="My account and devices">
               {user.email}
             </NavLink>

@@ -18,14 +18,22 @@ export class ApiError extends Error {
 }
 
 // 401 codes that mean "your access cookie is missing or expired" — fixable by refreshing.
-// Any other 401 (wrong password, revoked session…) is final.
 const REFRESHABLE = new Set(['AUTH_REQUIRED', 'TOKEN_EXPIRED'])
+
+// 401 codes that mean "this session is OVER" (signed out elsewhere, demoted by an admin,
+// password reset, theft detected…). A refresh can't bring it back, so don't try: just tell
+// the app you're signed out. Other 401s (e.g. a wrong password at login) are only errors.
+const SESSION_OVER = new Set(['SESSION_REVOKED', 'SESSION_EXPIRED', 'INVALID_TOKEN', 'REFRESH_TOKEN_REUSED'])
 
 // Called when refreshing fails, i.e. the session is really over (AuthContext listens).
 const sessionEndedListeners = new Set()
 export function onSessionEnded(listener) {
   sessionEndedListeners.add(listener)
   return () => sessionEndedListeners.delete(listener)
+}
+
+function notifySessionEnded() {
+  sessionEndedListeners.forEach((listener) => listener())
 }
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
@@ -79,11 +87,15 @@ export async function api(path, { method = 'GET', body, retryOnExpiry = true } =
 
   const error = await toApiError(res)
 
-  if (res.status === 401 && retryOnExpiry && REFRESHABLE.has(error.code)) {
-    if (await refreshSession()) {
-      return api(path, { method, body, retryOnExpiry: false }) // retry ONCE, never loop
+  if (res.status === 401) {
+    if (retryOnExpiry && REFRESHABLE.has(error.code)) {
+      if (await refreshSession()) {
+        return api(path, { method, body, retryOnExpiry: false }) // retry ONCE, never loop
+      }
+      notifySessionEnded() // the refresh failed too: the session is gone
+    } else if (SESSION_OVER.has(error.code)) {
+      notifySessionEnded()
     }
-    sessionEndedListeners.forEach((listener) => listener())
   }
   throw error
 }

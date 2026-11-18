@@ -97,12 +97,26 @@ describe('automatic refresh', () => {
     expect(fetchMock).toHaveBeenCalledTimes(3)
   })
 
-  test('other 401s (wrong password, revoked session) are NOT refreshed', async () => {
+  test('wrong password (401 INVALID_CREDENTIALS): not refreshed, and NOT treated as signed out', async () => {
     const fetchMock = script({ status: 401, body: { error: { code: 'INVALID_CREDENTIALS', message: 'no' } } })
+    const listener = vi.fn()
+    const stop = onSessionEnded(listener)
     await expect(api('/auth/login', { method: 'POST', body: {} })).rejects.toMatchObject({
       code: 'INVALID_CREDENTIALS',
     })
     expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(listener).not.toHaveBeenCalled()
+    stop()
+  })
+
+  test('revoked session (401 SESSION_REVOKED): no pointless refresh, app told "signed out"', async () => {
+    const fetchMock = script({ status: 401, body: { error: { code: 'SESSION_REVOKED', message: 'ended' } } })
+    const listener = vi.fn()
+    const stop = onSessionEnded(listener)
+    await expect(api('/auth/sessions')).rejects.toMatchObject({ code: 'SESSION_REVOKED' })
+    expect(fetchMock).toHaveBeenCalledTimes(1) // no POST /refresh: it can't bring a revoked session back
+    expect(listener).toHaveBeenCalledOnce()
+    stop()
   })
 })
 

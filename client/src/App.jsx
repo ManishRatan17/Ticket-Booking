@@ -3,7 +3,7 @@
 import { BrowserRouter, Route, Routes } from 'react-router-dom'
 import './App.css'
 import { AuthProvider } from './auth/AuthProvider.jsx'
-import { GuestOnly, RequireAuth } from './auth/guards.jsx'
+import { GuestOnly, RequireAdmin, RequireAuth } from './auth/guards.jsx'
 import { Layout } from './components/Layout.jsx'
 import { HomePage } from './pages/HomePage.jsx'
 import { LoginPage } from './pages/LoginPage.jsx'
@@ -12,6 +12,7 @@ import { ForgotPasswordPage } from './pages/ForgotPasswordPage.jsx'
 import { ResetPasswordPage } from './pages/ResetPasswordPage.jsx'
 import { NotFoundPage } from './pages/NotFoundPage.jsx'
 import { AccountPage } from './pages/AccountPage.jsx'
+import { AdminUsersPage } from './pages/AdminUsersPage.jsx'
 
 function App() {
   return (
@@ -31,6 +32,11 @@ function App() {
             {/* Signed-in users only (the server checks again on every request) */}
             <Route element={<RequireAuth />}>
               <Route path="account" element={<AccountPage />} />
+            </Route>
+
+            {/* Admins only (and the server answers 403 to anyone else anyway) */}
+            <Route element={<RequireAdmin />}>
+              <Route path="admin/users" element={<AdminUsersPage />} />
             </Route>
 
             {/* Reachable either way: the link comes from an email */}

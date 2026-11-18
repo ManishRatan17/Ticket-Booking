@@ -11,6 +11,10 @@ const MESSAGES = {
   REFRESH_TOKEN_REUSED: 'For your security you were signed out. Please log in again.',
   CSRF_REJECTED: 'This request was blocked for security reasons. Reload the page and try again.',
   AUTH_UNAVAILABLE: 'Sign-in is temporarily unavailable. Please try again in a moment.',
+  // Admin
+  FORBIDDEN: 'You do not have permission to do this.',
+  LAST_ADMIN: 'This is the only admin left. Make someone else an admin first.',
+  USER_NOT_FOUND: 'That user no longer exists.',
   // Reasons the server's Google callback can send back in ?reason=
   OAUTH_TX_INVALID: 'Google sign-in expired or was already used. Please try again.',
   OAUTH_STATE_MISMATCH: 'Google sign-in could not be verified. Please try again.',

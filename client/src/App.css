@@ -48,7 +48,7 @@ body {
 }
 
 .app {
-  max-width: 640px;
+  max-width: 820px;
   margin: 2rem auto;
   padding: 0 1rem;
 }
@@ -215,6 +215,36 @@ body {
   color: var(--ok);
   font-size: 0.8rem;
   font-weight: 600;
+}
+
+/* ---------- admin table ---------- */
+.table-wrap {
+  overflow-x: auto; /* wide tables scroll sideways on small screens instead of breaking the page */
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--surface);
+}
+
+.table th,
+.table td {
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+  white-space: nowrap;
+}
+
+.table th {
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.pager {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 1rem;
 }
 
 /* ---------- messages ---------- */
