@@ -22,6 +22,19 @@ function requiredSecret(name, minBytes = 32) {
 
 const DAY = 24 * 60 * 60; // seconds
 
+// Express "trust proxy": which proxies may tell us the client's real IP (X-Forwarded-For).
+//   unset/"false" → trust nobody: req.ip is whoever connected to us (safe default)
+//   "1"           → trust ONE proxy in front of us (typical on Railway/Render)
+//   "loopback"    → trust proxies on this machine (127.0.0.1, ::1)
+// Trusting too much is dangerous: anyone can SEND an X-Forwarded-For header, so a fake one
+// would let an attacker pick a new "IP" for every request and dodge every rate limit.
+function parseTrustProxy(value) {
+  if (!value || value === 'false') return false;
+  if (value === 'true') return true;
+  if (/^\d+$/.test(value)) return Number(value);
+  return value;
+}
+
 export const env = {
   isProduction: process.env.NODE_ENV === 'production',
   port: Number(process.env.PORT) || 5000,
@@ -31,6 +44,12 @@ export const env = {
     // escape hatch for local tools that refuse Secure cookies on plain http.
     // It can NEVER be turned off in production.
     secure: process.env.NODE_ENV === 'production' || process.env.COOKIE_SECURE !== 'false',
+  },
+  trustProxy: parseTrustProxy(process.env.TRUST_PROXY),
+  rateLimits: {
+    // Turned off only for the general test suite (see server/.env.test). Never in production.
+    enabled: process.env.NODE_ENV === 'production' || process.env.RATE_LIMITS_ENABLED !== 'false',
+    prefix: process.env.RATE_LIMIT_PREFIX || 'ratelimit', // Redis key prefix (tests use their own)
   },
   databaseUrl: required('DATABASE_URL'),
   redisUrl: required('REDIS_URL'),

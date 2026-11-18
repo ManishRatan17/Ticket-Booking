@@ -7,10 +7,14 @@ import adminRouter from './modules/admin/admin.routes.js';
 import { authenticate } from './middleware/authenticate.js';
 import { requireRole } from './middleware/authorize.js';
 import { rejectCrossSiteRequests } from './middleware/csrf.js';
+import { env } from './config/env.js';
 import { notFound, errorHandler } from './middleware/errorHandler.js';
 
 export function createApp() {
   const app = express();
+
+  // Decides what req.ip is when we run behind a proxy (see TRUST_PROXY in env.js).
+  app.set('trust proxy', env.trustProxy);
 
   // Middleware runs top to bottom for every request.
   app.use(helmet()); // security-related HTTP response headers

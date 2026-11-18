@@ -9,12 +9,21 @@ import {
   sessionIdParamsSchema,
 } from './auth.schemas.js';
 import * as authController from './auth.controller.js';
+import {
+  loginPerIp,
+  loginAttempts,
+  registerPerIp,
+  refreshPerIp,
+  googleStartPerIp,
+} from './auth.rate-limits.js';
 
 const router = Router();
 
-router.post('/register', validate({ body: registerSchema }), authController.register);
-router.post('/login', validate({ body: loginSchema }), authController.login);
-router.post('/refresh', authController.refresh); // authenticated by the refresh cookie, not a JWT
+// Middleware order matters: the IP limit runs BEFORE validation (invalid requests count too),
+// the per-email limit AFTER it (it needs the normalised email).
+router.post('/register', registerPerIp, validate({ body: registerSchema }), authController.register);
+router.post('/login', loginPerIp, validate({ body: loginSchema }), loginAttempts, authController.login);
+router.post('/refresh', refreshPerIp, authController.refresh); // authenticated by the refresh cookie
 router.post('/logout', authController.logout); // also by the refresh cookie: works after the JWT expired
 router.get('/me', authenticate, authController.me);
 
@@ -29,7 +38,7 @@ router.delete(
 );
 
 // Continue with Google (browser navigations, not fetch calls)
-router.get('/google', authController.googleStart);
+router.get('/google', googleStartPerIp, authController.googleStart);
 router.get(
   '/google/callback',
   validate({ query: googleCallbackQuerySchema }),
