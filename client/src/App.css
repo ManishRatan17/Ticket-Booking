@@ -151,6 +151,72 @@ body {
   text-align: center;
 }
 
+.button-small {
+  width: auto;
+  padding: 0.35rem 0.8rem;
+  font-size: 0.9rem;
+}
+
+.button-danger {
+  width: auto;
+  background: var(--error);
+  border-color: var(--error);
+}
+
+.button-danger:hover {
+  background: #991b1b;
+}
+
+/* ---------- account page ---------- */
+.panel {
+  padding: 1rem;
+  margin-bottom: 1rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.details {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 0.4rem 1rem;
+  margin: 0;
+}
+
+.details dt {
+  color: var(--muted);
+}
+
+.details dd {
+  margin: 0;
+}
+
+.session-list {
+  padding: 0;
+  list-style: none;
+}
+
+.session {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.session p {
+  margin: 0.25rem 0 0;
+}
+
+.badge {
+  margin-left: 0.5rem;
+  padding: 0.1rem 0.5rem;
+  border-radius: 999px;
+  background: var(--success-bg);
+  color: var(--ok);
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
 /* ---------- messages ---------- */
 .alert {
   margin-bottom: 1rem;

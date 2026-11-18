@@ -22,7 +22,9 @@ function NavBar() {
       <nav>
         {status === 'signed-in' ? (
           <>
-            <span className="muted">{user.email}</span>
+            <NavLink to="/account" title="My account and devices">
+              {user.email}
+            </NavLink>
             <button type="button" className="button-link" onClick={handleLogout}>
               Log out
             </button>
