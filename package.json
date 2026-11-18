@@ -14,6 +14,7 @@
     "test": "npm test -w server",
     "migrate": "npm run migrate -w server",
     "demo:race": "npm run demo:race -w server",
+    "set-role": "npm run set-role -w server --",
     "lint": "npm run lint -w client"
   },
   "engines": {

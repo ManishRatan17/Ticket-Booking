@@ -3,6 +3,9 @@ import helmet from 'helmet';
 import cookieParser from 'cookie-parser';
 import healthRouter from './routes/health.js';
 import authRouter from './modules/auth/auth.routes.js';
+import adminRouter from './modules/admin/admin.routes.js';
+import { authenticate } from './middleware/authenticate.js';
+import { requireRole } from './middleware/authorize.js';
 import { notFound, errorHandler } from './middleware/errorHandler.js';
 
 export function createApp() {
@@ -15,6 +18,8 @@ export function createApp() {
 
   app.use('/api/health', healthRouter);
   app.use('/api/auth', authRouter);
+  // The guard is applied ONCE, to the whole admin router: no admin route can forget it.
+  app.use('/api/admin', authenticate, requireRole('admin'), adminRouter);
 
   // These two must be LAST: nothing above matched → 404; anything threw → error handler.
   app.use(notFound);
