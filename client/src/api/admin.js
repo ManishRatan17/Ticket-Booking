@@ -1,8 +1,23 @@
-// Admin endpoints (backend step A6). The server allows these only for role "admin".
-import { api } from './client.js'
+// Admin endpoints (backend steps A6 and 4b). The server allows these only for role "admin".
+import { api, refreshSession } from './client.js'
 
 export const listUsers = ({ limit, offset }) =>
   api(`/admin/users?${new URLSearchParams({ limit: String(limit), offset: String(offset) })}`)
 
 export const changeRole = (userId, role) =>
   api(`/admin/users/${encodeURIComponent(userId)}/role`, { method: 'PATCH', body: { role } })
+
+export const createEvent = ({ name, totalTickets, saleStartsAt }) =>
+  api('/admin/events', { method: 'POST', body: { name, totalTickets, saleStartsAt } })
+
+// The admin API checks the role inside the ACCESS TOKEN, which was made at the last refresh.
+// Someone promoted a moment ago still holds a token that says "user" → 403. One refresh gets a
+// token with the role from the database (A6: "promotion takes effect at the next refresh").
+export async function withFreshRole(request) {
+  try {
+    return await request()
+  } catch (err) {
+    if (err.code === 'FORBIDDEN' && (await refreshSession())) return request()
+    throw err
+  }
+}

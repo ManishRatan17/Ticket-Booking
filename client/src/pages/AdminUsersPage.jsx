@@ -1,25 +1,12 @@
 // Admin → Users: a paged list of every account, and changing roles (backend step A6).
 import { useCallback, useEffect, useState } from 'react'
-import { changeRole, listUsers } from '../api/admin.js'
-import { refreshSession } from '../api/client.js'
+import { changeRole, listUsers, withFreshRole } from '../api/admin.js'
 import { useAuth } from '../auth/useAuth.js'
 import { Alert } from '../components/Alert.jsx'
 import { errorMessage } from '../lib/errorMessages.js'
 import { formatDate } from '../lib/format.js'
 
 const PAGE_SIZE = 20
-
-// The admin API checks the role inside the ACCESS TOKEN, which was made at the last refresh.
-// Someone promoted a moment ago still holds a token that says "user" → 403. One refresh gets a
-// token with the role from the database (A6: "promotion takes effect at the next refresh").
-async function withFreshRole(request) {
-  try {
-    return await request()
-  } catch (err) {
-    if (err.code === 'FORBIDDEN' && (await refreshSession())) return request()
-    throw err
-  }
-}
 
 export function AdminUsersPage() {
   const { user: me, reload } = useAuth()

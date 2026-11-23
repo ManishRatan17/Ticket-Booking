@@ -11,6 +11,12 @@ const MESSAGES = {
   REFRESH_TOKEN_REUSED: 'For your security you were signed out. Please log in again.',
   CSRF_REJECTED: 'This request was blocked for security reasons. Reload the page and try again.',
   AUTH_UNAVAILABLE: 'Sign-in is temporarily unavailable. Please try again in a moment.',
+  // Events and holds
+  EVENT_NOT_FOUND: 'This event does not exist.',
+  HOLD_NOT_FOUND: 'That hold no longer exists (it may have expired).',
+  SALE_NOT_STARTED: 'Tickets for this event are not on sale yet.',
+  HOLD_EXISTS: 'You already have tickets on hold for this event.',
+  // SOLD_OUT keeps the server's message: it says how many are left.
   // Admin
   FORBIDDEN: 'You do not have permission to do this.',
   LAST_ADMIN: 'This is the only admin left. Make someone else an admin first.',

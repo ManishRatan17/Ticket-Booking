@@ -20,10 +20,16 @@ function NavBar() {
         Flash-Sale Tickets
       </Link>
       <nav>
+        <NavLink to="/events">Events</NavLink>
         {status === 'signed-in' ? (
           <>
-            {/* Only a convenience: hiding the link is not what protects the admin API */}
-            {user.role === 'admin' && <NavLink to="/admin/users">Admin</NavLink>}
+            {/* Only a convenience: hiding the links is not what protects the admin API */}
+            {user.role === 'admin' && (
+              <>
+                <NavLink to="/admin/users">Users</NavLink>
+                <NavLink to="/admin/events">Manage events</NavLink>
+              </>
+            )}
             <NavLink to="/account" title="My account and devices">
               {user.email}
             </NavLink>

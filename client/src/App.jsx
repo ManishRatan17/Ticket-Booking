@@ -13,6 +13,9 @@ import { ResetPasswordPage } from './pages/ResetPasswordPage.jsx'
 import { NotFoundPage } from './pages/NotFoundPage.jsx'
 import { AccountPage } from './pages/AccountPage.jsx'
 import { AdminUsersPage } from './pages/AdminUsersPage.jsx'
+import { AdminEventsPage } from './pages/AdminEventsPage.jsx'
+import { EventsPage } from './pages/EventsPage.jsx'
+import { EventPage } from './pages/EventPage.jsx'
 
 function App() {
   return (
@@ -21,6 +24,10 @@ function App() {
         <Routes>
           <Route element={<Layout />}>
             <Route index element={<HomePage />} />
+
+            {/* Anyone can browse; the event page asks you to log in before holding */}
+            <Route path="events" element={<EventsPage />} />
+            <Route path="events/:id" element={<EventPage />} />
 
             {/* Only for signed-out visitors */}
             <Route element={<GuestOnly />}>
@@ -37,6 +44,7 @@ function App() {
             {/* Admins only (and the server answers 403 to anyone else anyway) */}
             <Route element={<RequireAdmin />}>
               <Route path="admin/users" element={<AdminUsersPage />} />
+              <Route path="admin/events" element={<AdminEventsPage />} />
             </Route>
 
             {/* Reachable either way: the link comes from an email */}
