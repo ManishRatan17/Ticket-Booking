@@ -70,6 +70,13 @@ export async function createHold({ eventId, userId, quantity }) {
   }
 }
 
+// "Now" according to REDIS — the same clock create-hold.lua uses for expiresAt.
+// Sent to the browser as serverTime, so a countdown never depends on the user's own clock.
+export async function redisNow() {
+  const [seconds, microseconds] = await redis.time();
+  return new Date(Number(seconds) * 1000 + Math.floor(Number(microseconds) / 1000));
+}
+
 function toHold(holdId, fields) {
   if (!fields.quantity) return null;
   const expiresAt = new Date(Number(fields.expiresAt));
