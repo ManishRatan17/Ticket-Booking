@@ -23,6 +23,7 @@ function NavBar() {
         <NavLink to="/events">Events</NavLink>
         {status === 'signed-in' ? (
           <>
+            <NavLink to="/orders">My orders</NavLink>
             {/* Only a convenience: hiding the links is not what protects the admin API */}
             {user.role === 'admin' && (
               <>

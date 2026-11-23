@@ -17,6 +17,7 @@ import { AdminEventsPage } from './pages/AdminEventsPage.jsx'
 import { EventsPage } from './pages/EventsPage.jsx'
 import { EventPage } from './pages/EventPage.jsx'
 import { CheckoutPage } from './pages/CheckoutPage.jsx'
+import { OrdersPage } from './pages/OrdersPage.jsx'
 
 function App() {
   return (
@@ -41,6 +42,7 @@ function App() {
             <Route element={<RequireAuth />}>
               <Route path="account" element={<AccountPage />} />
               <Route path="checkout/:id" element={<CheckoutPage />} />
+              <Route path="orders" element={<OrdersPage />} />
             </Route>
 
             {/* Admins only (and the server answers 403 to anyone else anyway) */}

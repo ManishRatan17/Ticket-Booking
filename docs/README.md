@@ -36,7 +36,7 @@ Roadmap from the original blueprint. ✅ done · 🟡 partly done · ⬜ not sta
 | 1 | Correct core: race-condition demo, atomic stock (Lua), concurrency tests, **ticket holds**, events API, event pages | ✅ |
 | Auth | (added before Phase 2) register/login, argon2id, JWT in HttpOnly cookies, refresh rotation + reuse detection, sessions, logout everywhere, Google sign-in, roles/admin, CSRF protection, rate limiting, password reset | ✅ |
 | Frontend | React pages for everything above, with minimal styling (real styling comes in Phase 7) | ✅ |
-| 2 | Orders & payment: holds → pending orders → (fake) payment → paid, idempotency, `sold_tickets` | 🟡 (2.0 demo data ✅ · 2a orders + idempotency ✅ · 2b/2c payment, webhook, failures ✅ · 2d my orders page ⬜) |
+| 2 | Orders & payment: holds → pending orders → (fake) payment → paid, idempotency, `sold_tickets` | ✅ (demo data · orders + idempotency · fake provider + signed webhook · failures, late payments, refunds logged · My orders page) |
 | 3 | Expiry: a background worker (BullMQ) that releases expired holds for everyone | ⬜ (today: lazy expiry only — see [07](07-tickets-and-holds.md#what-is-not-automatic-yet)) |
 | 4 | Waiting room: queue, admission worker, live position | ⬜ |
 | 5 | Protection: rate limit on holds, duplicate-tab and bot defence | 🟡 (auth endpoints are rate-limited; holds are not yet) |

@@ -13,13 +13,14 @@ Everything lives in [client/src/](../client/src/). Styling is deliberately minim
 | `/register` | [RegisterPage](../client/src/pages/RegisterPage.jsx) | signed-out only | register → login |
 | `/forgot-password` | [ForgotPasswordPage](../client/src/pages/ForgotPasswordPage.jsx) | signed-out only | forgot-password |
 | `/reset-password#token=…` | [ResetPasswordPage](../client/src/pages/ResetPasswordPage.jsx) | anyone (link from email) | reset-password |
-| `/checkout/:id` | [CheckoutPage](../client/src/pages/CheckoutPage.jsx) | signed in | `GET /api/orders/:id` (pay buttons: step 2b) |
+| `/checkout/:id` | [CheckoutPage](../client/src/pages/CheckoutPage.jsx) | signed in | `GET /api/orders/:id`, `POST /api/payments/fake/:id`, then polls the order until the webhook has settled it |
+| `/orders` | [OrdersPage](../client/src/pages/OrdersPage.jsx) | signed in | `GET /api/orders` (ticket numbers for paid orders, "pay now" for pending ones) |
 | `/account` | [AccountPage](../client/src/pages/AccountPage.jsx) | signed in | sessions, delete session, logout-all |
 | `/admin/users` | [AdminUsersPage](../client/src/pages/AdminUsersPage.jsx) | admin | list users, change role |
 | `/admin/events` | [AdminEventsPage](../client/src/pages/AdminEventsPage.jsx) | admin | create event, list events |
 | anything else | NotFoundPage | anyone | — |
 
-The [Layout](../client/src/components/Layout.jsx) wraps every page: nav bar (Events · Log in/Register, or your email → Account, Log out; admins also see Users and Manage events) and the Google sign-in result message.
+The [Layout](../client/src/components/Layout.jsx) wraps every page: nav bar (Events · Log in/Register, or My orders, your email → Account, Log out; admins also see Users and Manage events) and the Google sign-in result message.
 
 ## How data flows
 
