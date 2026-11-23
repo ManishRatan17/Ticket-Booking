@@ -13,9 +13,10 @@
 import { readFileSync } from 'node:fs';
 import { randomUUID } from 'node:crypto';
 import { redis } from '../../config/redis.js';
+import { env } from '../../config/env.js';
 import { stockKey } from './stock.js';
 
-export const HOLD_SECONDS = 5 * 60;
+export const HOLD_SECONDS = env.holds.seconds; // 5 minutes unless HOLD_SECONDS says otherwise
 export const MAX_TICKETS_PER_HOLD = 4;
 
 const holdKey = (holdId) => `hold:${holdId}`;

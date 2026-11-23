@@ -5,7 +5,7 @@ docker compose up -d     # the server tests use the real PostgreSQL and Redis
 npm test                 # server (node:test) then client (Vitest)
 ```
 
-Today: **205 server tests + 34 client tests**, all passing (about 10–15 s for the server suite).
+Today: **211 server tests + 34 client tests**, all passing (about 10–15 s for the server suite).
 
 ## How the server tests run
 
@@ -16,6 +16,7 @@ Today: **205 server tests + 34 client tests**, all passing (about 10–15 s for 
 | `--env-file .env` then `.env.test` | the last file wins: [.env.test](../server/.env.test) switches rate limits **off** for the suite (hundreds of requests from one IP would trip them). The rate-limit tests switch them back on for their own process |
 | `--test` | Node's built-in runner; every `.js` file in `test/` is a test file, each in its **own process** |
 | `--test-concurrency=4` | at most 4 files at once. All files in parallel made CPU-heavy argon2 + bursts delay new database connections past the 2-second timeout (a flaky failure, 1 in 4 runs) |
+| `.env.test`: `JOBS_ENABLED=false` | the suite creates hundreds of holds; without a worker their delayed jobs would pile up in Redis. `jobs.test.js` switches jobs back on with its own queue prefix and deletes its queue at the end |
 | `--test-timeout=60000` | a test that hangs (e.g. Docker stopped and ioredis retries forever) **fails** after 60 s instead of hanging the whole run |
 
 ## Isolation: tests leave no trace
@@ -58,6 +59,7 @@ Kept outside `test/` because Node runs every file inside `test/` as a test.
 | `events.test.js` | admin creation, reading, validation, **stock rebuilt from PostgreSQL**, rebuild race (`SET NX`) |
 | `orders.test.js` | hold → pending order, price from the database (body can't set it), **idempotency** (replay, 10 parallel same-key → 1 order, other key → 409, key reuse → 422, missing key → 400), IDOR, expired hold, lazy order expiry, the `tickets_sold` CHECK |
 | `payments.test.js` | pay → signed webhook → paid with ticket numbers; failed payment; the browser can't decide payment; wrong secret / tampered body → 401; duplicates (sequential and 10 at once); two deliveries for one order; amount mismatch; late payment (free → paid, sold out → refund); 20 simultaneous payments → numbers 1–20 |
+| `jobs.test.js` | a real worker inside the test process, 1-second holds (`HOLD_SECONDS=1`), private queue prefix: the job is scheduled with retry/dead-letter settings; an **abandoned** hold is released with nobody looking; an unpaid order becomes `expired`; a paid hold is left alone; the job is idempotent (3 runs at once → tickets back once); a job that runs too early fails and changes nothing |
 | `holds-http.test.js` | the holds API: every status code, IDOR, CSRF, lazy release on read, **300 users × 100 tickets over HTTP** |
 
 ## Client test files (Vitest)
@@ -95,6 +97,8 @@ A test only proves something once it has been seen to **fail for the right reaso
 | paid hold RELEASED instead of consumed | 2 payment tests (stock went back up: an oversell) |
 | duplicate-webhook check removed | the sequential duplicate test (the parallel one still passed thanks to the order lock — two independent layers) |
 | any webhook signature accepted | both signature tests |
+| worker never releases the hold | 3 job tests |
+| hold API never schedules the job | 3 job tests (the abandoned hold stays held) |
 
 ## Lessons from flaky and broken runs
 
@@ -107,4 +111,5 @@ A test only proves something once it has been seen to **fail for the right reaso
 | a manual check "missing" an email | the check script killed the servers before output reached the log | wait before stopping; verify with the database |
 | a manual check where every call failed | the script didn't wait for Express (Vite answered 502 meanwhile) | wait with `curl -f` |
 | manual registrations refused | the real register limit (5/hour from 127.0.0.1) | create manual-test users directly in the database |
+| a live check of the worker failed although all tests passed | leftover `npm run dev` trees from earlier checks: `node --watch` restarts its child, so killing only the port's process left an old server (without the test's settings) answering | stop the **whole process tree** (`taskkill /T`); first check which process actually serves the port |
 | "An Application Control policy has blocked this file" once | Windows security re-checking a native file just after Docker restarted (unproven) | didn't recur; oxlint (always blocked) was replaced by ESLint |

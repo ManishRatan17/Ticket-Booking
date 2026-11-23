@@ -24,6 +24,7 @@ Versions are the ones installed today (`package.json` allows newer minor version
 | **jose** | 6.2.17 | Signing/verifying JWTs (HS256 for our tokens, RS256 + JWKS for Google's) | Modern, maintained, no dependencies, promise-based |
 | **zod** | 4.6.7 | Validating and cleaning every request body / query / URL parameter | Strips unknown fields (stops mass assignment), normalises (trim, lowercase), precise error lists |
 | **helmet** | 8.3.0 | Security response headers | One line for a set of browser protections |
+| **bullmq** | 6.7.8 | Background jobs: a delayed "expire-hold" job per hold, retries with exponential backoff, failed jobs kept (dead-letter) | Runs on the Redis we already have; at-least-once delivery, delayed jobs, retries built in. Its optional native speed-up `msgpackr-extract` has its compile script **denied** (`allowScripts`) — the plain-JavaScript fallback is used |
 | **cookie-parser** | 1.4.7 | Reads cookies into `req.cookies` | Both tokens live in cookies |
 
 Node built-ins used heavily: `node:crypto` (random tokens, SHA-256, `timingSafeEqual`), `node:test` + `node:assert` (all server tests), `node:child_process` (tests that start a second process), `node:http` (pooled test client).
@@ -51,7 +52,6 @@ Node built-ins used heavily: `node:crypto` (random tokens, SHA-256, `timingSafeE
 
 | Tool | Phase | For |
 |---|---|---|
-| BullMQ | 3 | Background jobs: releasing expired holds, sending emails reliably |
 | Socket.IO or Server-Sent Events | 4 | Live waiting-room position |
 | k6 | 6 | Load tests with thousands of virtual users |
 | Razorpay (test mode) | 7 | Realistic payment flow |

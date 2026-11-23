@@ -4,6 +4,7 @@ import { AppError } from '../../lib/errors.js';
 import { stockKey } from '../reservation/stock.js';
 import { createHold, getUserHold, releaseHold, redisNow } from '../reservation/holds.js';
 import * as eventsRepository from './events.repository.js';
+import { scheduleHoldExpiry } from '../../jobs/queue.js';
 
 // ---------------------------------------------------------------------------
 // Stock: Postgres is the truth, Redis is the fast working copy
@@ -96,6 +97,11 @@ export async function holdTickets({ eventId, userId, quantity }) {
 
   switch (result.status) {
     case 'held':
+      // PRODUCER: schedule "expire this hold" for when its time runs out (Phase 3).
+      // If scheduling fails, the hold still stands — the sweep job (safety net) catches it later.
+      await scheduleHoldExpiry(result.hold).catch((err) =>
+        console.warn(`[jobs] could not schedule expiry for hold ${result.hold.id}: ${err.message}`),
+      );
       return { hold: toPublicHold(result.hold), serverTime: await redisNow() };
     case 'sold_out':
       throw new AppError(409, 'SOLD_OUT', `Not enough tickets left (${result.available} available)`, {

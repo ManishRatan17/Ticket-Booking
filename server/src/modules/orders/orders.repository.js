@@ -90,6 +90,20 @@ export async function expireIfOverdue(client, orderId) {
   return rows.length === 0 ? null : rows[0].hold_id;
 }
 
+// Used by the expiry WORKER once a hold has expired by Redis's clock: its pending order
+// (if any) can't be paid in time any more. Returns the order id if one was expired.
+// (If a payment webhook holds the order's row lock right now, this waits for it; if the
+// payment won, the order is 'paid' and nothing matches.)
+export async function expirePendingOrderForHold(client, holdId) {
+  const { rows } = await client.query(
+    `UPDATE orders SET status = 'expired', updated_at = now()
+      WHERE hold_id = $1 AND status = 'pending'
+     RETURNING id`,
+    [holdId],
+  );
+  return rows.length === 0 ? null : Number(rows[0].id);
+}
+
 export async function markPaid(client, { orderId, paymentId }) {
   await client.query(
     `UPDATE orders SET status = 'paid', payment_id = $2, paid_at = now(), failure_reason = NULL, updated_at = now()

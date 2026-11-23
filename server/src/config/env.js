@@ -82,6 +82,17 @@ export const env = {
     refreshTtlSeconds: 7 * DAY, // sliding: each refresh issues a fresh 7-day token
     reuseGraceSeconds: 10, // a token reused this soon is probably a second tab, not an attacker
   },
+  holds: {
+    // How long held tickets stay reserved (and how long an order has to be paid).
+    // 5 minutes; the expiry tests set it to 1–2 seconds.
+    seconds: Math.max(1, Number(process.env.HOLD_SECONDS ?? 300)),
+  },
+  jobs: {
+    // Background jobs (BullMQ). Off only for the general test suite (.env.test): hundreds of
+    // test holds would otherwise leave hundreds of delayed jobs in Redis. Never off in production.
+    enabled: process.env.NODE_ENV === 'production' || process.env.JOBS_ENABLED !== 'false',
+    prefix: process.env.JOBS_PREFIX || 'bull', // Redis key prefix for the queues (tests use their own)
+  },
   payments: {
     webhookSecret: paymentWebhookSecret(),
     // How long the fake provider waits before calling our webhook (a real one takes seconds).

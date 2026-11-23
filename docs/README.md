@@ -23,6 +23,7 @@ A ticketing platform built to stay **correct** (never sell a ticket twice) and *
 | 10 | [Testing](10-testing.md) | Every test file, how tests are isolated, mutation testing, flaky-test lessons |
 | 11 | [Decisions log](11-decisions-log.md) | Every decision, the options rejected, and why; known limitations |
 | 12 | [Orders & payments](12-orders-and-payments.md) | Checkout, idempotency keys, the fake provider, signed webhooks, ticket numbers, late payments, refunds |
+| 13 | [Background jobs](13-background-jobs.md) | BullMQ: delayed expiry jobs, the worker process, retries, dead-letter queue, idempotent jobs |
 
 ---
 
@@ -37,14 +38,14 @@ Roadmap from the original blueprint. ✅ done · 🟡 partly done · ⬜ not sta
 | Auth | (added before Phase 2) register/login, argon2id, JWT in HttpOnly cookies, refresh rotation + reuse detection, sessions, logout everywhere, Google sign-in, roles/admin, CSRF protection, rate limiting, password reset | ✅ |
 | Frontend | React pages for everything above, with minimal styling (real styling comes in Phase 7) | ✅ |
 | 2 | Orders & payment: holds → pending orders → (fake) payment → paid, idempotency, `sold_tickets` | ✅ (demo data · orders + idempotency · fake provider + signed webhook · failures, late payments, refunds logged · My orders page) |
-| 3 | Expiry: a background worker (BullMQ) that releases expired holds for everyone | ⬜ (today: lazy expiry only — see [07](07-tickets-and-holds.md#what-is-not-automatic-yet)) |
+| 3 | Expiry: a background worker (BullMQ) that releases expired holds for everyone | 🟡 (3a delayed job per hold + worker process ✅ · 3b safety-net sweep ⬜ · 3c admin jobs page ⬜) |
 | 4 | Waiting room: queue, admission worker, live position | ⬜ |
 | 5 | Protection: rate limit on holds, duplicate-tab and bot defence | 🟡 (auth endpoints are rate-limited; holds are not yet) |
 | 6 | Proof: k6 load tests with thousands of users, SQL verification | ⬜ |
 | 7 | Polish: styling, Razorpay test mode, deployment, demo video | ⬜ |
 | 8 | Stretch: numbered seats, multiple servers, metrics | ⬜ |
 
-**Numbers today:** 205 server tests + 34 frontend tests, all passing. 300 signed-in users racing for 100 tickets over real HTTP → exactly 100 holds.
+**Numbers today:** 211 server tests + 34 frontend tests, all passing. 300 signed-in users racing for 100 tickets over real HTTP → exactly 100 holds.
 
 ---
 
@@ -85,7 +86,8 @@ Emails (password reset) are **printed in the server terminal** in development.
 
 | Command | What it does |
 |---|---|
-| `npm run dev` | Starts the API (`node --watch`, restarts on file changes) and the React dev server (Vite) together, via `concurrently` |
+| `npm run dev` | Starts **three** processes together via `concurrently`: the API (`node --watch`), the background **worker** (`node --watch`), and the React dev server (Vite) |
+| `npm run worker` | Starts only the background worker (expires abandoned holds and unpaid orders) |
 | `npm test` | Runs all server tests (Node's built-in test runner) **and** all frontend tests (Vitest). Needs Docker running |
 | `npm run lint` | Checks the frontend code with ESLint |
 | `npm run build` | Builds the frontend for production into `client/dist` |

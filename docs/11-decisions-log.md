@@ -68,6 +68,20 @@ Every significant choice, the alternatives considered, and why. Newest at the bo
 | Fake provider + HMAC-signed webhook (2b) | browser says "paid"; Razorpay now | never trust the client for money; same shape as Razorpay |
 | Late payment: confirm if tickets still available, else failed + refund needed (2c) | always refuse | fair and safe |
 
+## Background jobs (Phase 3)
+
+| Decision | Alternatives | Why |
+|---|---|---|
+| BullMQ, one delayed "expire-hold" job per hold, scheduled when the hold is created | a timer scanning every few seconds; Redis key-expiry notifications | precise timing, retries, dead-letter queue; key-expiry events are not guaranteed to be delivered |
+| Worker in its own process (`npm run worker`, also started by `npm run dev`) | inside the API process | crash isolation; API and workers restart and scale separately |
+| One job expires the hold AND its pending order | two jobs | the order's deadline is the hold's deadline: one clock, one rule |
+| Job delay measured with Redis's clock; a job that runs early fails and is retried | Node's clock | expiresAt comes from Redis |
+| Jobs idempotent (`already_gone`, release returns tickets once) | — | BullMQ delivers at least once |
+| Failed jobs kept (`removeOnFail: false`) | auto-delete | a dead-letter queue: nothing fails silently |
+| Scheduling failure does not fail the hold | fail the request | the 3b safety-net sweep catches missing jobs |
+| `HOLD_SECONDS` configurable (default 300) | constant | tests use 1-second holds |
+| Separate Redis connection for BullMQ (`maxRetriesPerRequest: null`) | share the API's fail-fast connection | workers must wait for Redis, API requests must not |
+
 ## Frontend
 
 | Decision | Alternatives | Why |

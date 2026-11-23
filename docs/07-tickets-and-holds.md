@@ -67,7 +67,7 @@ Every expiry decision compares **Redis time with Redis time**. The browser and N
 If Redis deleted an expired hold by itself, its tickets would **never** come back to stock: nothing would remember how many to return. Expired holds are released **explicitly**:
 - by the **same user** creating a new hold (lazy expiry, inside create-hold.lua);
 - when the owner **looks** at their hold (`GET …/holds/mine` releases an expired one);
-- by the **Phase 3 worker**, for everyone (not built yet).
+- by the **background worker** (Phase 3): every hold gets a delayed `expire-hold` job when it is created — see [13](13-background-jobs.md).
 
 ## 4. Events and the HTTP API (Phase 1, Step 4b) — [modules/events/](../server/src/modules/events/)
 
@@ -109,7 +109,6 @@ Every one of these was also run against a deliberately broken version (mutation 
 
 ## What is not automatic yet
 
-- **Other users' expired holds** keep their tickets until the Phase 3 worker exists.
 - **Holds are lost** if Redis loses its data (their tickets come back on sale).
 - **Redis Cluster:** the scripts build some key names from data (e.g. `'hold:' .. id`) instead of declaring every key; fine on one Redis, would need hash tags on a cluster (Phase 8).
 - **Turning a hold into a paid order** (`orders`, `sold_tickets`, idempotency, webhooks) is Phase 2.
