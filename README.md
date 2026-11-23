@@ -1,5 +1,7 @@
 # Flash-Sale Ticketing System
 
+> 📖 **Full documentation — what's built, how it works behind the scenes, every endpoint and decision: [docs/README.md](docs/README.md)**
+
 Full-stack starter: **Express** API (Node.js 20.6+) and a **React + Vite** client, managed as npm workspaces.
 
 ```
