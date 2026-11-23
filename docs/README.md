@@ -64,6 +64,11 @@ npm run dev                        # API on :5000 and React on :5173, together
 
 Open **http://localhost:5173**. (The API alone is at http://localhost:5000/api/health.)
 
+A fresh database has no events, so the ticket pages look empty. Add demo events with:
+```powershell
+npm run seed:demo
+```
+
 To use the admin pages, make yourself an admin and log in again:
 ```powershell
 npm run set-role -- you@example.com admin
@@ -87,6 +92,7 @@ Emails (password reset) are **printed in the server terminal** in development.
 | `npm run migrate` | Applies any new database migrations (safe to run any number of times) |
 | `npm run demo:race` | The Phase 1 demo: 1,000 buyers vs 100 tickets, broken version vs the two fixes |
 | `npm run set-role -- <email> <user\|admin>` | Gives or removes admin rights from the command line |
+| `npm run seed:demo` | Creates three demo events (on sale now, almost sold out, on sale in 10 minutes). Safe to run again: existing ones are skipped |
 | `docker compose up -d` / `docker compose down` | Start / stop PostgreSQL and Redis (data is kept in Docker volumes) |
 
 ---

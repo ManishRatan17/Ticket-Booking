@@ -6,7 +6,7 @@ Everything lives in [client/src/](../client/src/). Styling is deliberately minim
 
 | URL | Page | Access | Backend used |
 |---|---|---|---|
-| `/` | [HomePage](../client/src/pages/HomePage.jsx) | anyone | `/api/health` |
+| `/` | [HomePage](../client/src/pages/HomePage.jsx) | anyone | `/api/health`, `GET /api/events` (lists events; with none, explains how to create some) |
 | `/events` | [EventsPage](../client/src/pages/EventsPage.jsx) | anyone | `GET /api/events` |
 | `/events/:id` | [EventPage](../client/src/pages/EventPage.jsx) | anyone (holding needs login) | event, hold, my hold, release |
 | `/login` | [LoginPage](../client/src/pages/LoginPage.jsx) | signed-out only | login, Google |
