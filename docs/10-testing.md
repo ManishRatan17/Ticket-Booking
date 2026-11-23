@@ -5,7 +5,7 @@ docker compose up -d     # the server tests use the real PostgreSQL and Redis
 npm test                 # server (node:test) then client (Vitest)
 ```
 
-Today: **234 server tests + 34 client tests**, all passing (about 10–15 s for the server suite).
+Today: **238 server tests + 34 client tests**, all passing (about 10–15 s for the server suite).
 
 ## How the server tests run
 
@@ -64,6 +64,7 @@ Kept outside `test/` because Node runs every file inside `test/` as a test.
 | `sweep.test.js` | the expiry index is maintained on create / release / pay and rebuilt by `indexAllHolds()`; the sweep releases an expired hold that never got a job, leaves running holds alone, expires an overdue order whose hold vanished, removes stale index entries, and two sweeps at once release each hold once |
 | `admin-jobs.test.js` | admin-only (403/401); overview has counts for every state, ≥ 1 worker, the 60-s sweep schedule; **the dead-letter flow**: a job fails its only attempt → listed with its error → cause fixed → Retry → completed, tickets back; retry of an unknown job → 404, of a job that hasn't failed → 409 |
 | `waiting-room.test.js` | no pass → 403; events without a room unchanged; arrival order and keeping your place on re-join; **300 simultaneous joins → positions 1–300**; N per tick in order; pass lasts 10 min and allows holding; the lobby (queue before the sale, no admission); **fairness under load** (300 people, 6 ticks, nobody overtakes); two admission runs at once never admit anyone twice |
+| `waiting-room-stream.test.js` | reads the raw SSE stream: correct content type; first message = current status; position updates live as people ahead are admitted, then `admitted` and the stream ends; 401 / 409 as plain JSON |
 | `holds-http.test.js` | the holds API: every status code, IDOR, CSRF, lazy release on read, **300 users × 100 tickets over HTTP** |
 
 ## Client test files (Vitest)

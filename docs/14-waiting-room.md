@@ -56,7 +56,30 @@ Per event: **`admission_per_second`** (migration 005). Empty = no waiting room �
 
 Status: `{ "status": "waiting" | "admitted" | "not_in_queue", "position", "total", "passExpiresInSeconds", "admissionPerSecond", "saleStartsAt", "estimatedWaitSeconds", "serverTime" }`. Events without a waiting room → `409 NO_WAITING_ROOM`.
 
+## Live position: Server-Sent Events (step 4b)
+
+`GET /api/events/:id/queue/stream` keeps one HTTP response open (`Content-Type: text/event-stream`) and writes a message whenever your position or status changes:
+
+```
+event: status
+data: {"status":"waiting","position":12,"total":4800,…}
+
+```
+
+| Choice | Why |
+|---|---|
+| **SSE**, not WebSockets or polling | updates only go server → browser; SSE is plain HTTP (our cookie auth, CSRF rules and proxies just work); browsers reconnect by themselves; no extra library |
+| check Redis once a second per stream, send **only when something visible changed** | `ZRANK` is cheap; no traffic while nothing moves |
+| `: ping` comment every 15 s | stops proxies from closing a quiet connection |
+| `retry: 2000` | after a drop, the browser reconnects in 2 s |
+| end the stream when you're **admitted**, and after 10 min | nothing left to wait for; reconnecting re-runs authentication |
+| `req.on('close')` stops the timers | a closed tab costs nothing |
+| headers `Cache-Control: no-cache, no-transform`, `X-Accel-Buffering: no` | never cache, compress or buffer a live stream |
+
+*Tested by reading the raw stream: position 2 → (admission tick) → 1 → (tick) → `admitted` → the server ends the stream. Not signed in → 401; no waiting room → normal JSON 409.*
+
+With several API servers, Redis **pub/sub** could push changes to every server instead of each stream checking (Phase 8).
+
 ## Coming next
 
-- **4b:** live position updates with Server-Sent Events.
 - **4c:** the queue screen in the React app; admins set the rate when creating an event.

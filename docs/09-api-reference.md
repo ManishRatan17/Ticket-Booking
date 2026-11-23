@@ -138,6 +138,9 @@ Body `{ "quantity": 1 }` (JSON integer 1–4)
 ### `GET /events/:id/queue`  · signed in — your status
 → `200 { "status": "waiting" | "admitted" | "not_in_queue", "position", "total", "passExpiresInSeconds", "admissionPerSecond", "saleStartsAt", "estimatedWaitSeconds", "serverTime" }` · `404 EVENT_NOT_FOUND` · `409 NO_WAITING_ROOM`
 
+### `GET /events/:id/queue/stream`  · signed in — **Server-Sent Events**
+`Content-Type: text/event-stream`; messages `event: status` with the same JSON as above, sent when the status or position changes; `: ping` every 15 s; ends when you are admitted or after 10 minutes (the browser reconnects).
+
 On a waiting-room event, `POST /events/:id/holds` without a pass → `403 NOT_ADMITTED`.
 
 ---
