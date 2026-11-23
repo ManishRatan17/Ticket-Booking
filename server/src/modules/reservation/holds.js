@@ -1,0 +1,103 @@
+// Ticket holds: "user 42 holds 2 tickets for event 7 until 12:05".
+// Built on the atomic stock counter from Phase 1 (stock.js), now with an owner and an expiry.
+//
+// Redis keys (the Lua scripts build some of these names too — keep them in sync):
+//   event:<eventId>:stock                 tickets available        (stock.js)
+//   hold:<holdId>                         { userId, eventId, quantity, createdAt, expiresAt }
+//   event:<eventId>:user:<userId>:hold    the user's hold id for that event
+//
+// Why holds are NOT deleted by a Redis TTL: Redis would delete the record, and its tickets
+// would never return to stock (nothing would remember how many to give back). Expired holds
+// are released explicitly: lazily when the same user holds again (create-hold.lua), and by
+// the expiry worker in Phase 3. Until then, OTHER users' expired holds keep their tickets.
+import { readFileSync } from 'node:fs';
+import { randomUUID } from 'node:crypto';
+import { redis } from '../../config/redis.js';
+import { stockKey } from './stock.js';
+
+export const HOLD_SECONDS = 5 * 60;
+export const MAX_TICKETS_PER_HOLD = 4;
+
+const holdKey = (holdId) => `hold:${holdId}`;
+const userHoldKey = (eventId, userId) => `event:${eventId}:user:${userId}:hold`;
+const lua = (file) => readFileSync(new URL(`./lua/${file}`, import.meta.url), 'utf8');
+
+redis.defineCommand('createHold', { numberOfKeys: 3, lua: lua('create-hold.lua') });
+redis.defineCommand('releaseHold', { numberOfKeys: 1, lua: lua('release-hold.lua') });
+
+// A thrown error = a BUG in the caller (bad input, stock never loaded). Business outcomes
+// like "sold out" are RETURNED, because they're normal.
+function assertValid({ eventId, userId, quantity }) {
+  if (!Number.isInteger(quantity) || quantity < 1 || quantity > MAX_TICKETS_PER_HOLD) {
+    throw new Error(`Invalid quantity: ${quantity}`);
+  }
+  if (!Number.isSafeInteger(userId) || userId < 1) throw new Error(`Invalid userId: ${userId}`);
+  if (eventId === undefined || eventId === null || String(eventId).includes(':')) {
+    throw new Error(`Invalid eventId: ${eventId}`); // ':' would break the key layout
+  }
+}
+
+// Returns one of:
+//   { status: 'held', hold }
+//   { status: 'already_holding', holdId }
+//   { status: 'sold_out', available }
+export async function createHold({ eventId, userId, quantity }) {
+  assertValid({ eventId, userId, quantity });
+  const holdId = randomUUID();
+  const [code, value] = await redis.createHold(
+    stockKey(eventId),
+    userHoldKey(eventId, userId),
+    holdKey(holdId),
+    holdId,
+    userId,
+    eventId,
+    quantity,
+    HOLD_SECONDS,
+  );
+
+  switch (code) {
+    case 1:
+      return {
+        status: 'held',
+        hold: { id: holdId, eventId: String(eventId), userId, quantity, expiresAt: new Date(Number(value)) },
+      };
+    case 0:
+      return { status: 'sold_out', available: Number(value) };
+    case -2:
+      return { status: 'already_holding', holdId: value };
+    default:
+      throw new Error(`No stock set up for event ${eventId}`);
+  }
+}
+
+function toHold(holdId, fields) {
+  if (!fields.quantity) return null;
+  const expiresAt = new Date(Number(fields.expiresAt));
+  return {
+    id: holdId,
+    eventId: fields.eventId,
+    userId: Number(fields.userId),
+    quantity: Number(fields.quantity),
+    createdAt: new Date(Number(fields.createdAt)),
+    expiresAt,
+    expired: expiresAt.getTime() <= Date.now(),
+  };
+}
+
+export async function getHold(holdId) {
+  return toHold(holdId, await redis.hgetall(holdKey(holdId)));
+}
+
+// The user's hold for an event, or null. An expired one is still returned (expired: true)
+// until it's released — the caller decides what to show.
+export async function getUserHold(eventId, userId) {
+  const holdId = await redis.get(userHoldKey(eventId, userId));
+  return holdId ? getHold(holdId) : null;
+}
+
+// Returns 'released' | 'not_found' | 'not_owner'.
+// Pass userId to release as that user (only their own hold); omit it for the system.
+export async function releaseHold(holdId, { userId } = {}) {
+  const result = await redis.releaseHold(holdKey(holdId), holdId, userId === undefined ? '' : String(userId));
+  return result === 1 ? 'released' : result === -1 ? 'not_owner' : 'not_found';
+}
