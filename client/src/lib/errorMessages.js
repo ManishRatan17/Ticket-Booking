@@ -21,6 +21,7 @@ const MESSAGES = {
   HOLD_EXPIRED: 'Your hold expired. Please hold tickets again.',
   ORDER_NOT_FOUND: 'This order does not exist.',
   ORDER_EXISTS: 'You already started checkout for these tickets.',
+  ORDER_NOT_PENDING: 'This order is no longer waiting for payment.',
   // Admin
   FORBIDDEN: 'You do not have permission to do this.',
   LAST_ADMIN: 'This is the only admin left. Make someone else an admin first.',

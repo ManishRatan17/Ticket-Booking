@@ -5,7 +5,7 @@ docker compose up -d     # the server tests use the real PostgreSQL and Redis
 npm test                 # server (node:test) then client (Vitest)
 ```
 
-Today: **192 server tests + 34 client tests**, all passing (about 10–15 s for the server suite).
+Today: **205 server tests + 34 client tests**, all passing (about 10–15 s for the server suite).
 
 ## How the server tests run
 
@@ -57,6 +57,7 @@ Kept outside `test/` because Node runs every file inside `test/` as a test.
 | `holds.test.js` | holds in Redis: rules, lazy expiry, idempotent release, owner check, 1,000-user race, mixed quantities, 50 clicks → 1 hold |
 | `events.test.js` | admin creation, reading, validation, **stock rebuilt from PostgreSQL**, rebuild race (`SET NX`) |
 | `orders.test.js` | hold → pending order, price from the database (body can't set it), **idempotency** (replay, 10 parallel same-key → 1 order, other key → 409, key reuse → 422, missing key → 400), IDOR, expired hold, lazy order expiry, the `tickets_sold` CHECK |
+| `payments.test.js` | pay → signed webhook → paid with ticket numbers; failed payment; the browser can't decide payment; wrong secret / tampered body → 401; duplicates (sequential and 10 at once); two deliveries for one order; amount mismatch; late payment (free → paid, sold out → refund); 20 simultaneous payments → numbers 1–20 |
 | `holds-http.test.js` | the holds API: every status code, IDOR, CSRF, lazy release on read, **300 users × 100 tickets over HTTP** |
 
 ## Client test files (Vitest)
@@ -91,6 +92,9 @@ A test only proves something once it has been seen to **fail for the right reaso
 | stock rebuild without `NX` | rebuild race, 3/3 runs |
 | client: session-over 401s not reported | the `SESSION_REVOKED` client test |
 | order insert without `ON CONFLICT DO NOTHING` | the 10-parallel idempotency race |
+| paid hold RELEASED instead of consumed | 2 payment tests (stock went back up: an oversell) |
+| duplicate-webhook check removed | the sequential duplicate test (the parallel one still passed thanks to the order lock — two independent layers) |
+| any webhook signature accepted | both signature tests |
 
 ## Lessons from flaky and broken runs
 

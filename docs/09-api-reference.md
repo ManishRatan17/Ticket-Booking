@@ -147,6 +147,19 @@ Order shape: `{ "id", "eventId", "eventName", "quantity", "amountPaise", "status
 
 ---
 
+## Payments
+
+### `POST /api/payments/fake/:orderId`  · signed in · development payment provider
+Body `{ "outcome": "success" | "failure" }` → `202 { "paymentId" }` (the result arrives later by webhook; poll `GET /api/orders/:id`)
+· `404 ORDER_NOT_FOUND` · `409 ORDER_NOT_PENDING` (`details.status`)
+
+### `POST /api/webhooks/payments`  · called by the payment provider, not the browser
+Header `X-Payment-Signature: sha256=<HMAC-SHA256 of the exact body>`. Body `{ "id": "evt_…", "type": "payment.succeeded" | "payment.failed", "data": { "orderId", "paymentId", "amountPaise" } }`
+→ `200 { "received": true, "outcome": "paid" | "failed" | "refund_needed" | "duplicate" | "already_paid" | "ignored" | "unknown_order", "ticketNumbers"? }`
+· `401 INVALID_SIGNATURE` · `400 INVALID_WEBHOOK` · `500` on a crash (the provider retries)
+
+---
+
 ## Trying it with curl
 
 ```bash

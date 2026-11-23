@@ -1,3 +1,5 @@
+import { randomBytes } from 'node:crypto';
+
 // Reads settings from environment variables (loaded from server/.env) in ONE place,
 // so the rest of the code never touches process.env directly.
 
@@ -21,6 +23,22 @@ function requiredSecret(name, minBytes = 32) {
 }
 
 const DAY = 24 * 60 * 60; // seconds
+
+// The secret the payment provider signs its webhooks with (HMAC-SHA256).
+// Production: REQUIRED (it must match what's configured at the provider).
+// Development: the FAKE provider runs inside this same server process, so a random secret
+// made at startup works for both sides, and nobody has to add it to .env.
+function paymentWebhookSecret() {
+  const value = process.env.PAYMENT_WEBHOOK_SECRET;
+  if (value) {
+    if (Buffer.byteLength(value, 'utf8') < 32) throw new Error('PAYMENT_WEBHOOK_SECRET must be at least 32 bytes long');
+    return value;
+  }
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error('Missing required environment variable: PAYMENT_WEBHOOK_SECRET');
+  }
+  return randomBytes(32).toString('hex');
+}
 
 // Express "trust proxy": which proxies may tell us the client's real IP (X-Forwarded-For).
 //   unset/"false" → trust nobody: req.ip is whoever connected to us (safe default)
@@ -63,6 +81,11 @@ export const env = {
     ttlSeconds: 30 * DAY, // absolute: password needed again after this, however active you are
     refreshTtlSeconds: 7 * DAY, // sliding: each refresh issues a fresh 7-day token
     reuseGraceSeconds: 10, // a token reused this soon is probably a second tab, not an attacker
+  },
+  payments: {
+    webhookSecret: paymentWebhookSecret(),
+    // How long the fake provider waits before calling our webhook (a real one takes seconds).
+    fakeDelayMs: Number(process.env.FAKE_PAYMENT_DELAY_MS ?? 800),
   },
   // Where the browser is sent after Google sign-in (the React app).
   clientUrl: process.env.CLIENT_URL || 'http://localhost:5173',

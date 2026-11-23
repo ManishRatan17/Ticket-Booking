@@ -77,7 +77,7 @@ Added by 004: `hold_id` (**unique** — one order per hold), `amount_paise` (pri
 `event_id`, `ticket_number` (`> 0`), `order_id`, with **`UNIQUE (event_id, ticket_number)` — the safety net of the whole project**: even if every other layer failed, the database refuses to sell ticket #7 of an event twice. Used today to rebuild Redis stock (`total − sold`).
 
 #### `processed_webhooks` (used from Phase 2)
-`webhook_id` (primary key), `provider`, `received_at` — a payment webhook delivered twice hits the primary key and is ignored (idempotency).
+`webhook_id` (primary key), `provider`, `received_at` — every handled payment webhook is recorded with `INSERT … ON CONFLICT DO NOTHING` inside the payment transaction; a repeat delivery inserts nothing and is ignored (idempotency).
 
 ### Patterns used with PostgreSQL
 
@@ -122,6 +122,7 @@ Emails and IPs never appear in keys — they are SHA-256 hashed.
 | [hold-stock.lua](../server/src/modules/reservation/lua/hold-stock.lua) (Phase 1 demo) | read stock → enough? → subtract |
 | [create-hold.lua](../server/src/modules/reservation/lua/create-hold.lua) | read Redis time → stock exists? → user has an **active** hold? (refuse) / **expired** hold? (release it) → enough tickets? → subtract, write hold, link user |
 | [release-hold.lua](../server/src/modules/reservation/lua/release-hold.lua) | hold exists? → owner check → give tickets back → delete hold → unlink user (only if the link still points at it) |
+| [consume-hold.lua](../server/src/modules/reservation/lua/consume-hold.lua) | the hold was PAID for → delete it WITHOUT returning its tickets (they're sold) → unlink the user |
 | [fixed-window.lua](../server/src/lib/lua/fixed-window.lua) | `INCR` the counter → if it's the first hit, `EXPIRE` it → return count and time left |
 
 ### When to use a Redis expiry (TTL) — and when not

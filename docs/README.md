@@ -22,6 +22,7 @@ A ticketing platform built to stay **correct** (never sell a ticket twice) and *
 | 09 | [API reference](09-api-reference.md) | Every endpoint, request, response and error code |
 | 10 | [Testing](10-testing.md) | Every test file, how tests are isolated, mutation testing, flaky-test lessons |
 | 11 | [Decisions log](11-decisions-log.md) | Every decision, the options rejected, and why; known limitations |
+| 12 | [Orders & payments](12-orders-and-payments.md) | Checkout, idempotency keys, the fake provider, signed webhooks, ticket numbers, late payments, refunds |
 
 ---
 
@@ -35,7 +36,7 @@ Roadmap from the original blueprint. ✅ done · 🟡 partly done · ⬜ not sta
 | 1 | Correct core: race-condition demo, atomic stock (Lua), concurrency tests, **ticket holds**, events API, event pages | ✅ |
 | Auth | (added before Phase 2) register/login, argon2id, JWT in HttpOnly cookies, refresh rotation + reuse detection, sessions, logout everywhere, Google sign-in, roles/admin, CSRF protection, rate limiting, password reset | ✅ |
 | Frontend | React pages for everything above, with minimal styling (real styling comes in Phase 7) | ✅ |
-| 2 | Orders & payment: holds → pending orders → (fake) payment → paid, idempotency, `sold_tickets` | 🟡 (2.0 demo data ✅ · 2a orders + idempotency ✅ · 2b payment, 2c failures, 2d my orders ⬜) |
+| 2 | Orders & payment: holds → pending orders → (fake) payment → paid, idempotency, `sold_tickets` | 🟡 (2.0 demo data ✅ · 2a orders + idempotency ✅ · 2b/2c payment, webhook, failures ✅ · 2d my orders page ⬜) |
 | 3 | Expiry: a background worker (BullMQ) that releases expired holds for everyone | ⬜ (today: lazy expiry only — see [07](07-tickets-and-holds.md#what-is-not-automatic-yet)) |
 | 4 | Waiting room: queue, admission worker, live position | ⬜ |
 | 5 | Protection: rate limit on holds, duplicate-tab and bot defence | 🟡 (auth endpoints are rate-limited; holds are not yet) |
@@ -43,7 +44,7 @@ Roadmap from the original blueprint. ✅ done · 🟡 partly done · ⬜ not sta
 | 7 | Polish: styling, Razorpay test mode, deployment, demo video | ⬜ |
 | 8 | Stretch: numbered seats, multiple servers, metrics | ⬜ |
 
-**Numbers today:** 192 server tests + 34 frontend tests, all passing. 300 signed-in users racing for 100 tickets over real HTTP → exactly 100 holds.
+**Numbers today:** 205 server tests + 34 frontend tests, all passing. 300 signed-in users racing for 100 tickets over real HTTP → exactly 100 holds.
 
 ---
 

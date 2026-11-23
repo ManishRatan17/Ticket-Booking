@@ -18,7 +18,7 @@ import * as eventsRepository from './events.repository.js';
 //
 // Known limit: holds that lived in Redis are lost with it, so their tickets come back on sale.
 // Acceptable for 5-minute holds; PAID tickets are safe because they're counted in Postgres.
-async function ensureStock(event) {
+export async function ensureStock(event) {
   const key = stockKey(event.id);
   const current = await redis.get(key);
   if (current !== null) return Number(current);

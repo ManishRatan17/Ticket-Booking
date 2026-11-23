@@ -24,6 +24,7 @@ const lua = (file) => readFileSync(new URL(`./lua/${file}`, import.meta.url), 'u
 
 redis.defineCommand('createHold', { numberOfKeys: 3, lua: lua('create-hold.lua') });
 redis.defineCommand('releaseHold', { numberOfKeys: 1, lua: lua('release-hold.lua') });
+redis.defineCommand('consumeHold', { numberOfKeys: 1, lua: lua('consume-hold.lua') });
 
 // A thrown error = a BUG in the caller (bad input, stock never loaded). Business outcomes
 // like "sold out" are RETURNED, because they're normal.
@@ -100,6 +101,13 @@ export async function getHold(holdId) {
 export async function getUserHold(eventId, userId) {
   const holdId = await redis.get(userHoldKey(eventId, userId));
   return holdId ? getHold(holdId) : null;
+}
+
+// The hold was PAID for: delete it and keep its tickets out of stock (they're sold now).
+// Returns true if the hold still existed, false if it was already gone (released after
+// expiring, or consumed by an earlier delivery of the same payment).
+export async function consumeHold(holdId) {
+  return (await redis.consumeHold(holdKey(holdId), holdId)) === 1;
 }
 
 // Returns 'released' | 'not_found' | 'not_owner'.

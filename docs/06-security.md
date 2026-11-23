@@ -30,6 +30,10 @@ Every defence in the project, the attack it stops, and where it lives. Most have
 | Clickjacking, MIME sniffing, framework fingerprinting | helmet headers; `X-Powered-By` removed | app.js |
 | Secrets in git | `.env` ignored; `.env.example` has empty values; checked before every commit | `.gitignore` |
 | Malicious install scripts (supply chain) | npm `allowScripts`: argon2's compile script denied | root `package.json` |
+| Fake "I paid" from the browser | the browser can only START a payment; only a signed webhook marks an order paid | [payments/](../server/src/modules/payments/) |
+| Forged / altered payment webhooks | HMAC-SHA256 over the exact raw body, constant-time comparison, secret required in production | [signature.js](../server/src/modules/payments/signature.js) |
+| Duplicate webhooks / double charges | `processed_webhooks` + order row lock + `already_paid` check; `Idempotency-Key` on order creation | payments.service.js, orders.service.js |
+| Client choosing the price | amount computed on the server from `price_paise`; a body field is ignored | orders.service.js |
 | Selling more tickets than exist | atomic Lua scripts; `UNIQUE (event_id, ticket_number)` in PostgreSQL | [07](07-tickets-and-holds.md) |
 
 ## CSRF in detail
