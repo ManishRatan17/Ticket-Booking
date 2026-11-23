@@ -12,7 +12,8 @@ const MINUTE = 60_000;
 const DEMO_EVENTS = [
   { name: 'Demo: Indie Night', totalTickets: 200, startsInMs: -MINUTE, pricePaise: 49_900 }, // ₹499, on sale now
   { name: 'Demo: Almost Sold Out', totalTickets: 5, startsInMs: -MINUTE, pricePaise: 99_900 }, // try selling out
-  { name: 'Demo: Big Festival', totalTickets: 1000, startsInMs: 10 * MINUTE, pricePaise: 149_900 }, // countdown
+  // A waiting room letting 2 people in per second: join before the sale opens and watch your place.
+  { name: 'Demo: Big Festival', totalTickets: 1000, startsInMs: 10 * MINUTE, pricePaise: 149_900, admissionPerSecond: 2 },
 ];
 
 try {
@@ -24,6 +25,13 @@ try {
         demo.name,
         demo.pricePaise,
       ]);
+      // …and the demo waiting room, if it was seeded before waiting rooms existed.
+      if (demo.admissionPerSecond) {
+        await pool.query('UPDATE events SET admission_per_second = $2 WHERE name = $1 AND admission_per_second IS NULL', [
+          demo.name,
+          demo.admissionPerSecond,
+        ]);
+      }
       console.log(`skipped  ${demo.name} (already exists)`);
       continue;
     }
@@ -32,6 +40,7 @@ try {
       totalTickets: demo.totalTickets,
       saleStartsAt: new Date(Date.now() + demo.startsInMs),
       pricePaise: demo.pricePaise,
+      admissionPerSecond: demo.admissionPerSecond ?? null,
     });
     console.log(`created  ${event.name} — id ${event.id}, ${event.totalTickets} tickets`);
   }

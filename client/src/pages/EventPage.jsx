@@ -10,6 +10,8 @@ import { Alert } from '../components/Alert.jsx'
 import { useCountdown } from '../hooks/useCountdown.js'
 import { errorMessage } from '../lib/errorMessages.js'
 import { clockOffset, formatCountdown } from '../lib/serverClock.js'
+import { useQueueStatus } from '../hooks/useQueueStatus.js'
+import { WaitingRoom } from '../components/WaitingRoom.jsx'
 
 // Loads the event, plus my hold if I'm signed in. Returns everything the page shows.
 async function loadPage(eventId, signedIn) {
@@ -67,6 +69,20 @@ export function EventPage() {
   const event = page?.event
   const holdSecondsLeft = useCountdown(page?.hold?.expiresAt, page?.offset ?? 0, onHoldExpired)
   const saleSecondsLeft = useCountdown(event && !event.onSale ? event.saleStartsAt : null, page?.offset ?? 0, reload)
+
+  // Waiting room (Phase 4): only for events with an admission rate. Not needed once you hold tickets.
+  const hasRoom = Boolean(event?.admissionPerSecond)
+  const queue = useQueueStatus(id, signedIn && hasRoom && !page?.hold)
+  const admitted = queue.status?.status === 'admitted'
+
+  async function handleJoin() {
+    setError(null)
+    try {
+      await queue.join()
+    } catch (err) {
+      setError(errorMessage(err))
+    }
+  }
 
   async function handleHold(e) {
     e.preventDefault()
@@ -144,9 +160,9 @@ export function EventPage() {
       <Alert>{error}</Alert>
       <Alert kind="info">{notice}</Alert>
 
-      {!event.onSale ? (
-        <p>On sale in {formatCountdown(saleSecondsLeft)}</p>
-      ) : page.hold ? (
+      {hasRoom && <p className="muted">This sale has a waiting room ({event.admissionPerSecond} people let in per second).</p>}
+
+      {page.hold ? (
         <div>
           <p>
             You're holding <strong>{page.hold.quantity}</strong> ticket{page.hold.quantity > 1 ? 's' : ''}. Hold
@@ -164,12 +180,23 @@ export function EventPage() {
           <Link to="/login" state={{ from: location.pathname }}>
             Log in
           </Link>{' '}
-          to hold tickets.
+          {hasRoom ? 'to join the queue.' : 'to hold tickets.'}
         </p>
+      ) : hasRoom && !admitted ? (
+        // You can queue before the sale opens; admission starts when it does.
+        <WaitingRoom status={queue.status} onJoin={handleJoin} saleOpensIn={event.onSale ? 0 : saleSecondsLeft} />
+      ) : !event.onSale ? (
+        <p>On sale in {formatCountdown(saleSecondsLeft)}</p>
       ) : event.available === 0 ? (
         <p>Sold out.</p>
       ) : (
         <form onSubmit={handleHold}>
+          {admitted && (
+            <p>
+              <strong>It's your turn!</strong> Choose your tickets within{' '}
+              {formatCountdown(queue.status.passExpiresInSeconds)}.
+            </p>
+          )}
           <label htmlFor="quantity">Tickets </label>
           <select id="quantity" value={quantity} onChange={(e) => setQuantity(Number(e.target.value))}>
             {Array.from({ length: maxChoice }, (_, i) => i + 1).map((n) => (

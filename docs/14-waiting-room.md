@@ -82,6 +82,25 @@ data: {"status":"waiting","position":12,"total":4800,…}
 
 With several API servers, Redis **pub/sub** could push changes to every server instead of each stream checking (Phase 8).
 
+## The queue screen (step 4c)
+
+| File | What it does |
+|---|---|
+| [api/waitingRoom.js](../client/src/api/waitingRoom.js) | `joinQueue(id)` (POST), `getQueueStatus(id)` (GET), `queueStreamUrl(id)` |
+| [hooks/useQueueStatus.js](../client/src/hooks/useQueueStatus.js) | your live status: GET once → if `waiting`, open an `EventSource` and apply each `status` message → if the stream errors, close it and **poll every 2 s** instead; stops when `admitted`. `join()` joins, then bumps a counter so the effect reconnects |
+| [components/WaitingRoom.jsx](../client/src/components/WaitingRoom.jsx) | `not_in_queue` → **Join the queue**; `waiting` → "You're #12 of 4,800 in line", the sale countdown ("your place is saved") and "About 0:06 to go" |
+| [pages/EventPage.jsx](../client/src/pages/EventPage.jsx) | for events with `admissionPerSecond`: signed out → "Log in to join the queue"; signed in and not admitted → `<WaitingRoom>`; admitted → "**It's your turn!** Choose your tickets within 9:58" above the normal hold form. Once you hold tickets the queue is no longer watched |
+| [pages/AdminEventsPage.jsx](../client/src/pages/AdminEventsPage.jsx) | new field "Waiting room: people let in per second" (empty = no waiting room → sent as `null`) |
+| [lib/errorMessages.js](../client/src/lib/errorMessages.js) | `NOT_ADMITTED`, `NO_WAITING_ROOM` |
+
+**Why a polling fallback?** `EventSource` can't refresh an expired access cookie (it isn't our `fetch` client), and it can't read the status code of a failed connection. When the stream breaks, polling through `api()` refreshes the cookie on 401 and keeps the screen moving. Polling every 2 s is fine for the few people whose stream broke, but it would be too expensive for everyone, which is why the stream comes first.
+
+**Why the page asks for status once before opening the stream:** most visitors are `not_in_queue` or already `admitted`, and they don't need a connection held open.
+
+**Demo:** `npm run seed:demo` gives *Demo: Big Festival* a waiting room letting 2 people in per second. Join with two accounts (two browsers, or one private window) and watch the second one move from #2 to admitted.
+
+*Checked live against a separate API + worker on port 5059: holding without queueing → `403 NOT_ADMITTED`; A joins → #1, B joins → #2; B's stream: `waiting #2` at +0.36 s → `admitted` at +1.24 s (one admission tick let both in, rate 2/s); B then holds → `201`.*
+
 ## Coming next
 
-- **4c:** the queue screen in the React app; admins set the rate when creating an event.
+- **Phase 5 (protection):** bot and abuse defences around the queue and the hold endpoint.

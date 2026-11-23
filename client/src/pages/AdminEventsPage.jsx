@@ -8,7 +8,7 @@ import { FormField } from '../components/FormField.jsx'
 import { errorMessage, fieldErrors } from '../lib/errorMessages.js'
 import { formatDate, formatMoney } from '../lib/format.js'
 
-const EMPTY_FORM = { name: '', totalTickets: '100', price: '499', saleStartsAt: '' }
+const EMPTY_FORM = { name: '', totalTickets: '100', price: '499', admissionPerSecond: '', saleStartsAt: '' }
 
 export function AdminEventsPage() {
   const [events, setEvents] = useState(null)
@@ -44,6 +44,8 @@ export function AdminEventsPage() {
           totalTickets: Number(form.totalTickets),
           // Rupees typed by a person → whole paise for the server (₹499.50 → 49950). Never send decimals.
           pricePaise: Math.round(Number(form.price) * 100),
+          // Empty = no waiting room; a number = let that many people in per second.
+          admissionPerSecond: form.admissionPerSecond ? Number(form.admissionPerSecond) : null,
           // <input type="datetime-local"> gives LOCAL time without a zone ("2026-12-01T18:00").
           // new Date() reads it as local time; toISOString() sends it in UTC — unambiguous.
           // Empty = "on sale right now".
@@ -89,6 +91,15 @@ export function AdminEventsPage() {
           value={form.price}
           onChange={update('price')}
           error={errors.pricePaise}
+        />
+        <FormField
+          id="admissionPerSecond"
+          label="Waiting room: people let in per second (empty = no waiting room)"
+          type="number"
+          min="1"
+          value={form.admissionPerSecond}
+          onChange={update('admissionPerSecond')}
+          error={errors.admissionPerSecond}
         />
         <FormField
           id="saleStartsAt"

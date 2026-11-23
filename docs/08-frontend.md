@@ -8,7 +8,7 @@ Everything lives in [client/src/](../client/src/). Styling is deliberately minim
 |---|---|---|---|
 | `/` | [HomePage](../client/src/pages/HomePage.jsx) | anyone | `/api/health`, `GET /api/events` (lists events; with none, explains how to create some) |
 | `/events` | [EventsPage](../client/src/pages/EventsPage.jsx) | anyone | `GET /api/events` |
-| `/events/:id` | [EventPage](../client/src/pages/EventPage.jsx) | anyone (holding needs login) | event, hold, my hold, release |
+| `/events/:id` | [EventPage](../client/src/pages/EventPage.jsx) | anyone (holding needs login) | event, hold, my hold, release; waiting room: join, status, `queue/stream` (SSE) |
 | `/login` | [LoginPage](../client/src/pages/LoginPage.jsx) | signed-out only | login, Google |
 | `/register` | [RegisterPage](../client/src/pages/RegisterPage.jsx) | signed-out only | register → login |
 | `/forgot-password` | [ForgotPasswordPage](../client/src/pages/ForgotPasswordPage.jsx) | signed-out only | forgot-password |
@@ -17,7 +17,7 @@ Everything lives in [client/src/](../client/src/). Styling is deliberately minim
 | `/orders` | [OrdersPage](../client/src/pages/OrdersPage.jsx) | signed in | `GET /api/orders` (ticket numbers for paid orders, "pay now" for pending ones) |
 | `/account` | [AccountPage](../client/src/pages/AccountPage.jsx) | signed in | sessions, delete session, logout-all |
 | `/admin/users` | [AdminUsersPage](../client/src/pages/AdminUsersPage.jsx) | admin | list users, change role |
-| `/admin/events` | [AdminEventsPage](../client/src/pages/AdminEventsPage.jsx) | admin | create event, list events |
+| `/admin/events` | [AdminEventsPage](../client/src/pages/AdminEventsPage.jsx) | admin | create event (optionally with a waiting-room rate), list events |
 | `/admin/jobs` | [AdminJobsPage](../client/src/pages/AdminJobsPage.jsx) | admin | `GET /api/admin/jobs` every 5 s, `POST /api/admin/jobs/:id/retry` |
 | anything else | NotFoundPage | anyone | — |
 
@@ -73,6 +73,7 @@ A laptop 3 minutes fast or 10 minutes slow still shows 5:00 for a new hold (unit
 4. Choose 1–`min(4, available)` → **Hold tickets** → "You're holding N tickets. Hold expires in 4:59" + **Release tickets**.
 5. `SOLD_OUT` / `HOLD_EXISTS` → message, then reload the real stock and your real hold.
 6. Hold expires → "Your hold expired and the tickets went back on sale."
+7. **Waiting room** (events with `admissionPerSecond`, Phase 4): signed out → "Log in to join the queue"; signed in → [WaitingRoom](../client/src/components/WaitingRoom.jsx) ("Join the queue", then "You're #N of M in line", kept live by [useQueueStatus](../client/src/hooks/useQueueStatus.js): Server-Sent Events, falling back to polling every 2 s); admitted → "It's your turn! Choose your tickets within 9:58" + the hold form. Details: [14-waiting-room.md](14-waiting-room.md#the-queue-screen-step-4c).
 
 ## Other details
 
