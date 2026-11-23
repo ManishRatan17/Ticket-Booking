@@ -13,6 +13,7 @@ Everything lives in [client/src/](../client/src/). Styling is deliberately minim
 | `/register` | [RegisterPage](../client/src/pages/RegisterPage.jsx) | signed-out only | register → login |
 | `/forgot-password` | [ForgotPasswordPage](../client/src/pages/ForgotPasswordPage.jsx) | signed-out only | forgot-password |
 | `/reset-password#token=…` | [ResetPasswordPage](../client/src/pages/ResetPasswordPage.jsx) | anyone (link from email) | reset-password |
+| `/checkout/:id` | [CheckoutPage](../client/src/pages/CheckoutPage.jsx) | signed in | `GET /api/orders/:id` (pay buttons: step 2b) |
 | `/account` | [AccountPage](../client/src/pages/AccountPage.jsx) | signed in | sessions, delete session, logout-all |
 | `/admin/users` | [AdminUsersPage](../client/src/pages/AdminUsersPage.jsx) | admin | list users, change role |
 | `/admin/events` | [AdminEventsPage](../client/src/pages/AdminEventsPage.jsx) | admin | create event, list events |

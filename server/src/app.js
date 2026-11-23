@@ -5,6 +5,7 @@ import healthRouter from './routes/health.js';
 import authRouter from './modules/auth/auth.routes.js';
 import adminRouter from './modules/admin/admin.routes.js';
 import eventsRouter from './modules/events/events.routes.js';
+import ordersRouter from './modules/orders/orders.routes.js';
 import { authenticate } from './middleware/authenticate.js';
 import { requireRole } from './middleware/authorize.js';
 import { rejectCrossSiteRequests } from './middleware/csrf.js';
@@ -28,6 +29,7 @@ export function createApp() {
   // The guard is applied ONCE, to the whole admin router: no admin route can forget it.
   app.use('/api/admin', authenticate, requireRole('admin'), adminRouter);
   app.use('/api', eventsRouter); // /api/events…, /api/holds/…
+  app.use('/api', ordersRouter); // /api/orders…
 
   // These two must be LAST: nothing above matched → 404; anything threw → error handler.
   app.use(notFound);

@@ -5,7 +5,7 @@ docker compose up -d     # the server tests use the real PostgreSQL and Redis
 npm test                 # server (node:test) then client (Vitest)
 ```
 
-Today: **180 server tests + 31 client tests**, all passing (about 10–15 s for the server suite).
+Today: **192 server tests + 34 client tests**, all passing (about 10–15 s for the server suite).
 
 ## How the server tests run
 
@@ -56,6 +56,7 @@ Kept outside `test/` because Node runs every file inside `test/` as a test.
 | `password-reset.test.js` | link in `#fragment`, identical answers, no waiting for email, newest link only, single use, race, expiry, rollback on "password = email", sessions revoked, Google-only users |
 | `holds.test.js` | holds in Redis: rules, lazy expiry, idempotent release, owner check, 1,000-user race, mixed quantities, 50 clicks → 1 hold |
 | `events.test.js` | admin creation, reading, validation, **stock rebuilt from PostgreSQL**, rebuild race (`SET NX`) |
+| `orders.test.js` | hold → pending order, price from the database (body can't set it), **idempotency** (replay, 10 parallel same-key → 1 order, other key → 409, key reuse → 422, missing key → 400), IDOR, expired hold, lazy order expiry, the `tickets_sold` CHECK |
 | `holds-http.test.js` | the holds API: every status code, IDOR, CSRF, lazy release on read, **300 users × 100 tickets over HTTP** |
 
 ## Client test files (Vitest)
@@ -89,6 +90,7 @@ A test only proves something once it has been seen to **fail for the right reaso
 | server sale-start check removed | `SALE_NOT_STARTED` test |
 | stock rebuild without `NX` | rebuild race, 3/3 runs |
 | client: session-over 401s not reported | the `SESSION_REVOKED` client test |
+| order insert without `ON CONFLICT DO NOTHING` | the 10-parallel idempotency race |
 
 ## Lessons from flaky and broken runs
 

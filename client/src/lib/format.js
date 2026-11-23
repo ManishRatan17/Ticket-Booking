@@ -44,6 +44,12 @@ export function timeAgo(date, now = Date.now()) {
   return 'just now'
 }
 
+// 49900 → "₹499.00". Money travels as whole paise (integers) and is only turned into
+// rupees for display — decimals are never used for amounts.
+export function formatMoney(paise) {
+  return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(paise / 100)
+}
+
 export function formatDate(date) {
   return new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' }).format(new Date(date))
 }

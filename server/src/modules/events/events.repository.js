@@ -2,7 +2,7 @@
 // Redis only keeps a fast working copy of each event's stock.
 import { pool } from '../../config/db.js';
 
-const COLUMNS = 'id, name, total_tickets, sale_starts_at, created_at';
+const COLUMNS = 'id, name, total_tickets, sale_starts_at, price_paise, created_at';
 
 function toEvent(row) {
   return {
@@ -10,14 +10,15 @@ function toEvent(row) {
     name: row.name,
     totalTickets: row.total_tickets,
     saleStartsAt: row.sale_starts_at,
+    pricePaise: row.price_paise, // whole paise: ₹499.00 = 49900
     createdAt: row.created_at,
   };
 }
 
-export async function createEvent({ name, totalTickets, saleStartsAt }) {
+export async function createEvent({ name, totalTickets, saleStartsAt, pricePaise }) {
   const { rows } = await pool.query(
-    `INSERT INTO events (name, total_tickets, sale_starts_at) VALUES ($1, $2, $3) RETURNING ${COLUMNS}`,
-    [name, totalTickets, saleStartsAt],
+    `INSERT INTO events (name, total_tickets, sale_starts_at, price_paise) VALUES ($1, $2, $3, $4) RETURNING ${COLUMNS}`,
+    [name, totalTickets, saleStartsAt, pricePaise],
   );
   return toEvent(rows[0]);
 }
@@ -30,6 +31,19 @@ export async function listEvents() {
 export async function findEventById(id) {
   const { rows } = await pool.query(`SELECT ${COLUMNS} FROM events WHERE id = $1`, [id]);
   return rows.length === 0 ? null : toEvent(rows[0]);
+}
+
+// Takes the next `quantity` ticket numbers for an event, atomically (Postgres row lock).
+// The CHECK (tickets_sold <= total_tickets) makes the DATABASE refuse an oversell: if this
+// would go past the total, Postgres throws (constraint events_tickets_sold_within_total).
+// Returns the numbers, e.g. [9, 10].
+export async function takeTicketNumbers(client, eventId, quantity) {
+  const { rows } = await client.query(
+    'UPDATE events SET tickets_sold = tickets_sold + $2 WHERE id = $1 RETURNING tickets_sold',
+    [eventId, quantity],
+  );
+  const last = rows[0].tickets_sold;
+  return Array.from({ length: quantity }, (_, i) => last - quantity + 1 + i);
 }
 
 // Tickets that are SOLD for good (paid orders, Phase 2). Used to rebuild Redis stock.

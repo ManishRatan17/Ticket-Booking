@@ -1,5 +1,13 @@
 import { describe, test, expect } from 'vitest'
-import { describeDevice, timeAgo } from './format.js'
+import { describeDevice, timeAgo, formatMoney } from './format.js'
+
+describe('formatMoney (paise → rupees, display only)', () => {
+  test.each([
+    [49_900, '₹499.00'],
+    [0, '₹0.00'],
+    [150_000_00, '₹1,50,000.00'], // Indian digit grouping
+  ])('%i paise → %s', (paise, text) => expect(formatMoney(paise)).toBe(text))
+})
 
 describe('describeDevice', () => {
   const cases = [

@@ -17,6 +17,7 @@ The database structure lives in numbered SQL files in [server/migrations/](../se
 | `001_initial_schema.sql` | `users`, `events`, `orders`, `sold_tickets`, `processed_webhooks` |
 | `002_auth.sql` | users get `role`, `password_changed_at`, lowercase-email check; new `sessions`, `refresh_tokens`, `password_reset_tokens` |
 | `003_google_login.sql` | `password_hash` becomes optional; users get `email_verified_at`; new `user_identities`; new revoke reason `account_linked` |
+| `004_orders_payments.sql` | events get `price_paise` and `tickets_sold` (with `CHECK tickets_sold BETWEEN 0 AND total_tickets`); orders get `hold_id` (unique), `amount_paise`, `paid_at`, `failure_reason` |
 
 ### Tables
 
@@ -66,9 +67,10 @@ Index: `sessions_active_user_id_idx ON (user_id) WHERE revoked_at IS NULL` — a
 | constraints | `UNIQUE (provider, provider_user_id)`: one Google account → one user. `UNIQUE (user_id, provider)`: one user → at most one Google account |
 
 #### `events`
-`id`, `name`, `total_tickets` (`CHECK > 0`), `sale_starts_at`, `created_at`.
+`id`, `name`, `total_tickets` (`CHECK > 0`), `sale_starts_at`, `created_at`, **`price_paise`** (whole paise, ≥ 0 — never decimals for money), **`tickets_sold`** — the counter that hands out ticket numbers (`UPDATE … SET tickets_sold = tickets_sold + n RETURNING`, atomic under the row lock) with **`CHECK (tickets_sold BETWEEN 0 AND total_tickets)`**: the database itself refuses an oversell (the third safety net).
 
 #### `orders` (used from Phase 2)
+Added by 004: `hold_id` (**unique** — one order per hold), `amount_paise` (price × quantity, computed on the server), `paid_at`, `failure_reason`. Original columns:
 `user_id`, `event_id`, `quantity` (`> 0`), `status` (`pending` → `paid` | `failed` | `expired`), `idempotency_key` with `UNIQUE (user_id, idempotency_key)` (a retried request can't create a second order), `payment_id`, `expires_at`, `created_at`, `updated_at`. Indexes on `user_id` and `(event_id, status)`.
 
 #### `sold_tickets` (used from Phase 2)

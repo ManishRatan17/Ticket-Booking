@@ -1,8 +1,10 @@
 // One event: hold 1–4 tickets, see the hold count down, release it.
 // Payment (turning a hold into an order) comes in Phase 2.
-import { useCallback, useEffect, useState } from 'react'
-import { Link, useLocation, useParams } from 'react-router-dom'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { getEvent, getMyHold, holdTickets, releaseHold, MAX_TICKETS_PER_HOLD } from '../api/events.js'
+import { createOrder } from '../api/orders.js'
+import { formatMoney } from '../lib/format.js'
 import { useAuth } from '../auth/useAuth.js'
 import { Alert } from '../components/Alert.jsx'
 import { useCountdown } from '../hooks/useCountdown.js'
@@ -21,6 +23,10 @@ async function loadPage(eventId, signedIn) {
 export function EventPage() {
   const { id } = useParams()
   const location = useLocation()
+  const navigate = useNavigate()
+  // One idempotency key per hold: clicking Checkout twice (or a retry) sends the SAME key,
+  // so the server returns the same order instead of making a second one.
+  const checkoutKey = useRef(null)
   const { status } = useAuth()
   const signedIn = status === 'signed-in'
 
@@ -78,6 +84,27 @@ export function EventPage() {
     }
   }
 
+  async function handleCheckout() {
+    if (checkoutKey.current?.holdId !== page.hold.id) {
+      checkoutKey.current = { holdId: page.hold.id, key: crypto.randomUUID() }
+    }
+    setBusy(true)
+    setError(null)
+    try {
+      const { order } = await createOrder(page.hold.id, checkoutKey.current.key)
+      navigate(`/checkout/${order.id}`)
+    } catch (err) {
+      if (err.code === 'ORDER_EXISTS' && err.details?.orderId) {
+        navigate(`/checkout/${err.details.orderId}`) // started in another tab: continue that one
+        return
+      }
+      setError(errorMessage(err))
+      await reload()
+    } finally {
+      setBusy(false)
+    }
+  }
+
   async function handleRelease() {
     setBusy(true)
     setError(null)
@@ -111,7 +138,7 @@ export function EventPage() {
       </p>
       <h1>{event.name}</h1>
       <p>
-        {event.available} of {event.totalTickets} tickets left
+        {formatMoney(event.pricePaise)} per ticket · {event.available} of {event.totalTickets} left
       </p>
 
       <Alert>{error}</Alert>
@@ -125,9 +152,11 @@ export function EventPage() {
             You're holding <strong>{page.hold.quantity}</strong> ticket{page.hold.quantity > 1 ? 's' : ''}. Hold
             expires in <strong>{formatCountdown(holdSecondsLeft)}</strong>.
           </p>
-          <p className="muted">Paying for held tickets comes in the next phase of the project.</p>
+          <button type="button" onClick={handleCheckout} disabled={busy}>
+            Checkout — {formatMoney(event.pricePaise * page.hold.quantity)}
+          </button>{' '}
           <button type="button" onClick={handleRelease} disabled={busy}>
-            {busy ? 'Releasing…' : 'Release tickets'}
+            Release tickets
           </button>
         </div>
       ) : !signedIn ? (

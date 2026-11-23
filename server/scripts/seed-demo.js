@@ -10,15 +10,20 @@ import { createEvent } from '../src/modules/events/events.service.js';
 
 const MINUTE = 60_000;
 const DEMO_EVENTS = [
-  { name: 'Demo: Indie Night', totalTickets: 200, startsInMs: -MINUTE }, // on sale now
-  { name: 'Demo: Almost Sold Out', totalTickets: 5, startsInMs: -MINUTE }, // try selling out
-  { name: 'Demo: Big Festival', totalTickets: 1000, startsInMs: 10 * MINUTE }, // watch the countdown
+  { name: 'Demo: Indie Night', totalTickets: 200, startsInMs: -MINUTE, pricePaise: 49_900 }, // ₹499, on sale now
+  { name: 'Demo: Almost Sold Out', totalTickets: 5, startsInMs: -MINUTE, pricePaise: 99_900 }, // try selling out
+  { name: 'Demo: Big Festival', totalTickets: 1000, startsInMs: 10 * MINUTE, pricePaise: 149_900 }, // countdown
 ];
 
 try {
   for (const demo of DEMO_EVENTS) {
     const { rowCount } = await pool.query('SELECT 1 FROM events WHERE name = $1', [demo.name]);
     if (rowCount > 0) {
+      // Demo events seeded before prices existed got price 0: give them their price.
+      await pool.query('UPDATE events SET price_paise = $2 WHERE name = $1 AND price_paise = 0', [
+        demo.name,
+        demo.pricePaise,
+      ]);
       console.log(`skipped  ${demo.name} (already exists)`);
       continue;
     }
@@ -26,6 +31,7 @@ try {
       name: demo.name,
       totalTickets: demo.totalTickets,
       saleStartsAt: new Date(Date.now() + demo.startsInMs),
+      pricePaise: demo.pricePaise,
     });
     console.log(`created  ${event.name} — id ${event.id}, ${event.totalTickets} tickets`);
   }

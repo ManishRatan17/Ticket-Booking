@@ -17,6 +17,10 @@ const MESSAGES = {
   SALE_NOT_STARTED: 'Tickets for this event are not on sale yet.',
   HOLD_EXISTS: 'You already have tickets on hold for this event.',
   // SOLD_OUT keeps the server's message: it says how many are left.
+  // Orders and payment
+  HOLD_EXPIRED: 'Your hold expired. Please hold tickets again.',
+  ORDER_NOT_FOUND: 'This order does not exist.',
+  ORDER_EXISTS: 'You already started checkout for these tickets.',
   // Admin
   FORBIDDEN: 'You do not have permission to do this.',
   LAST_ADMIN: 'This is the only admin left. Make someone else an admin first.',

@@ -76,10 +76,11 @@ async function toApiError(res) {
 
 // api('/auth/me')                                  → GET, returns parsed JSON
 // api('/auth/login', { method: 'POST', body: {…} })
-export async function api(path, { method = 'GET', body, retryOnExpiry = true } = {}) {
+// api('/orders', { method: 'POST', body: {…}, headers: { 'Idempotency-Key': key } })
+export async function api(path, { method = 'GET', body, headers = {}, retryOnExpiry = true } = {}) {
   const res = await fetch(`/api${path}`, {
     method,
-    headers: body === undefined ? undefined : { 'Content-Type': 'application/json' },
+    headers: body === undefined ? headers : { 'Content-Type': 'application/json', ...headers },
     body: body === undefined ? undefined : JSON.stringify(body),
   })
 
@@ -90,7 +91,7 @@ export async function api(path, { method = 'GET', body, retryOnExpiry = true } =
   if (res.status === 401) {
     if (retryOnExpiry && REFRESHABLE.has(error.code)) {
       if (await refreshSession()) {
-        return api(path, { method, body, retryOnExpiry: false }) // retry ONCE, never loop
+        return api(path, { method, body, headers, retryOnExpiry: false }) // retry ONCE, never loop
       }
       notifySessionEnded() // the refresh failed too: the session is gone
     } else if (SESSION_OVER.has(error.code)) {

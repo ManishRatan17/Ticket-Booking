@@ -5,6 +5,7 @@ import { listEvents } from '../api/events.js'
 import { Alert } from '../components/Alert.jsx'
 import { errorMessage } from '../lib/errorMessages.js'
 import { clockOffset, formatCountdown, secondsUntil } from '../lib/serverClock.js'
+import { formatMoney } from '../lib/format.js'
 
 export function EventsPage() {
   const [data, setData] = useState(null) // { events, offset }
@@ -31,7 +32,7 @@ export function EventsPage() {
         <ul>
           {data.events.map((event) => (
             <li key={event.id}>
-              <Link to={`/events/${event.id}`}>{event.name}</Link> —{' '}
+              <Link to={`/events/${event.id}`}>{event.name}</Link> — {formatMoney(event.pricePaise)} —{' '}
               {event.onSale
                 ? `${event.available} of ${event.totalTickets} tickets left`
                 : `on sale in ${formatCountdown(secondsUntil(event.saleStartsAt, data.offset))}`}

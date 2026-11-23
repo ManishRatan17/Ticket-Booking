@@ -40,9 +40,9 @@ async function withAvailability(event, now) {
 // Events
 // ---------------------------------------------------------------------------
 
-export async function createEvent({ name, totalTickets, saleStartsAt }) {
+export async function createEvent({ name, totalTickets, saleStartsAt, pricePaise = 0 }) {
   // 1. Postgres first: the event exists for real.
-  const event = await eventsRepository.createEvent({ name, totalTickets, saleStartsAt });
+  const event = await eventsRepository.createEvent({ name, totalTickets, saleStartsAt, pricePaise });
   // 2. Then Redis. If this fails, nothing is lost: ensureStock rebuilds it on first use.
   await ensureStock(event).catch((err) => console.warn(`[events] stock for event ${event.id} not loaded yet: ${err.message}`));
   return withAvailability(event, await redisNow());

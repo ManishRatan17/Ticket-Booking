@@ -16,6 +16,7 @@ import { AdminUsersPage } from './pages/AdminUsersPage.jsx'
 import { AdminEventsPage } from './pages/AdminEventsPage.jsx'
 import { EventsPage } from './pages/EventsPage.jsx'
 import { EventPage } from './pages/EventPage.jsx'
+import { CheckoutPage } from './pages/CheckoutPage.jsx'
 
 function App() {
   return (
@@ -39,6 +40,7 @@ function App() {
             {/* Signed-in users only (the server checks again on every request) */}
             <Route element={<RequireAuth />}>
               <Route path="account" element={<AccountPage />} />
+              <Route path="checkout/:id" element={<CheckoutPage />} />
             </Route>
 
             {/* Admins only (and the server answers 403 to anyone else anyway) */}

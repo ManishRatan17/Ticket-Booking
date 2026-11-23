@@ -104,8 +104,8 @@ Body `{ "role": "user" | "admin" }` → `200 { "user": {…} }`
 Demotion revokes all of that user's sessions immediately; promotion applies at their next refresh.
 
 ### `POST /events`
-Body `{ "name": "3–120 chars", "totalTickets": 1–100000, "saleStartsAt": "2026-12-01T18:00:00Z" }` (any date, also past)
-→ `201 { "event": { "id", "name", "totalTickets", "saleStartsAt", "createdAt", "available", "onSale" } }`
+Body `{ "name": "3–120 chars", "totalTickets": 1–100000, "saleStartsAt": "2026-12-01T18:00:00Z", "pricePaise": 49900 }` (any date, also past; `pricePaise` whole paise 0–10,000,000, default 0)
+→ `201 { "event": { "id", "name", "totalTickets", "saleStartsAt", "pricePaise", "createdAt", "available", "onSale" } }`
 
 ---
 
@@ -127,6 +127,23 @@ Body `{ "quantity": 1 }` (JSON integer 1–4)
 
 ### `DELETE /holds/:holdId`  · signed in
 `holdId` must be a UUID → `204` · `404 HOLD_NOT_FOUND` (not yours, unknown, or already released)
+
+---
+
+## Orders — `/api` (signed in)
+
+### `POST /orders`
+Header **`Idempotency-Key: <8–128 letters, digits, - or _>`** (the browser makes one random key per checkout attempt and re-sends it on retries). Body `{ "holdId": "<uuid>" }`. The amount comes from the database (`price_paise × quantity`); the order's deadline is the hold's deadline.
+→ `201 { "order": {…}, "serverTime" }` the first time · `200` + header `Idempotent-Replayed: true` for a retry with the same key (same order)
+· `400 IDEMPOTENCY_KEY_REQUIRED` · `404 HOLD_NOT_FOUND` (unknown or not yours) · `409 HOLD_EXPIRED` · `409 ORDER_EXISTS` (`details.orderId`: this hold already has an order) · `422 IDEMPOTENCY_KEY_REUSED` (same key, different hold)
+
+Order shape: `{ "id", "eventId", "eventName", "quantity", "amountPaise", "status": "pending|paid|failed|expired", "expiresAt", "paidAt", "failureReason", "ticketNumbers": [], "createdAt" }`
+
+### `GET /orders/:id`
+→ `200 { "order": {…}, "serverTime" }` · `404 ORDER_NOT_FOUND` (unknown or not yours). A pending order past its deadline is marked `expired` here and its held tickets return to sale.
+
+### `GET /orders`
+→ `200 { "orders": [ … ] }`, newest first.
 
 ---
 

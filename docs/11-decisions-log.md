@@ -54,6 +54,20 @@ Every significant choice, the alternatives considered, and why. Newest at the bo
 | Google: hand-built OIDC with `jose` + `fetch` | `openid-client` | every step visible for learning; `jose` does the cryptography |
 | Google linking: "verified email wins" | refuse and ask to link manually | defeats account pre-hijacking without extra UI |
 
+## Orders & payment (Phase 2)
+
+| Decision | Alternatives | Why |
+|---|---|---|
+| `npm run seed:demo` + home page lists events | manual setup only | a fresh database showed only the sign-in pages |
+| Money as whole **paise** (`INTEGER`) | decimals / floats | `0.1 + 0.2 ≠ 0.3`; Razorpay also uses paise |
+| Price read from the database when ordering | price sent by the client | the client must never choose what it pays |
+| `Idempotency-Key` header made by the browser per checkout attempt; `ON CONFLICT DO NOTHING` | key derived from the hold | industry standard; same key → same order even under 10 parallel clicks |
+| One order per hold (partial unique index) | — | a second tab with another key gets `409 ORDER_EXISTS` + the existing order |
+| Order deadline = hold deadline; lazy expiry on read | separate timer | one clock, one rule; the Phase 3 worker will expire everyone |
+| Ticket numbers from `events.tickets_sold` with a `CHECK` | `MAX()+1`; Redis counter | atomic, and the database refuses an oversell itself |
+| Fake provider + HMAC-signed webhook (2b) | browser says "paid"; Razorpay now | never trust the client for money; same shape as Razorpay |
+| Late payment: confirm if tickets still available, else failed + refund needed (2c) | always refuse | fair and safe |
+
 ## Frontend
 
 | Decision | Alternatives | Why |

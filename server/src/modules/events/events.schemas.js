@@ -7,6 +7,8 @@ export const createEventSchema = z.object({
   // Any moment is allowed — even the past, so a demo event can be on sale immediately.
   // z.coerce.date() turns "2026-12-01T18:00:00Z" into a Date and rejects nonsense.
   saleStartsAt: z.coerce.date(),
+  // Whole paise (₹1 = 100 paise). 0 = free. Max ₹1,00,000 per ticket.
+  pricePaise: z.number().int().min(0).max(10_000_000).default(0),
 });
 
 export const eventIdParamsSchema = z.object({

@@ -1,0 +1,115 @@
+// SQL for orders. Functions take a `client` (the pool, or a transaction's connection).
+
+// One order with its event name and ticket numbers (empty until paid).
+const ORDER_SELECT = `
+  SELECT o.id, o.user_id, o.event_id, e.name AS event_name, o.quantity, o.amount_paise, o.status,
+         o.hold_id, o.idempotency_key, o.payment_id, o.expires_at, o.paid_at, o.failure_reason, o.created_at,
+         COALESCE(array_agg(s.ticket_number ORDER BY s.ticket_number)
+                  FILTER (WHERE s.ticket_number IS NOT NULL), '{}') AS ticket_numbers
+    FROM orders AS o
+    JOIN events AS e ON e.id = o.event_id
+    LEFT JOIN sold_tickets AS s ON s.order_id = o.id`;
+
+function toOrder(row) {
+  return {
+    id: Number(row.id),
+    userId: Number(row.user_id),
+    eventId: Number(row.event_id),
+    eventName: row.event_name,
+    quantity: row.quantity,
+    amountPaise: row.amount_paise,
+    status: row.status, // pending → paid | failed | expired
+    holdId: row.hold_id,
+    idempotencyKey: row.idempotency_key,
+    paymentId: row.payment_id,
+    expiresAt: row.expires_at,
+    paidAt: row.paid_at,
+    failureReason: row.failure_reason,
+    createdAt: row.created_at,
+    ticketNumbers: row.ticket_numbers,
+  };
+}
+
+async function selectOne(client, where, params) {
+  const { rows } = await client.query(`${ORDER_SELECT} WHERE ${where} GROUP BY o.id, e.name`, params);
+  return rows.length === 0 ? null : toOrder(rows[0]);
+}
+
+export const findOrderById = (client, orderId) => selectOne(client, 'o.id = $1', [orderId]);
+
+// Ownership is part of the query: someone else's order simply isn't found (→ 404, IDOR).
+export const findOrderForUser = (client, orderId, userId) =>
+  selectOne(client, 'o.id = $1 AND o.user_id = $2', [orderId, userId]);
+
+export const findOrderByIdempotencyKey = (client, userId, key) =>
+  selectOne(client, 'o.user_id = $1 AND o.idempotency_key = $2', [userId, key]);
+
+export async function findOrderIdByHold(client, holdId) {
+  const { rows } = await client.query('SELECT id FROM orders WHERE hold_id = $1', [holdId]);
+  return rows.length === 0 ? null : Number(rows[0].id);
+}
+
+export async function listOrdersForUser(client, userId) {
+  const { rows } = await client.query(
+    `${ORDER_SELECT} WHERE o.user_id = $1 GROUP BY o.id, e.name ORDER BY o.created_at DESC`,
+    [userId],
+  );
+  return rows.map(toOrder);
+}
+
+// "Insert unless this user already used this idempotency key." Returns the new order's id,
+// or null if the key was taken (by an earlier request, or one racing us right now).
+// ON CONFLICT … DO NOTHING is atomic: two parallel requests can't both insert.
+export async function insertOrder(client, { userId, eventId, quantity, amountPaise, holdId, idempotencyKey, expiresAt }) {
+  const { rows } = await client.query(
+    `INSERT INTO orders (user_id, event_id, quantity, amount_paise, hold_id, idempotency_key, expires_at)
+     VALUES ($1, $2, $3, $4, $5, $6, $7)
+     ON CONFLICT (user_id, idempotency_key) DO NOTHING
+     RETURNING id`,
+    [userId, eventId, quantity, amountPaise, holdId, idempotencyKey, expiresAt],
+  );
+  return rows.length === 0 ? null : Number(rows[0].id);
+}
+
+// Locks the order row until the transaction ends (the payment webhook uses this, so two
+// deliveries of the same payment can't both act on the order).
+export async function lockOrder(client, orderId) {
+  const { rows } = await client.query('SELECT id, status FROM orders WHERE id = $1 FOR UPDATE', [orderId]);
+  return rows[0] ?? null;
+}
+
+// Lazy expiry: a pending order past its deadline becomes 'expired'. Returns its hold id
+// if this call did the expiring (so the caller can give the held tickets back), else null.
+export async function expireIfOverdue(client, orderId) {
+  const { rows } = await client.query(
+    `UPDATE orders SET status = 'expired', updated_at = now()
+      WHERE id = $1 AND status = 'pending' AND expires_at < now()
+     RETURNING hold_id`,
+    [orderId],
+  );
+  return rows.length === 0 ? null : rows[0].hold_id;
+}
+
+export async function markPaid(client, { orderId, paymentId }) {
+  await client.query(
+    `UPDATE orders SET status = 'paid', payment_id = $2, paid_at = now(), failure_reason = NULL, updated_at = now()
+      WHERE id = $1`,
+    [orderId, paymentId],
+  );
+}
+
+export async function markFailed(client, { orderId, paymentId, reason }) {
+  await client.query(
+    `UPDATE orders SET status = 'failed', payment_id = COALESCE($2, payment_id), failure_reason = $3, updated_at = now()
+      WHERE id = $1`,
+    [orderId, paymentId, reason],
+  );
+}
+
+export async function insertSoldTickets(client, { eventId, orderId, ticketNumbers }) {
+  await client.query(
+    `INSERT INTO sold_tickets (event_id, ticket_number, order_id)
+     SELECT $1, unnest($2::int[]), $3`,
+    [eventId, ticketNumbers, orderId],
+  );
+}
