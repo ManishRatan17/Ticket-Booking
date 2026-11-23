@@ -10,6 +10,8 @@ import { closeConnections } from '../src/config/connections.js';
 import { stockKey } from '../src/modules/reservation/stock.js';
 import { createEvent } from '../src/modules/events/events.service.js';
 import { createSignedInUsers } from '../test-support/users.js';
+import { deleteEventKeys } from '../test-support/redis-cleanup.js';
+
 
 const RUN = `test-orders-${randomUUID().slice(0, 8)}`;
 let server, baseUrl;
@@ -25,14 +27,7 @@ after(async () => {
   const { rows } = await pool.query('SELECT id FROM events WHERE name LIKE $1', [`${RUN}%`]);
   const ids = rows.map((r) => r.id);
   if (ids.length) {
-    const keys = [];
-    for await (const batch of redis.scanStream({ match: 'hold:*', count: 1000 })) {
-      for (const key of batch) if (ids.map(String).includes(await redis.hget(key, 'eventId'))) keys.push(key);
-    }
-    for (const id of ids) {
-      for await (const batch of redis.scanStream({ match: `event:${id}:*`, count: 1000 })) keys.push(...batch);
-    }
-    if (keys.length) await redis.del(...keys);
+    await deleteEventKeys(ids);
     await pool.query('DELETE FROM sold_tickets WHERE event_id = ANY($1)', [ids]);
     await pool.query('DELETE FROM orders WHERE event_id = ANY($1)', [ids]);
     await pool.query('DELETE FROM events WHERE id = ANY($1)', [ids]);

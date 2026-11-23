@@ -108,6 +108,8 @@ Redis runs every command one at a time, so **one command is atomic**. Several st
 | `event:<eventId>:stock` | string (number) | tickets available | never | event creation; holds (−); releases (+); rebuilt from Postgres if missing |
 | `hold:<holdId>` | hash | `userId`, `eventId`, `quantity`, `createdAt`, `expiresAt` (ms, Redis clock) | **never on purpose** — released explicitly (see [07](07-tickets-and-holds.md)) | `create-hold.lua` / `release-hold.lua` |
 | `event:<eventId>:user:<userId>:hold` | string | that user's hold id for that event | never (deleted on release) | the same scripts |
+| `holds:by-expiry` | sorted set | member = hold id, score = `expiresAt` (ms): every hold by expiry time | never (entries removed with their hold) | the hold Lua scripts (ZADD on create, ZREM on release/consume, atomically); `indexAllHolds()` at worker start |
+| `bull:expirations:*` | BullMQ's own keys | the job queue: delayed, waiting, active, completed, failed jobs, the sweep schedule | per job settings | BullMQ ([jobs/](../server/src/jobs/)) |
 | `session:revoked:<sessionId>` | string `"1"` | "this session is over" | **15 min** (an access token's lifetime) | [revocation.js](../server/src/modules/auth/revocation.js) |
 | `oauth:tx:<sha256(txId)>` | string (JSON) | `state`, `nonce`, `codeVerifier` of a Google sign-in in progress | **10 min**; read-and-deleted with `GETDEL` | [oauth-transactions.js](../server/src/modules/auth/oauth-transactions.js) |
 | `ratelimit:<name>:<sha256(id)>` | string (number) | hits in the current window | the window (60 s – 1 h) | [rateLimiter.js](../server/src/lib/rateLimiter.js) + `fixed-window.lua` |

@@ -70,7 +70,19 @@ A real worker runs inside the test process with 1-second holds: an **abandoned**
 
 Also verified live with `npm run dev` and `HOLD_SECONDS=3`: hold 3 tickets, close nothing, look at nothing — 6 seconds later all tickets are back and the worker logs `expire-hold … → {"outcome":"released"}`.
 
-## Coming next
+## The safety net (step 3b)
 
-- **3b — safety net:** holds that never got a job (created before Phase 3, or scheduling failed while Redis hiccuped) and overdue orders are found by a periodic **sweep**, using a sorted set of holds by expiry.
+Per-hold jobs can be **missed**: holds created before Phase 3 have no job; scheduling can fail while Redis hiccups (the hold still succeeds); a queue can be wiped. So a second mechanism checks everything every **60 seconds**.
+
+**The index — a sorted set.** `holds:by-expiry` holds every hold's id with its `expiresAt` as the **score**. The Lua scripts keep it up to date **in the same atomic step** as the hold itself (`ZADD` on create, `ZREM` on release, consume, and lazy release), so it can never disagree with the holds. "Which holds expired before now?" is then one fast query: `ZRANGEBYSCORE holds:by-expiry -inf <now>`.
+
+**The sweep job** (`sweep-expired`, [processors.js](../server/src/jobs/processors.js)):
+1. Takes expired holds from the index in batches of 500 — **batch after batch until none are left** (capped at 50 batches per run; the next run continues) — and runs the same idempotent `expireHold` on each. Holds that vanished some other way leave a stale index entry, which is removed.
+2. Expires **pending orders past their deadline** in PostgreSQL (5 s grace, so per-hold jobs normally go first) and releases their holds — this covers orders whose hold was lost with Redis data.
+
+**Scheduling it once:** `upsertJobScheduler('sweep-expired', { every: 60000 })` — a schedule stored in Redis. "Upsert" means every worker can call it at startup and there is still exactly one schedule (tested: 3 simultaneous setups → 1 schedule). At startup the worker also runs `indexAllHolds()` (`ZADD NX` for every existing hold) so holds from before the index existed are covered.
+
+**Found while building it:** the first sweep test failed because the development Redis contained **hundreds of stale holds** left by a test file whose cleanup didn't delete hold keys. One batch of 500 didn't reach the test's hold — which showed that the sweep must loop until nothing expired is left, not stop after one batch. Both were fixed (the cleanup now lives in one shared helper, [test-support/redis-cleanup.js](../server/test-support/redis-cleanup.js)), and the first real sweep released all of those stale holds.
+
+## Coming next
 - **3c — admin page:** queue counts, the failed jobs (dead-letter queue) with their errors, and a Retry button.

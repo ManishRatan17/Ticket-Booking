@@ -12,6 +12,8 @@ import { stockKey } from '../src/modules/reservation/stock.js';
 import { createEvent } from '../src/modules/events/events.service.js';
 import { createSignedInUsers } from '../test-support/users.js';
 import { createPooledClient } from '../test-support/pooled-http.js';
+import { deleteEventKeys } from '../test-support/redis-cleanup.js';
+
 
 const RUN = `test-holdshttp-${randomUUID().slice(0, 8)}`;
 let server, baseUrl;
@@ -26,14 +28,7 @@ before(async () => {
 after(async () => {
   const { rows } = await pool.query('SELECT id FROM events WHERE name LIKE $1', [`${RUN}%`]);
   const ids = rows.map((r) => String(r.id));
-  const keys = [];
-  for await (const batch of redis.scanStream({ match: 'hold:*', count: 1000 })) {
-    for (const key of batch) if (ids.includes(await redis.hget(key, 'eventId'))) keys.push(key);
-  }
-  for (const id of ids) {
-    for await (const batch of redis.scanStream({ match: `event:${id}:*`, count: 1000 })) keys.push(...batch);
-  }
-  for (let i = 0; i < keys.length; i += 500) await redis.del(...keys.slice(i, i + 500));
+  await deleteEventKeys(ids);
   if (ids.length) await pool.query('DELETE FROM events WHERE id = ANY($1)', [ids]);
   await pool.query('DELETE FROM users WHERE email LIKE $1', [`${RUN}%`]);
   server.close();

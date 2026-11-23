@@ -5,7 +5,7 @@ docker compose up -d     # the server tests use the real PostgreSQL and Redis
 npm test                 # server (node:test) then client (Vitest)
 ```
 
-Today: **211 server tests + 34 client tests**, all passing (about 10–15 s for the server suite).
+Today: **220 server tests + 34 client tests**, all passing (about 10–15 s for the server suite).
 
 ## How the server tests run
 
@@ -35,6 +35,7 @@ Kept outside `test/` because Node runs every file inside `test/` as a test.
 | [cookies.js](../server/test-support/cookies.js) | read `Set-Cookie`, build `Cookie` headers, list flags (Node's `fetch` has no cookie jar) |
 | [fake-google.js](../server/test-support/fake-google.js) | a fake OpenID provider: RSA keys, JWKS, codes, PKCE check, signed ID tokens |
 | [users.js](../server/test-support/users.js) | creates hundreds of signed-in users fast (user + session rows + tokens signed by the real code) without 300 argon2 logins |
+| [redis-cleanup.js](../server/test-support/redis-cleanup.js) | `deleteEventKeys(ids)`: removes a test's stock keys, holds, user links and expiry-index entries in one place (replaced 7 hand-written copies; one of them forgot hold keys and left hundreds of stale holds in the dev Redis) |
 | [pooled-http.js](../server/test-support/pooled-http.js) | HTTP client with a connection pool. On Windows, 300 brand-new simultaneous connections to a local port get ~68 refused by the OS (measured; not affected by the server's backlog). A pool of 50 keep-alive connections gets all 300 requests through — still a real race |
 
 ## Server test files
@@ -60,6 +61,7 @@ Kept outside `test/` because Node runs every file inside `test/` as a test.
 | `orders.test.js` | hold → pending order, price from the database (body can't set it), **idempotency** (replay, 10 parallel same-key → 1 order, other key → 409, key reuse → 422, missing key → 400), IDOR, expired hold, lazy order expiry, the `tickets_sold` CHECK |
 | `payments.test.js` | pay → signed webhook → paid with ticket numbers; failed payment; the browser can't decide payment; wrong secret / tampered body → 401; duplicates (sequential and 10 at once); two deliveries for one order; amount mismatch; late payment (free → paid, sold out → refund); 20 simultaneous payments → numbers 1–20 |
 | `jobs.test.js` | a real worker inside the test process, 1-second holds (`HOLD_SECONDS=1`), private queue prefix: the job is scheduled with retry/dead-letter settings; an **abandoned** hold is released with nobody looking; an unpaid order becomes `expired`; a paid hold is left alone; the job is idempotent (3 runs at once → tickets back once); a job that runs too early fails and changes nothing |
+| `sweep.test.js` | the expiry index is maintained on create / release / pay and rebuilt by `indexAllHolds()`; the sweep releases an expired hold that never got a job, leaves running holds alone, expires an overdue order whose hold vanished, removes stale index entries, and two sweeps at once release each hold once |
 | `holds-http.test.js` | the holds API: every status code, IDOR, CSRF, lazy release on read, **300 users × 100 tickets over HTTP** |
 
 ## Client test files (Vitest)
@@ -99,6 +101,7 @@ A test only proves something once it has been seen to **fail for the right reaso
 | any webhook signature accepted | both signature tests |
 | worker never releases the hold | 3 job tests |
 | hold API never schedules the job | 3 job tests (the abandoned hold stays held) |
+| new holds not added to the expiry index | the index test |
 
 ## Lessons from flaky and broken runs
 
@@ -112,4 +115,6 @@ A test only proves something once it has been seen to **fail for the right reaso
 | a manual check where every call failed | the script didn't wait for Express (Vite answered 502 meanwhile) | wait with `curl -f` |
 | manual registrations refused | the real register limit (5/hour from 127.0.0.1) | create manual-test users directly in the database |
 | a live check of the worker failed although all tests passed | leftover `npm run dev` trees from earlier checks: `node --watch` restarts its child, so killing only the port's process left an old server (without the test's settings) answering | stop the **whole process tree** (`taskkill /T`); first check which process actually serves the port |
+| the first sweep test took 6 s and missed its hold | hundreds of stale holds from a test cleanup that didn't delete hold keys; one batch of 500 didn't reach the test's hold | the sweep loops until done; one shared cleanup helper |
+| `jobs.test.js` failed after adding the cleanup helper | a normal `import` is hoisted, so the helper loaded `env.js` before the test applied its settings | dynamic `await import()` in that file |
 | "An Application Control policy has blocked this file" once | Windows security re-checking a native file just after Docker restarted (unproven) | didn't recur; oxlint (always blocked) was replaced by ESLint |

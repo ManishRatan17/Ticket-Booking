@@ -4,6 +4,8 @@ import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { redis } from '../src/config/redis.js';
 import { closeConnections } from '../src/config/connections.js';
+import { deleteEventKeys } from '../test-support/redis-cleanup.js';
+
 import { setStock, getStock, stockKey } from '../src/modules/reservation/stock.js';
 import {
   createHold,
@@ -24,15 +26,12 @@ async function newEvent(tickets) {
 }
 
 after(async () => {
-  // Hold records don't contain the RUN prefix in their key, so find them by their eventId.
-  const keys = [];
-  for await (const batch of redis.scanStream({ match: `event:${RUN}-*`, count: 500 })) keys.push(...batch);
-  for await (const batch of redis.scanStream({ match: 'hold:*', count: 500 })) {
-    for (const key of batch) {
-      if ((await redis.hget(key, 'eventId'))?.startsWith(RUN)) keys.push(key);
-    }
+  // This file's event ids are strings ("test-holds-…-3"); find them from their stock keys.
+  const ids = [];
+  for await (const batch of redis.scanStream({ match: `event:${RUN}-*:stock`, count: 500 })) {
+    ids.push(...batch.map((key) => key.slice('event:'.length, -':stock'.length)));
   }
-  for (let i = 0; i < keys.length; i += 500) await redis.del(...keys.slice(i, i + 500));
+  await deleteEventKeys(ids);
   await closeConnections();
 });
 

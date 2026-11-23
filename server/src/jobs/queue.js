@@ -54,6 +54,15 @@ export async function scheduleHoldExpiry(hold) {
   );
 }
 
+export const SWEEP_EVERY_MS = 60_000;
+
+// The safety-net sweep runs every 60 s. A job SCHEDULER (stored in Redis) creates the jobs, so
+// it keeps going across restarts; "upsert" means calling this again changes nothing — so every
+// worker can call it at startup, and there's still only ONE schedule.
+export async function scheduleSweep() {
+  await getQueue().upsertJobScheduler('sweep-expired', { every: SWEEP_EVERY_MS }, { name: 'sweep-expired', data: {} });
+}
+
 export async function closeQueue() {
   if (queue) {
     await queue.close();

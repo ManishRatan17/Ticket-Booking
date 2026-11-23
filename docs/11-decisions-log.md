@@ -79,6 +79,9 @@ Every significant choice, the alternatives considered, and why. Newest at the bo
 | Jobs idempotent (`already_gone`, release returns tickets once) | — | BullMQ delivers at least once |
 | Failed jobs kept (`removeOnFail: false`) | auto-delete | a dead-letter queue: nothing fails silently |
 | Scheduling failure does not fail the hold | fail the request | the 3b safety-net sweep catches missing jobs |
+| Safety net: sorted-set index `holds:by-expiry` maintained inside the Lua scripts + a 60-second sweep | `SCAN hold:*` every time; no safety net | one fast query; atomic, so the index never disagrees with the holds |
+| Sweep loops in batches of 500 until done (≤ 50 batches/run) | one batch per run | more than 500 holds can expire in a minute after a big sale |
+| `upsertJobScheduler` for the sweep, called by every worker at startup | one designated scheduler process | idempotent: still exactly one schedule |
 | `HOLD_SECONDS` configurable (default 300) | constant | tests use 1-second holds |
 | Separate Redis connection for BullMQ (`maxRetriesPerRequest: null`) | share the API's fail-fast connection | workers must wait for Redis, API requests must not |
 

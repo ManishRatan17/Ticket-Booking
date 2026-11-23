@@ -19,6 +19,11 @@ import { stockKey } from './stock.js';
 export const HOLD_SECONDS = env.holds.seconds; // 5 minutes unless HOLD_SECONDS says otherwise
 export const MAX_TICKETS_PER_HOLD = 4;
 
+// An index of every hold by its expiry time (Redis SORTED SET: member = hold id,
+// score = expiresAt in ms). Kept up to date by the Lua scripts themselves, atomically.
+// "Which holds expired before now?" is then one fast query: ZRANGEBYSCORE … -inf now.
+export const HOLDS_BY_EXPIRY = 'holds:by-expiry';
+
 const holdKey = (holdId) => `hold:${holdId}`;
 const userHoldKey = (eventId, userId) => `event:${eventId}:user:${userId}:hold`;
 const lua = (file) => readFileSync(new URL(`./lua/${file}`, import.meta.url), 'utf8');
@@ -102,6 +107,29 @@ export async function getHold(holdId) {
 export async function getUserHold(eventId, userId) {
   const holdId = await redis.get(userHoldKey(eventId, userId));
   return holdId ? getHold(holdId) : null;
+}
+
+// Ids of holds whose time ran out (by Redis's clock), oldest first, at most `limit`.
+export async function expiredHoldIds(limit = 500) {
+  const now = await redisNow();
+  return redis.zrangebyscore(HOLDS_BY_EXPIRY, '-inf', now.getTime(), 'LIMIT', 0, limit);
+}
+
+export async function removeFromExpiryIndex(holdId) {
+  await redis.zrem(HOLDS_BY_EXPIRY, holdId);
+}
+
+// Puts every existing hold into the index (ZADD NX: entries already there are left alone).
+// For holds made before the index existed, or after the index was lost. Run by the worker at startup.
+export async function indexAllHolds() {
+  let added = 0;
+  for await (const keys of redis.scanStream({ match: 'hold:*', count: 500 })) {
+    for (const key of keys) {
+      const expiresAt = await redis.hget(key, 'expiresAt');
+      if (expiresAt) added += await redis.zadd(HOLDS_BY_EXPIRY, 'NX', expiresAt, key.slice('hold:'.length));
+    }
+  }
+  return added;
 }
 
 // The hold was PAID for: delete it and keep its tickets out of stock (they're sold now).

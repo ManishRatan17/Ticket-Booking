@@ -14,6 +14,7 @@ if not eventId then
 end
 
 redis.call('DEL', KEYS[1])
+redis.call('ZREM', 'holds:by-expiry', ARGV[1])
 local userHoldKey = 'event:' .. eventId .. ':user:' .. ownerId .. ':hold'
 if redis.call('GET', userHoldKey) == ARGV[1] then
   redis.call('DEL', userHoldKey)

@@ -11,7 +11,10 @@
 --   { -1 }                    no stock key: the event's stock was never loaded
 --   { -2, existingHoldId }    this user already has an ACTIVE hold for this event
 --
--- ⚠️ Key names built inside the script ('hold:' .. id, 'event:' ...) must match holds.js / stock.js.
+-- Also keeps the index 'holds:by-expiry' (a sorted set: member = hold id, score = expiresAt)
+-- up to date in the SAME atomic step, so it can never disagree with the holds themselves.
+--
+-- ⚠️ Key names built inside the script ('hold:' .. id, 'event:' ..., 'holds:by-expiry') must match holds.js / stock.js.
 -- (Redis Cluster would want every key declared in KEYS; fine on a single Redis — see Phase 8.)
 
 -- Redis's own clock: the server and Redis can never disagree about "now".
@@ -39,6 +42,7 @@ if existingId then
     stock = stock + oldQuantity
   end
   redis.call('DEL', existingKey, KEYS[2])
+  redis.call('ZREM', 'holds:by-expiry', existingId)
 end
 
 local quantity = tonumber(ARGV[4])
@@ -55,4 +59,5 @@ redis.call('HSET', KEYS[3],
   'createdAt', nowMs,
   'expiresAt', expiresAt)
 redis.call('SET', KEYS[2], ARGV[1])
+redis.call('ZADD', 'holds:by-expiry', expiresAt, ARGV[1])
 return { 1, expiresAt }

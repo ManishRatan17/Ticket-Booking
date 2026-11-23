@@ -38,14 +38,14 @@ Roadmap from the original blueprint. ✅ done · 🟡 partly done · ⬜ not sta
 | Auth | (added before Phase 2) register/login, argon2id, JWT in HttpOnly cookies, refresh rotation + reuse detection, sessions, logout everywhere, Google sign-in, roles/admin, CSRF protection, rate limiting, password reset | ✅ |
 | Frontend | React pages for everything above, with minimal styling (real styling comes in Phase 7) | ✅ |
 | 2 | Orders & payment: holds → pending orders → (fake) payment → paid, idempotency, `sold_tickets` | ✅ (demo data · orders + idempotency · fake provider + signed webhook · failures, late payments, refunds logged · My orders page) |
-| 3 | Expiry: a background worker (BullMQ) that releases expired holds for everyone | 🟡 (3a delayed job per hold + worker process ✅ · 3b safety-net sweep ⬜ · 3c admin jobs page ⬜) |
+| 3 | Expiry: a background worker (BullMQ) that releases expired holds for everyone | 🟡 (3a delayed job per hold + worker process ✅ · 3b safety-net sweep ✅ · 3c admin jobs page ⬜) |
 | 4 | Waiting room: queue, admission worker, live position | ⬜ |
 | 5 | Protection: rate limit on holds, duplicate-tab and bot defence | 🟡 (auth endpoints are rate-limited; holds are not yet) |
 | 6 | Proof: k6 load tests with thousands of users, SQL verification | ⬜ |
 | 7 | Polish: styling, Razorpay test mode, deployment, demo video | ⬜ |
 | 8 | Stretch: numbered seats, multiple servers, metrics | ⬜ |
 
-**Numbers today:** 211 server tests + 34 frontend tests, all passing. 300 signed-in users racing for 100 tickets over real HTTP → exactly 100 holds.
+**Numbers today:** 220 server tests + 34 frontend tests, all passing. 300 signed-in users racing for 100 tickets over real HTTP → exactly 100 holds.
 
 ---
 

@@ -10,6 +10,8 @@ import { runMigrations } from '../src/db/migrate.js';
 import { closeConnections } from '../src/config/connections.js';
 import { stockKey } from '../src/modules/reservation/stock.js';
 import { createSignedInUsers } from '../test-support/users.js';
+import { deleteEventKeys } from '../test-support/redis-cleanup.js';
+
 
 const RUN = `test-events-${randomUUID().slice(0, 8)}`;
 let server, baseUrl, admin, user;
@@ -29,7 +31,8 @@ after(async () => {
     await pool.query('DELETE FROM sold_tickets WHERE event_id = ANY($1)', [ids]);
     await pool.query('DELETE FROM orders WHERE event_id = ANY($1)', [ids]);
     await pool.query('DELETE FROM events WHERE id = ANY($1)', [ids]);
-    await redis.del(...ids.map((id) => stockKey(id)));
+    // Every Redis key of these events: stock, holds (the rebuild-race test makes 10), index entries.
+    await deleteEventKeys(ids);
   }
   await pool.query('DELETE FROM users WHERE email LIKE $1', [`${RUN}%`]);
   server.close();

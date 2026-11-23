@@ -20,6 +20,9 @@ const { getQueue } = await import('../src/jobs/queue.js');
 const { createWorker } = await import('../src/jobs/worker.js');
 const { expireHold } = await import('../src/jobs/processors.js');
 const { createSignedInUsers } = await import('../test-support/users.js');
+// (dynamic too: a normal import would load env.js BEFORE the settings above are applied)
+const { deleteEventKeys } = await import('../test-support/redis-cleanup.js');
+
 
 await runMigrations({ log: () => {} });
 const server = createApp().listen(0);
@@ -35,9 +38,7 @@ after(async () => {
   const { rows } = await pool.query('SELECT id FROM events WHERE name LIKE $1', [`${RUN}%`]);
   const ids = rows.map((r) => r.id);
   if (ids.length) {
-    for (const id of ids) {
-      for await (const batch of redis.scanStream({ match: `event:${id}:*`, count: 1000 })) if (batch.length) await redis.del(...batch);
-    }
+    await deleteEventKeys(ids);
     await pool.query('DELETE FROM sold_tickets WHERE event_id = ANY($1)', [ids]);
     await pool.query('DELETE FROM orders WHERE event_id = ANY($1)', [ids]);
     await pool.query('DELETE FROM events WHERE id = ANY($1)', [ids]);
@@ -168,4 +169,16 @@ test('a job that runs too EARLY fails (so BullMQ retries it later) and changes n
   await assert.rejects(expireHold({ holdId: h.id }), /has not expired yet/);
   assert.equal(await stock(e.id), 9);
   await redis.hset(`hold:${h.id}`, 'expiresAt', Date.now() - 1000); // let the cleanup job finish it
+});
+
+// ---------- the safety-net schedule ----------
+
+test('the 60-second sweep is scheduled ONCE, however many workers set it up', async () => {
+  const { scheduleSweep, SWEEP_EVERY_MS } = await import('../src/jobs/queue.js');
+  await Promise.all([scheduleSweep(), scheduleSweep(), scheduleSweep()]); // three workers starting at once
+
+  const schedulers = await getQueue().getJobSchedulers();
+  const sweeps = schedulers.filter((s) => s.key === 'sweep-expired');
+  assert.equal(sweeps.length, 1);
+  assert.equal(Number(sweeps[0].every), SWEEP_EVERY_MS);
 });

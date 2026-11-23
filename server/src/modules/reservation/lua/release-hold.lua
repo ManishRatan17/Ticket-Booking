@@ -26,6 +26,7 @@ if redis.call('EXISTS', stockKey) == 1 then
   redis.call('INCRBY', stockKey, quantity)
 end
 redis.call('DEL', KEYS[1])
+redis.call('ZREM', 'holds:by-expiry', ARGV[1])
 -- Only unlink the user if the link still points at THIS hold.
 if redis.call('GET', userHoldKey) == ARGV[1] then
   redis.call('DEL', userHoldKey)
