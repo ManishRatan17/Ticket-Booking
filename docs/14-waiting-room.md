@@ -27,6 +27,8 @@ Per event: **`admission_per_second`** (migration 005). Empty = no waiting room �
 | `wr:<eventId>:pass:<userId>` | string with TTL | "admitted" — expires after `ADMISSION_PASS_SECONDS` (default 600) |
 | `wr:active` | set | event ids whose room has people waiting (so the worker only checks those) |
 
+The prefix `wr` is configurable (`WAITING_ROOM_PREFIX`); tests use `test-wr` so a development worker — which admits people every second — never touches their rooms.
+
 **Why a sorted set:** your position is `ZRANK` — one fast command even with 100,000 people in line — and `ZADD` stores each member once. **Why arrival numbers, not timestamps:** two people joining in the same millisecond would tie; a counter (`INCR`) can't.
 
 ## The two Lua scripts (each one atomic step)

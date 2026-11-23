@@ -79,8 +79,12 @@ export async function sweepExpired({ batchSize = 500, maxBatches = 50 } = {}) {
 // has people in it and whose sale has started. N per second = the event's admission_per_second.
 // This is ADMISSION CONTROL: however many thousands arrive at once, the hold endpoint only
 // ever sees a steady, predictable number of new shoppers per second.
-export async function admitWaiting() {
-  const roomIds = await activeRooms();
+//
+// eventIds: limit this run to some events (tests use it so test files never admit people in each
+// other's rooms). The worker passes nothing: every active room.
+export async function admitWaiting({ eventIds } = {}) {
+  const active = await activeRooms();
+  const roomIds = eventIds ? active.filter((id) => eventIds.map(String).includes(String(id))) : active;
   if (roomIds.length === 0) return { admitted: 0 };
 
   const { rows } = await pool.query(
@@ -95,7 +99,7 @@ export async function admitWaiting() {
   }
   // Rooms of events that no longer exist: clean them up.
   const known = new Set(rows.map((r) => String(r.id)));
-  for (const id of roomIds) if (!known.has(String(id))) await dropRoom(id);
+  if (!eventIds) for (const id of roomIds) if (!known.has(String(id))) await dropRoom(id);
   return { admitted };
 }
 

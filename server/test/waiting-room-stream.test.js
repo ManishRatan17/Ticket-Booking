@@ -9,7 +9,7 @@ import { runMigrations } from '../src/db/migrate.js';
 import { closeConnections } from '../src/config/connections.js';
 import { createEvent } from '../src/modules/events/events.service.js';
 import { admitWaiting } from '../src/jobs/processors.js';
-import { ACTIVE_ROOMS } from '../src/modules/waiting-room/waiting-room.js';
+import { ACTIVE_ROOMS, passKey as roomPassKey, queueKey, roomKeysPattern } from '../src/modules/waiting-room/waiting-room.js';
 import { createSignedInUsers } from '../test-support/users.js';
 import { deleteEventKeys } from '../test-support/redis-cleanup.js';
 
@@ -27,7 +27,7 @@ before(async () => {
 after(async () => {
   for (const id of createdEventIds) {
     const keys = [];
-    for await (const batch of redis.scanStream({ match: `wr:${id}:*`, count: 1000 })) keys.push(...batch);
+    for await (const batch of redis.scanStream({ match: roomKeysPattern(id), count: 1000 })) keys.push(...batch);
     if (keys.length) await redis.del(...keys);
     await redis.srem(ACTIVE_ROOMS, String(id));
   }
@@ -96,10 +96,10 @@ test('live: your position updates as people ahead are let in, then "admitted" an
   const stream = await openStream(ann, e.id);
   assert.equal((await stream.next()).position, 2);
 
-  await admitWaiting(); // lets in the person ahead
+  await admitWaiting({ eventIds: [e.id] }); // lets in the person ahead
   assert.equal((await stream.next()).position, 1, 'moved up without asking');
 
-  await admitWaiting(); // lets ann in
+  await admitWaiting({ eventIds: [e.id] }); // lets ann in
   assert.equal((await stream.next()).status, 'admitted');
   assert.equal(await stream.next(), null, 'the server closes the stream once you are in');
 });

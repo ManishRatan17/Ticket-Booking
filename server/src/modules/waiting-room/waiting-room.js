@@ -1,4 +1,4 @@
-// The waiting room's data, all in Redis (Phase 4).
+// The waiting room's data, all in Redis (Phase 4). Prefix "wr" (WAITING_ROOM_PREFIX; tests use their own):
 //
 //   wr:<eventId>:queue        SORTED SET  member = user id, score = arrival number (1, 2, 3 …)
 //   wr:<eventId>:seq          counter that hands out arrival numbers
@@ -11,10 +11,12 @@ import { readFileSync } from 'node:fs';
 import { redis } from '../../config/redis.js';
 import { env } from '../../config/env.js';
 
-export const ACTIVE_ROOMS = 'wr:active';
-const queueKey = (eventId) => `wr:${eventId}:queue`;
-const seqKey = (eventId) => `wr:${eventId}:seq`;
-const passKey = (eventId, userId) => `wr:${eventId}:pass:${userId}`;
+const PREFIX = env.waitingRoom.prefix;
+export const ACTIVE_ROOMS = `${PREFIX}:active`;
+export const queueKey = (eventId) => `${PREFIX}:${eventId}:queue`;
+const seqKey = (eventId) => `${PREFIX}:${eventId}:seq`;
+export const passKey = (eventId, userId) => `${PREFIX}:${eventId}:pass:${userId}`;
+export const roomKeysPattern = (eventId) => `${PREFIX}:${eventId}:*`; // for cleanup
 const lua = (file) => readFileSync(new URL(`./lua/${file}`, import.meta.url), 'utf8');
 
 redis.defineCommand('wrJoin', { numberOfKeys: 4, lua: lua('join-queue.lua') });
@@ -51,7 +53,7 @@ export async function hasPass(eventId, userId) {
 
 // Admit the next `count` people. Returns their user ids, in queue order.
 export async function admitNext(eventId, count) {
-  return redis.wrAdmit(queueKey(eventId), ACTIVE_ROOMS, eventId, count, env.waitingRoom.passSeconds);
+  return redis.wrAdmit(queueKey(eventId), ACTIVE_ROOMS, eventId, count, env.waitingRoom.passSeconds, PREFIX);
 }
 
 export async function activeRooms() {

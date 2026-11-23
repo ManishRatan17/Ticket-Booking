@@ -9,7 +9,7 @@ import { runMigrations } from '../src/db/migrate.js';
 import { closeConnections } from '../src/config/connections.js';
 import { createEvent } from '../src/modules/events/events.service.js';
 import { admitWaiting } from '../src/jobs/processors.js';
-import { ACTIVE_ROOMS } from '../src/modules/waiting-room/waiting-room.js';
+import { ACTIVE_ROOMS, passKey as roomPassKey, queueKey, roomKeysPattern } from '../src/modules/waiting-room/waiting-room.js';
 import { createSignedInUsers } from '../test-support/users.js';
 import { createPooledClient } from '../test-support/pooled-http.js';
 import { deleteEventKeys } from '../test-support/redis-cleanup.js';
@@ -28,7 +28,7 @@ before(async () => {
 after(async () => {
   for (const id of createdEventIds) {
     const keys = [];
-    for await (const batch of redis.scanStream({ match: `wr:${id}:*`, count: 1000 })) keys.push(...batch);
+    for await (const batch of redis.scanStream({ match: roomKeysPattern(id), count: 1000 })) keys.push(...batch);
     if (keys.length) await redis.del(...keys);
     await redis.srem(ACTIVE_ROOMS, String(id));
   }
@@ -117,7 +117,7 @@ test('admission: N per tick, in arrival order; everyone behind moves up', async 
   const [first, second, third] = await users(3);
   for (const u of [first, second, third]) await join(u, e.id);
 
-  await admitWaiting(); // one tick of the admission worker
+  await admitWaiting({ eventIds: [e.id] }); // one tick of the admission worker
 
   assert.equal((await status(first, e.id)).body.status, 'admitted');
   assert.equal((await status(second, e.id)).body.status, 'admitted');
@@ -129,7 +129,7 @@ test('admitted: holding works, and the pass lasts 10 minutes', async () => {
   const e = await event({ rate: 5 });
   const [ann] = await users(1);
   await join(ann, e.id);
-  await admitWaiting();
+  await admitWaiting({ eventIds: [e.id] });
 
   const s = (await status(ann, e.id)).body;
   assert.equal(s.status, 'admitted');
@@ -145,7 +145,7 @@ test('the lobby: before the sale opens people can queue, but nobody is let in ye
   assert.equal(joined.status, 'waiting');
   assert.ok(joined.estimatedWaitSeconds > 3500, 'the estimate includes the time until the sale');
 
-  await admitWaiting();
+  await admitWaiting({ eventIds: [e.id] });
   assert.equal((await status(ann, e.id)).body.status, 'waiting');
 });
 
@@ -154,9 +154,9 @@ test('fairness under load: 300 in line, rate 50 → 6 ticks admit everyone, stri
   const crowd = await users(300);
   for (const u of crowd) await join(u, e.id); // sequential: arrival order = array order
 
-  const passKey = (u) => `wr:${e.id}:pass:${u.id}`;
+  const passKey = (u) => roomPassKey(e.id, u.id);
   for (let tick = 1; tick <= 6; tick++) {
-    await admitWaiting();
+    await admitWaiting({ eventIds: [e.id] });
     const admittedNow = await Promise.all(crowd.map(async (u) => (await redis.exists(passKey(u))) === 1));
     const count = admittedNow.filter(Boolean).length;
     assert.equal(count, Math.min(300, tick * 50), `tick ${tick}`);
@@ -171,10 +171,10 @@ test('two admission runs at the same moment never let in more than 2 × N, or an
   const crowd = await users(10);
   for (const u of crowd) await join(u, e.id);
 
-  await Promise.all([admitWaiting(), admitWaiting()]);
-  const passes = await Promise.all(crowd.map((u) => redis.exists(`wr:${e.id}:pass:${u.id}`)));
+  await Promise.all([admitWaiting({ eventIds: [e.id] }), admitWaiting({ eventIds: [e.id] })]);
+  const passes = await Promise.all(crowd.map((u) => redis.exists(roomPassKey(e.id, u.id))));
   assert.equal(passes.filter((x) => x === 1).length, 6);
-  assert.equal(Number(await redis.zcard(`wr:${e.id}:queue`)), 4);
+  assert.equal(Number(await redis.zcard(queueKey(e.id))), 4);
 });
 
 test('not signed in → 401; unknown event → 404', async () => {

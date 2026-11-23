@@ -90,6 +90,9 @@ export const env = {
   waitingRoom: {
     // How long an admission pass lasts: time to choose tickets after being let in.
     passSeconds: Math.max(1, Number(process.env.ADMISSION_PASS_SECONDS ?? 600)),
+    // Redis key prefix. Tests use their own (.env.test), so a development worker admitting
+    // people every second never touches the tests' waiting rooms.
+    prefix: process.env.WAITING_ROOM_PREFIX || 'wr',
   },
   jobs: {
     // Background jobs (BullMQ). Off only for the general test suite (.env.test): hundreds of
