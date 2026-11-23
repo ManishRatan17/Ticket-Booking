@@ -104,7 +104,7 @@ Body `{ "role": "user" | "admin" }` → `200 { "user": {…} }`
 Demotion revokes all of that user's sessions immediately; promotion applies at their next refresh.
 
 ### `POST /events`
-Body `{ "name": "3–120 chars", "totalTickets": 1–100000, "saleStartsAt": "2026-12-01T18:00:00Z", "pricePaise": 49900 }` (any date, also past; `pricePaise` whole paise 0–10,000,000, default 0)
+Body `{ "name": "3–120 chars", "totalTickets": 1–100000, "saleStartsAt": "2026-12-01T18:00:00Z", "pricePaise": 49900, "admissionPerSecond": 50 }` (`admissionPerSecond` 1–10,000, or null = no waiting room) (any date, also past; `pricePaise` whole paise 0–10,000,000, default 0)
 → `201 { "event": { "id", "name", "totalTickets", "saleStartsAt", "pricePaise", "createdAt", "available", "onSale" } }`
 
 ### `GET /jobs`
@@ -133,6 +133,12 @@ Body `{ "quantity": 1 }` (JSON integer 1–4)
 
 ### `DELETE /holds/:holdId`  · signed in
 `holdId` must be a UUID → `204` · `404 HOLD_NOT_FOUND` (not yours, unknown, or already released)
+
+### `POST /events/:id/queue`  · signed in — join the waiting room (or re-join: you keep your place)
+### `GET /events/:id/queue`  · signed in — your status
+→ `200 { "status": "waiting" | "admitted" | "not_in_queue", "position", "total", "passExpiresInSeconds", "admissionPerSecond", "saleStartsAt", "estimatedWaitSeconds", "serverTime" }` · `404 EVENT_NOT_FOUND` · `409 NO_WAITING_ROOM`
+
+On a waiting-room event, `POST /events/:id/holds` without a pass → `403 NOT_ADMITTED`.
 
 ---
 

@@ -12,6 +12,7 @@ import {
   removeFromExpiryIndex,
 } from '../modules/reservation/holds.js';
 import * as ordersRepository from '../modules/orders/orders.repository.js';
+import { activeRooms, admitNext, dropRoom } from '../modules/waiting-room/waiting-room.js';
 
 // "expire-hold": the hold's 5 minutes are over.
 export async function expireHold({ holdId }) {
@@ -74,7 +75,32 @@ export async function sweepExpired({ batchSize = 500, maxBatches = 50 } = {}) {
   return { holdsReleased, staleEntries, ordersExpired: rows.length };
 }
 
+// "admit-waiting": every second, let the next people in, for every event whose waiting room
+// has people in it and whose sale has started. N per second = the event's admission_per_second.
+// This is ADMISSION CONTROL: however many thousands arrive at once, the hold endpoint only
+// ever sees a steady, predictable number of new shoppers per second.
+export async function admitWaiting() {
+  const roomIds = await activeRooms();
+  if (roomIds.length === 0) return { admitted: 0 };
+
+  const { rows } = await pool.query(
+    'SELECT id, admission_per_second, sale_starts_at FROM events WHERE id = ANY($1::bigint[])',
+    [roomIds],
+  );
+  const now = await redisNow();
+  let admitted = 0;
+  for (const event of rows) {
+    if (!event.admission_per_second || new Date(event.sale_starts_at) > now) continue; // still the lobby
+    admitted += (await admitNext(event.id, event.admission_per_second)).length;
+  }
+  // Rooms of events that no longer exist: clean them up.
+  const known = new Set(rows.map((r) => String(r.id)));
+  for (const id of roomIds) if (!known.has(String(id))) await dropRoom(id);
+  return { admitted };
+}
+
 export const processors = {
   'expire-hold': expireHold,
   'sweep-expired': sweepExpired,
+  'admit-waiting': admitWaiting,
 };

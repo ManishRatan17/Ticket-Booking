@@ -9,6 +9,8 @@ export const createEventSchema = z.object({
   saleStartsAt: z.coerce.date(),
   // Whole paise (₹1 = 100 paise). 0 = free. Max ₹1,00,000 per ticket.
   pricePaise: z.number().int().min(0).max(10_000_000).default(0),
+  // Waiting room: let this many people in per second. null/absent = no waiting room.
+  admissionPerSecond: z.number().int().min(1).max(10_000).nullable().default(null),
 });
 
 export const eventIdParamsSchema = z.object({

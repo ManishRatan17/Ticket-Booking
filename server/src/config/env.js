@@ -87,6 +87,10 @@ export const env = {
     // 5 minutes; the expiry tests set it to 1–2 seconds.
     seconds: Math.max(1, Number(process.env.HOLD_SECONDS ?? 300)),
   },
+  waitingRoom: {
+    // How long an admission pass lasts: time to choose tickets after being let in.
+    passSeconds: Math.max(1, Number(process.env.ADMISSION_PASS_SECONDS ?? 600)),
+  },
   jobs: {
     // Background jobs (BullMQ). Off only for the general test suite (.env.test): hundreds of
     // test holds would otherwise leave hundreds of delayed jobs in Redis. Never off in production.

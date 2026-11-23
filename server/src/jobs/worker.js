@@ -20,7 +20,11 @@ export function createWorker({ log = console.log } = {}) {
     },
   );
 
-  worker.on('completed', (job, result) => log(`[worker] ${job.name} ${job.id} → ${JSON.stringify(result)}`));
+  worker.on('completed', (job, result) => {
+    // admit-waiting runs every second: only log it when it actually let someone in.
+    if (job.name === 'admit-waiting' && !result?.admitted) return;
+    log(`[worker] ${job.name} ${job.id} → ${JSON.stringify(result)}`);
+  });
   worker.on('failed', (job, err) =>
     log(`[worker] ${job?.name} ${job?.id} failed (attempt ${job?.attemptsMade}/${job?.opts.attempts}): ${err.message}`),
   );

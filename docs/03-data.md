@@ -17,6 +17,7 @@ The database structure lives in numbered SQL files in [server/migrations/](../se
 | `001_initial_schema.sql` | `users`, `events`, `orders`, `sold_tickets`, `processed_webhooks` |
 | `002_auth.sql` | users get `role`, `password_changed_at`, lowercase-email check; new `sessions`, `refresh_tokens`, `password_reset_tokens` |
 | `003_google_login.sql` | `password_hash` becomes optional; users get `email_verified_at`; new `user_identities`; new revoke reason `account_linked` |
+| `005_waiting_room.sql` | events get `admission_per_second` (NULL = no waiting room) |
 | `004_orders_payments.sql` | events get `price_paise` and `tickets_sold` (with `CHECK tickets_sold BETWEEN 0 AND total_tickets`); orders get `hold_id` (unique), `amount_paise`, `paid_at`, `failure_reason` |
 
 ### Tables
@@ -110,6 +111,7 @@ Redis runs every command one at a time, so **one command is atomic**. Several st
 | `event:<eventId>:user:<userId>:hold` | string | that user's hold id for that event | never (deleted on release) | the same scripts |
 | `holds:by-expiry` | sorted set | member = hold id, score = `expiresAt` (ms): every hold by expiry time | never (entries removed with their hold) | the hold Lua scripts (ZADD on create, ZREM on release/consume, atomically); `indexAllHolds()` at worker start |
 | `bull:expirations:*` | BullMQ's own keys | the job queue: delayed, waiting, active, completed, failed jobs, the sweep schedule | per job settings | BullMQ ([jobs/](../server/src/jobs/)) |
+| `wr:<eventId>:queue` · `wr:<eventId>:seq` · `wr:<eventId>:pass:<userId>` · `wr:active` | sorted set · counter · string · set | the waiting room: line by arrival number, the arrival counter, admission passes, rooms with people waiting | passes: `ADMISSION_PASS_SECONDS` (600) | [waiting-room/](../server/src/modules/waiting-room/) — see [14](14-waiting-room.md) |
 | `session:revoked:<sessionId>` | string `"1"` | "this session is over" | **15 min** (an access token's lifetime) | [revocation.js](../server/src/modules/auth/revocation.js) |
 | `oauth:tx:<sha256(txId)>` | string (JSON) | `state`, `nonce`, `codeVerifier` of a Google sign-in in progress | **10 min**; read-and-deleted with `GETDEL` | [oauth-transactions.js](../server/src/modules/auth/oauth-transactions.js) |
 | `ratelimit:<name>:<sha256(id)>` | string (number) | hits in the current window | the window (60 s – 1 h) | [rateLimiter.js](../server/src/lib/rateLimiter.js) + `fixed-window.lua` |

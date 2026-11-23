@@ -63,6 +63,13 @@ export async function scheduleSweep() {
   await getQueue().upsertJobScheduler('sweep-expired', { every: SWEEP_EVERY_MS }, { name: 'sweep-expired', data: {} });
 }
 
+// The admission worker lets people out of waiting rooms every second (Phase 4). Same idea as
+// the sweep: one schedule in Redis, safe for every worker to set up at startup.
+export const ADMIT_EVERY_MS = 1000;
+export async function scheduleAdmissions() {
+  await getQueue().upsertJobScheduler('admit-waiting', { every: ADMIT_EVERY_MS }, { name: 'admit-waiting', data: {} });
+}
+
 export async function closeQueue() {
   if (queue) {
     await queue.close();

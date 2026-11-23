@@ -2,7 +2,7 @@
 // Redis only keeps a fast working copy of each event's stock.
 import { pool } from '../../config/db.js';
 
-const COLUMNS = 'id, name, total_tickets, sale_starts_at, price_paise, created_at';
+const COLUMNS = 'id, name, total_tickets, sale_starts_at, price_paise, admission_per_second, created_at';
 
 function toEvent(row) {
   return {
@@ -11,14 +11,16 @@ function toEvent(row) {
     totalTickets: row.total_tickets,
     saleStartsAt: row.sale_starts_at,
     pricePaise: row.price_paise, // whole paise: ₹499.00 = 49900
+    admissionPerSecond: row.admission_per_second, // null = no waiting room
     createdAt: row.created_at,
   };
 }
 
-export async function createEvent({ name, totalTickets, saleStartsAt, pricePaise }) {
+export async function createEvent({ name, totalTickets, saleStartsAt, pricePaise, admissionPerSecond = null }) {
   const { rows } = await pool.query(
-    `INSERT INTO events (name, total_tickets, sale_starts_at, price_paise) VALUES ($1, $2, $3, $4) RETURNING ${COLUMNS}`,
-    [name, totalTickets, saleStartsAt, pricePaise],
+    `INSERT INTO events (name, total_tickets, sale_starts_at, price_paise, admission_per_second)
+     VALUES ($1, $2, $3, $4, $5) RETURNING ${COLUMNS}`,
+    [name, totalTickets, saleStartsAt, pricePaise, admissionPerSecond],
   );
   return toEvent(rows[0]);
 }

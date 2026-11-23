@@ -1,0 +1,65 @@
+// The waiting room's data, all in Redis (Phase 4).
+//
+//   wr:<eventId>:queue        SORTED SET  member = user id, score = arrival number (1, 2, 3 …)
+//   wr:<eventId>:seq          counter that hands out arrival numbers
+//   wr:<eventId>:pass:<user>  "admitted" — expires after env.waitingRoom.passSeconds
+//   wr:active                 SET of event ids whose room has people waiting (for the worker)
+//
+// Why a sorted set: "what's my position?" is ZRANK — one fast command, even with 100,000 people
+// in line — and ZADD only adds a member once, so a second tab can't take a second place.
+import { readFileSync } from 'node:fs';
+import { redis } from '../../config/redis.js';
+import { env } from '../../config/env.js';
+
+export const ACTIVE_ROOMS = 'wr:active';
+const queueKey = (eventId) => `wr:${eventId}:queue`;
+const seqKey = (eventId) => `wr:${eventId}:seq`;
+const passKey = (eventId, userId) => `wr:${eventId}:pass:${userId}`;
+const lua = (file) => readFileSync(new URL(`./lua/${file}`, import.meta.url), 'utf8');
+
+redis.defineCommand('wrJoin', { numberOfKeys: 4, lua: lua('join-queue.lua') });
+redis.defineCommand('wrAdmit', { numberOfKeys: 2, lua: lua('admit.lua') });
+
+// Join (or re-join: you keep your place). Returns a status (see describe()).
+export async function joinQueue(eventId, userId) {
+  const [status, a, b] = await redis.wrJoin(
+    queueKey(eventId),
+    seqKey(eventId),
+    passKey(eventId, userId),
+    ACTIVE_ROOMS,
+    userId,
+    eventId,
+  );
+  return status === 'admitted' ? { status, passExpiresInSeconds: a } : { status, position: a, total: b };
+}
+
+// Where am I? Read-only (several separate reads: fine for DISPLAY, nothing is decided on it).
+export async function queueStatus(eventId, userId) {
+  const [passTtl, rank, total] = await Promise.all([
+    redis.ttl(passKey(eventId, userId)),
+    redis.zrank(queueKey(eventId), String(userId)),
+    redis.zcard(queueKey(eventId)),
+  ]);
+  if (passTtl > 0) return { status: 'admitted', passExpiresInSeconds: passTtl };
+  if (rank === null) return { status: 'not_in_queue' };
+  return { status: 'waiting', position: rank + 1, total };
+}
+
+export async function hasPass(eventId, userId) {
+  return (await redis.exists(passKey(eventId, userId))) === 1;
+}
+
+// Admit the next `count` people. Returns their user ids, in queue order.
+export async function admitNext(eventId, count) {
+  return redis.wrAdmit(queueKey(eventId), ACTIVE_ROOMS, eventId, count, env.waitingRoom.passSeconds);
+}
+
+export async function activeRooms() {
+  return redis.smembers(ACTIVE_ROOMS);
+}
+
+// A room whose event no longer exists: forget it entirely.
+export async function dropRoom(eventId) {
+  await redis.srem(ACTIVE_ROOMS, String(eventId));
+  await redis.del(queueKey(eventId), seqKey(eventId));
+}

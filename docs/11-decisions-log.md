@@ -85,6 +85,18 @@ Every significant choice, the alternatives considered, and why. Newest at the bo
 | `HOLD_SECONDS` configurable (default 300) | constant | tests use 1-second holds |
 | Separate Redis connection for BullMQ (`maxRetriesPerRequest: null`) | share the API's fail-fast connection | workers must wait for Redis, API requests must not |
 
+## Waiting room (Phase 4)
+
+| Decision | Alternatives | Why |
+|---|---|---|
+| Per-event `admission_per_second` (NULL = no room) | always on; global setting | existing events and tests unchanged; each sale chooses its own rate |
+| Sorted set with arrival numbers from `INCR` | Redis list; timestamps as scores | O(log n) position lookups; one place per user; counters never tie |
+| Join and admit as Lua scripts | separate commands | joining twice / admitting twice / leaving a room un-checked are all check-then-act races |
+| Admission worker: N per second for rooms in `wr:active` | admit when someone leaves | predictable load (admission control); only active rooms are checked |
+| Pass = Redis key with a 10-minute TTL | a signed token | instant revocation possible, one lookup, expiry handled by Redis (no side effect needed — a fit for TTL) |
+| Queue opens before the sale (lobby) | only after the sale opens | fair order among people who came early; admission starts at sale time |
+| Must be signed in to queue | anonymous queue | one place per account; bots need accounts (Phase 5 adds more) |
+
 ## Frontend
 
 | Decision | Alternatives | Why |

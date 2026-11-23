@@ -5,6 +5,7 @@ import { stockKey } from '../reservation/stock.js';
 import { createHold, getUserHold, releaseHold, redisNow } from '../reservation/holds.js';
 import * as eventsRepository from './events.repository.js';
 import { scheduleHoldExpiry } from '../../jobs/queue.js';
+import { hasPass } from '../waiting-room/waiting-room.js';
 
 // ---------------------------------------------------------------------------
 // Stock: Postgres is the truth, Redis is the fast working copy
@@ -41,9 +42,9 @@ async function withAvailability(event, now) {
 // Events
 // ---------------------------------------------------------------------------
 
-export async function createEvent({ name, totalTickets, saleStartsAt, pricePaise = 0 }) {
+export async function createEvent({ name, totalTickets, saleStartsAt, pricePaise = 0, admissionPerSecond = null }) {
   // 1. Postgres first: the event exists for real.
-  const event = await eventsRepository.createEvent({ name, totalTickets, saleStartsAt, pricePaise });
+  const event = await eventsRepository.createEvent({ name, totalTickets, saleStartsAt, pricePaise, admissionPerSecond });
   // 2. Then Redis. If this fails, nothing is lost: ensureStock rebuilds it on first use.
   await ensureStock(event).catch((err) => console.warn(`[events] stock for event ${event.id} not loaded yet: ${err.message}`));
   return withAvailability(event, await redisNow());
@@ -81,6 +82,11 @@ export async function holdTickets({ eventId, userId, quantity }) {
     throw new AppError(409, 'SALE_NOT_STARTED', 'Tickets for this event are not on sale yet', {
       saleStartsAt: event.saleStartsAt,
     });
+  }
+
+  // Waiting room: only people who were let in (who hold a pass) may hold tickets.
+  if (event.admissionPerSecond && !(await hasPass(event.id, userId))) {
+    throw new AppError(403, 'NOT_ADMITTED', 'Join the waiting room first; you can hold tickets once you are let in');
   }
 
   await ensureStock(event);
