@@ -107,6 +107,12 @@ Demotion revokes all of that user's sessions immediately; promotion applies at t
 Body `{ "name": "3–120 chars", "totalTickets": 1–100000, "saleStartsAt": "2026-12-01T18:00:00Z", "pricePaise": 49900 }` (any date, also past; `pricePaise` whole paise 0–10,000,000, default 0)
 → `201 { "event": { "id", "name", "totalTickets", "saleStartsAt", "pricePaise", "createdAt", "available", "onSale" } }`
 
+### `GET /jobs`
+→ `200 { "counts": { "waiting", "delayed", "active", "completed", "failed" }, "workersOnline", "schedules": [ { "name", "everyMs", "nextRunAt" } ], "failedJobs": [ { "id", "name", "data", "error", "attempts", "maxAttempts", "createdAt", "failedAt" } ] }` (the 50 most recent failures)
+
+### `POST /jobs/:id/retry`
+→ `202 { "retried": true }` · `404 JOB_NOT_FOUND` · `409 JOB_NOT_FAILED`
+
 ---
 
 ## Events & holds — `/api`

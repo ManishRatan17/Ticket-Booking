@@ -10,6 +10,11 @@ export const changeRole = (userId, role) =>
 export const createEvent = ({ name, totalTickets, saleStartsAt }) =>
   api('/admin/events', { method: 'POST', body: { name, totalTickets, saleStartsAt } })
 
+// Background jobs (Phase 3): counts, workers, schedules, failed jobs (dead-letter queue).
+export const getJobsOverview = () => api('/admin/jobs')
+
+export const retryJob = (jobId) => api(`/admin/jobs/${encodeURIComponent(jobId)}/retry`, { method: 'POST' })
+
 // The admin API checks the role inside the ACCESS TOKEN, which was made at the last refresh.
 // Someone promoted a moment ago still holds a token that says "user" → 403. One refresh gets a
 // token with the role from the database (A6: "promotion takes effect at the next refresh").

@@ -18,9 +18,10 @@ Everything lives in [client/src/](../client/src/). Styling is deliberately minim
 | `/account` | [AccountPage](../client/src/pages/AccountPage.jsx) | signed in | sessions, delete session, logout-all |
 | `/admin/users` | [AdminUsersPage](../client/src/pages/AdminUsersPage.jsx) | admin | list users, change role |
 | `/admin/events` | [AdminEventsPage](../client/src/pages/AdminEventsPage.jsx) | admin | create event, list events |
+| `/admin/jobs` | [AdminJobsPage](../client/src/pages/AdminJobsPage.jsx) | admin | `GET /api/admin/jobs` every 5 s, `POST /api/admin/jobs/:id/retry` |
 | anything else | NotFoundPage | anyone | — |
 
-The [Layout](../client/src/components/Layout.jsx) wraps every page: nav bar (Events · Log in/Register, or My orders, your email → Account, Log out; admins also see Users and Manage events) and the Google sign-in result message.
+The [Layout](../client/src/components/Layout.jsx) wraps every page: nav bar (Events · Log in/Register, or My orders, your email → Account, Log out; admins also see Users, Manage events and Jobs) and the Google sign-in result message.
 
 ## How data flows
 

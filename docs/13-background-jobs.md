@@ -84,5 +84,19 @@ Per-hold jobs can be **missed**: holds created before Phase 3 have no job; sched
 
 **Found while building it:** the first sweep test failed because the development Redis contained **hundreds of stale holds** left by a test file whose cleanup didn't delete hold keys. One batch of 500 didn't reach the test's hold — which showed that the sweep must loop until nothing expired is left, not stop after one batch. Both were fixed (the cleanup now lives in one shared helper, [test-support/redis-cleanup.js](../server/test-support/redis-cleanup.js)), and the first real sweep released all of those stale holds.
 
+## The admin page (step 3c)
+
+**Admin → Jobs** ([AdminJobsPage](../client/src/pages/AdminJobsPage.jsx), refreshes every 5 s) shows:
+- **Workers online** — 0 means nothing is releasing expired holds (with a hint to start `npm run worker`);
+- **jobs by state** — delayed (holds not expired yet), waiting, active, completed (last 1,000 kept), **failed**;
+- **schedules** — the sweep, every 60 s, and when it runs next;
+- **failed jobs** — the dead-letter queue: name, id, error, attempts, when — each with a **Retry** button.
+
+Retry puts the job back in the queue (`job.retry()`) — safe because every job is idempotent. The intended workflow: a job fails every attempt → a human reads the error → fixes the cause → presses Retry. Tested end to end: an `expire-hold` job for a hold that wasn't expired yet fails (one attempt), is listed with "has not expired yet", the hold's time runs out, Retry → completed, tickets back. Verified live too: with `npm run dev` the page reports 1 worker online and the sweep running every 60 s.
+
+API: `GET /api/admin/jobs`, `POST /api/admin/jobs/:id/retry` (`404 JOB_NOT_FOUND`, `409 JOB_NOT_FAILED`) — see [09](09-api-reference.md).
+
 ## Coming next
-- **3c — admin page:** queue counts, the failed jobs (dead-letter queue) with their errors, and a Retry button.
+
+- **Phase 4 — waiting room:** a queue in front of the sale, an admission worker (built on the same job machinery), live position updates.
+- Moving password-reset emails onto the job queue, so a crash can no longer lose one.

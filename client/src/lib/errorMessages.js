@@ -26,6 +26,8 @@ const MESSAGES = {
   FORBIDDEN: 'You do not have permission to do this.',
   LAST_ADMIN: 'This is the only admin left. Make someone else an admin first.',
   USER_NOT_FOUND: 'That user no longer exists.',
+  JOB_NOT_FOUND: 'That job no longer exists.',
+  JOB_NOT_FAILED: 'Only failed jobs can be retried.',
   // Reasons the server's Google callback can send back in ?reason=
   OAUTH_TX_INVALID: 'Google sign-in expired or was already used. Please try again.',
   OAUTH_STATE_MISMATCH: 'Google sign-in could not be verified. Please try again.',

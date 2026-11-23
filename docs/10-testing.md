@@ -5,7 +5,7 @@ docker compose up -d     # the server tests use the real PostgreSQL and Redis
 npm test                 # server (node:test) then client (Vitest)
 ```
 
-Today: **220 server tests + 34 client tests**, all passing (about 10–15 s for the server suite).
+Today: **224 server tests + 34 client tests**, all passing (about 10–15 s for the server suite).
 
 ## How the server tests run
 
@@ -62,6 +62,7 @@ Kept outside `test/` because Node runs every file inside `test/` as a test.
 | `payments.test.js` | pay → signed webhook → paid with ticket numbers; failed payment; the browser can't decide payment; wrong secret / tampered body → 401; duplicates (sequential and 10 at once); two deliveries for one order; amount mismatch; late payment (free → paid, sold out → refund); 20 simultaneous payments → numbers 1–20 |
 | `jobs.test.js` | a real worker inside the test process, 1-second holds (`HOLD_SECONDS=1`), private queue prefix: the job is scheduled with retry/dead-letter settings; an **abandoned** hold is released with nobody looking; an unpaid order becomes `expired`; a paid hold is left alone; the job is idempotent (3 runs at once → tickets back once); a job that runs too early fails and changes nothing |
 | `sweep.test.js` | the expiry index is maintained on create / release / pay and rebuilt by `indexAllHolds()`; the sweep releases an expired hold that never got a job, leaves running holds alone, expires an overdue order whose hold vanished, removes stale index entries, and two sweeps at once release each hold once |
+| `admin-jobs.test.js` | admin-only (403/401); overview has counts for every state, ≥ 1 worker, the 60-s sweep schedule; **the dead-letter flow**: a job fails its only attempt → listed with its error → cause fixed → Retry → completed, tickets back; retry of an unknown job → 404, of a job that hasn't failed → 409 |
 | `holds-http.test.js` | the holds API: every status code, IDOR, CSRF, lazy release on read, **300 users × 100 tickets over HTTP** |
 
 ## Client test files (Vitest)

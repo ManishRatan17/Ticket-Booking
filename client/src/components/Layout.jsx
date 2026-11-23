@@ -29,6 +29,7 @@ function NavBar() {
               <>
                 <NavLink to="/admin/users">Users</NavLink>
                 <NavLink to="/admin/events">Manage events</NavLink>
+                <NavLink to="/admin/jobs">Jobs</NavLink>
               </>
             )}
             <NavLink to="/account" title="My account and devices">

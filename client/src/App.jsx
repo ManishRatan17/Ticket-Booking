@@ -14,6 +14,7 @@ import { NotFoundPage } from './pages/NotFoundPage.jsx'
 import { AccountPage } from './pages/AccountPage.jsx'
 import { AdminUsersPage } from './pages/AdminUsersPage.jsx'
 import { AdminEventsPage } from './pages/AdminEventsPage.jsx'
+import { AdminJobsPage } from './pages/AdminJobsPage.jsx'
 import { EventsPage } from './pages/EventsPage.jsx'
 import { EventPage } from './pages/EventPage.jsx'
 import { CheckoutPage } from './pages/CheckoutPage.jsx'
@@ -49,6 +50,7 @@ function App() {
             <Route element={<RequireAdmin />}>
               <Route path="admin/users" element={<AdminUsersPage />} />
               <Route path="admin/events" element={<AdminEventsPage />} />
+              <Route path="admin/jobs" element={<AdminJobsPage />} />
             </Route>
 
             {/* Reachable either way: the link comes from an email */}

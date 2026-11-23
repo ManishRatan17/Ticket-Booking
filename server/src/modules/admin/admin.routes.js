@@ -7,6 +7,8 @@ import { listUsersQuerySchema, userIdParamsSchema, changeRoleBodySchema } from '
 import * as adminController from './admin.controller.js';
 import { createEventSchema } from '../events/events.schemas.js';
 import * as eventsController from '../events/events.controller.js';
+import { z } from 'zod';
+import * as adminJobs from './admin.jobs.js';
 
 const router = Router();
 
@@ -19,5 +21,18 @@ router.patch(
 
 // Events: protected by the same router-level admin guard as everything in this file.
 router.post('/events', validate({ body: createEventSchema }), eventsController.createEvent);
+
+// Background jobs (Phase 3): overview + retrying a failed job from the dead-letter queue.
+router.get('/jobs', async (req, res) => {
+  res.json(await adminJobs.getJobsOverview());
+});
+router.post(
+  '/jobs/:id/retry',
+  validate({ params: z.object({ id: z.string().min(1).max(200) }) }),
+  async (req, res) => {
+    await adminJobs.retryFailedJob(req.validated.params.id);
+    res.status(202).json({ retried: true }); // 202: the job will run again shortly
+  },
+);
 
 export default router;
