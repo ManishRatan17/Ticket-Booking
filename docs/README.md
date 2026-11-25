@@ -32,6 +32,7 @@ A ticketing platform built to stay **correct** (never sell a ticket twice) and *
 | 19 | [Load testing](19-load-testing.md) | 10,000 people, 300 tickets: k6, the results, what it found and what was fixed |
 | 20 | [The admin side](20-admin-side.md) | Admins don't buy; Manage events with live numbers and editing; System; bot notifications |
 | 21 | [Deployment](21-deployment.md) | One Docker image (API + website), production settings, real email, step by step on Railway |
+| 22 | [Demo video script](22-demo-script.md) | A 2-minute walkthrough: what to show and what to say |
 
 ---
 
@@ -54,12 +55,12 @@ Roadmap from the original blueprint. ✅ done · 🟡 partly done · ⬜ not sta
 | 5e | Bot strikes: suspicion score from bot signals, 1st strike = booking paused 15 days, 2nd within a year = banned; appeals; admin page | ✅ |
 | Admin side | admins can't buy or ask for help; Manage events (live numbers, editing); "Jobs" → System with a worker light; bot notifications with the person's email | ✅ |
 | 6 | Proof: k6 load tests with thousands of users, SQL verification | ✅ (10,000 people → exactly 300 sold, 0 failed requests; waiting room: median 3 ms, p95 48 ms; found and fixed a database bottleneck on the hold path) |
-| 7 | Polish: styling, Razorpay test mode, deployment, demo video | 🟡 (project README ✅ · deployment-ready: one image serving API + website, real email via Resend through the job queue, receipts, admin bot alerts ✅ · deploying needs your accounts ⬜ · Razorpay ⬜ · demo video ⬜ · styling: later, by you) |
+| 7 | Polish: styling, Razorpay test mode, deployment, demo video | 🟡 (project README ✅ · deployment-ready: one image serving API + website, real email via Resend through the job queue, receipts, admin bot alerts ✅ · deploying needs your accounts ⬜ · Razorpay test mode (built and tested against a fake Razorpay; needs your test keys) ✅ · demo video script ✅ (recording: you) · styling: later, by you) |
 | 8 | Stretch: numbered seats, multiple servers, metrics | ⬜ |
 
 **Load test (laptop, one API process):** 10,000 people for 300 tickets → **exactly 300 sold, 0 duplicates, 0 failed requests**. Through the waiting room: median **3 ms**, p95 **48 ms**. With no waiting room at all, 500 clicks a second: median 6 ms, p95 327 ms. Details: [19](19-load-testing.md).
 
-**Numbers today:** 352 server tests + 40 frontend tests, all passing. 300 signed-in users racing for 100 tickets over real HTTP → exactly 100 holds.
+**Numbers today:** 363 server tests + 41 frontend tests, all passing. 300 signed-in users racing for 100 tickets over real HTTP → exactly 100 holds.
 
 ---
 
