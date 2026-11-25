@@ -5,6 +5,7 @@
 //   event:<eventId>:stock                 tickets available        (stock.js)
 //   hold:<holdId>                         { userId, eventId, quantity, createdAt, expiresAt }
 //   event:<eventId>:user:<userId>:hold    the user's hold id for that event
+//   event:<eventId>:user:<userId>:bought  tickets the user has PAID for (Phase 5b purchase cap)
 //
 // Why holds are NOT deleted by a Redis TTL: Redis would delete the record, and its tickets
 // would never return to stock (nothing would remember how many to give back). Expired holds
@@ -18,6 +19,9 @@ import { stockKey } from './stock.js';
 
 export const HOLD_SECONDS = env.holds.seconds; // 5 minutes unless HOLD_SECONDS says otherwise
 export const MAX_TICKETS_PER_HOLD = 4;
+// Per person per event, over ALL their orders (Phase 5b). Without it one account could
+// hold 4 → pay → hold 4 → pay … and empty the event.
+export const MAX_TICKETS_PER_USER = 4;
 
 // An index of every hold by its expiry time (Redis SORTED SET: member = hold id,
 // score = expiresAt in ms). Kept up to date by the Lua scripts themselves, atomically.
@@ -26,9 +30,10 @@ export const HOLDS_BY_EXPIRY = 'holds:by-expiry';
 
 const holdKey = (holdId) => `hold:${holdId}`;
 const userHoldKey = (eventId, userId) => `event:${eventId}:user:${userId}:hold`;
+const boughtKey = (eventId, userId) => `event:${eventId}:user:${userId}:bought`;
 const lua = (file) => readFileSync(new URL(`./lua/${file}`, import.meta.url), 'utf8');
 
-redis.defineCommand('createHold', { numberOfKeys: 3, lua: lua('create-hold.lua') });
+redis.defineCommand('createHold', { numberOfKeys: 4, lua: lua('create-hold.lua') });
 redis.defineCommand('releaseHold', { numberOfKeys: 1, lua: lua('release-hold.lua') });
 redis.defineCommand('consumeHold', { numberOfKeys: 1, lua: lua('consume-hold.lua') });
 
@@ -48,6 +53,7 @@ function assertValid({ eventId, userId, quantity }) {
 //   { status: 'held', hold }
 //   { status: 'already_holding', holdId }
 //   { status: 'sold_out', available }
+//   { status: 'limit_reached', bought }    (bought + quantity > MAX_TICKETS_PER_USER)
 export async function createHold({ eventId, userId, quantity }) {
   assertValid({ eventId, userId, quantity });
   const holdId = randomUUID();
@@ -55,11 +61,13 @@ export async function createHold({ eventId, userId, quantity }) {
     stockKey(eventId),
     userHoldKey(eventId, userId),
     holdKey(holdId),
+    boughtKey(eventId, userId),
     holdId,
     userId,
     eventId,
     quantity,
     HOLD_SECONDS,
+    MAX_TICKETS_PER_USER,
   );
 
   switch (code) {
@@ -72,6 +80,8 @@ export async function createHold({ eventId, userId, quantity }) {
       return { status: 'sold_out', available: Number(value) };
     case -2:
       return { status: 'already_holding', holdId: value };
+    case -3:
+      return { status: 'limit_reached', bought: Number(value) };
     default:
       throw new Error(`No stock set up for event ${eventId}`);
   }
@@ -107,6 +117,28 @@ export async function getHold(holdId) {
 export async function getUserHold(eventId, userId) {
   const holdId = await redis.get(userHoldKey(eventId, userId));
   return holdId ? getHold(holdId) : null;
+}
+
+// ---------- tickets bought (Phase 5b) ----------
+// Redis keeps a fast copy of "how many tickets has this user bought for this event";
+// PostgreSQL (paid orders) is the truth. Same pattern as the stock (ensureStock).
+
+// The count, or null if Redis doesn't have it (never set, or Redis lost it).
+export async function getBought(eventId, userId) {
+  const value = await redis.get(boughtKey(eventId, userId));
+  return value === null ? null : Number(value);
+}
+
+// Rebuild from PostgreSQL. SET NX: if a payment created the key meanwhile, that one wins.
+export async function setBoughtIfMissing(eventId, userId, count) {
+  await redis.set(boughtKey(eventId, userId), count, 'NX');
+  return getBought(eventId, userId);
+}
+
+// For a LATE payment, whose hold was already released: the tickets were taken from stock
+// directly (no hold to consume), so they're counted here instead.
+export async function addBought(eventId, userId, quantity) {
+  await redis.incrby(boughtKey(eventId, userId), quantity);
 }
 
 // Ids of holds whose time ran out (by Redis's clock), oldest first, at most `limit`.

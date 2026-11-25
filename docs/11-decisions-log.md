@@ -104,6 +104,9 @@ Every significant choice, the alternatives considered, and why. Newest at the bo
 | Ticket-path limits per **user** (strict) and per **IP** (generous) | per IP only | many real buyers share one IP (campus Wi-Fi); a per-user limit is exact |
 | Per-IP limit **before** `authenticate`, per-user after | both after | turn floods away before any cookie work; per-user needs `req.user` |
 | Reuse the fixed-window limiter | token bucket, sliding log | already tested; the window-edge burst is harmless when one hold per user is enforced anyway |
+| Purchase cap 4 per person per event, checked in `create-hold.lua` **and** in the payment transaction | Redis only; PostgreSQL only | Redis refuses fast and atomically; PostgreSQL (event row locked) is the truth and sees simultaneous payments Redis can't |
+| `bought` counted inside `consume-hold.lua` | a separate `INCRBY` after the commit | no gap where the hold is gone but not yet counted |
+| Over the cap at payment → `failed` + refund logged | reject the webhook | the money already moved; same policy as a late payment that finds no tickets |
 
 ## Frontend
 

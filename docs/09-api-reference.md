@@ -126,10 +126,10 @@ Body `{ "name": "3–120 chars", "totalTickets": 1–100000, "saleStartsAt": "20
 ### `POST /events/:id/holds`  · signed in · limits 10/min per user, 120/min per IP
 Body `{ "quantity": 1 }` (JSON integer 1–4)
 → `201 { "hold": { "id", "eventId", "quantity", "expiresAt" }, "serverTime" }`
-· `409 SOLD_OUT` (`details.available`) · `409 HOLD_EXISTS` (`details.holdId`) · `409 SALE_NOT_STARTED` (`details.saleStartsAt`) · `404 EVENT_NOT_FOUND` · `400`
+· `409 SOLD_OUT` (`details.available`) · `409 HOLD_EXISTS` (`details.holdId`) · `409 PURCHASE_LIMIT` (`details: { bought, limit }`: at most 4 tickets per person per event, over all orders) · `409 SALE_NOT_STARTED` (`details.saleStartsAt`) · `404 EVENT_NOT_FOUND` · `400`
 
 ### `GET /events/:id/holds/mine`  · signed in
-→ `200 { "hold": {…} | null, "serverTime" }` (an expired hold is released and reported as `null`)
+→ `200 { "hold": {…} | null, "purchase": { "bought", "limit" }, "serverTime" }` (an expired hold is released and reported as `null`; `purchase` = tickets you have bought for this event, and the per-person limit)
 
 ### `DELETE /holds/:holdId`  · signed in · limit 20/min per user
 `holdId` must be a UUID → `204` · `404 HOLD_NOT_FOUND` (not yours, unknown, or already released)

@@ -104,6 +104,15 @@ export async function expirePendingOrderForHold(client, holdId) {
   return rows.length === 0 ? null : Number(rows[0].id);
 }
 
+// Tickets this user has PAID for at this event (the purchase cap's source of truth, Phase 5b).
+export async function paidQuantityForUser(client, eventId, userId) {
+  const { rows } = await client.query(
+    `SELECT COALESCE(SUM(quantity), 0)::int AS paid FROM orders WHERE event_id = $1 AND user_id = $2 AND status = 'paid'`,
+    [eventId, userId],
+  );
+  return rows[0].paid;
+}
+
 export async function markPaid(client, { orderId, paymentId }) {
   await client.query(
     `UPDATE orders SET status = 'paid', payment_id = $2, paid_at = now(), failure_reason = NULL, updated_at = now()

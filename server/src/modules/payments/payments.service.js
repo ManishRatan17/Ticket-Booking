@@ -1,7 +1,7 @@
 // Payments: from "the provider says it's paid" to tickets with numbers.
 import { pool, withTransaction } from '../../config/db.js';
 import { AppError } from '../../lib/errors.js';
-import { consumeHold, releaseHold } from '../reservation/holds.js';
+import { addBought, consumeHold, releaseHold, MAX_TICKETS_PER_USER } from '../reservation/holds.js';
 import { holdTickets as takeFromStock } from '../reservation/stock.js';
 import { ensureStock } from '../events/events.service.js';
 import * as eventsRepository from '../events/events.repository.js';
@@ -65,6 +65,19 @@ export async function handlePaymentEvent(event, provider = 'fake') {
       return { outcome: 'failed', releaseHoldId: order.holdId };
     }
 
+    // 3c. Purchase cap (Phase 5b), checked against the TRUTH: paid orders in PostgreSQL.
+    //     Redis already refuses a hold over the cap; this catches what Redis can't see, e.g. two
+    //     orders paid for at once (an old pending order paid late + a new one), or a Redis that
+    //     lost its counts. Locking the event row first makes payments for this event take turns,
+    //     so two of them can't both read "0 bought" and both pass.
+    await eventsRepository.lockEvent(client, order.eventId);
+    const paidBefore = await ordersRepository.paidQuantityForUser(client, order.eventId, order.userId);
+    if (paidBefore + order.quantity > MAX_TICKETS_PER_USER) {
+      await ordersRepository.markFailed(client, { orderId, paymentId, reason: 'purchase_limit' });
+      console.warn(`[refund] order ${orderId}: over the ${MAX_TICKETS_PER_USER}-ticket limit: refund payment ${paymentId}`);
+      return { outcome: 'refund_needed', releaseHoldId: order.holdId };
+    }
+
     // 4. Make sure the tickets are really set aside — in REDIS, before we commit.
     //    Normal case: the hold still exists → consume it (its tickets stay out of stock).
     //    LATE payment: the hold expired and was released → try to take the tickets again.
@@ -75,6 +88,8 @@ export async function handlePaymentEvent(event, provider = 'fake') {
     if (!reserved) {
       await ensureStock(await eventsRepository.findEventById(order.eventId));
       reserved = await takeFromStock(order.eventId, order.quantity);
+      // No hold was consumed, so count these tickets as bought here (consume-hold.lua does it otherwise).
+      if (reserved) await addBought(order.eventId, order.userId, order.quantity);
     }
     if (!reserved) {
       // Late AND sold out meanwhile: we can't deliver. Fail the order; the money must go back.

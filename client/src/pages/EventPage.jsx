@@ -17,9 +17,10 @@ import { WaitingRoom } from '../components/WaitingRoom.jsx'
 async function loadPage(eventId, signedIn) {
   const [{ event, serverTime }, mine] = await Promise.all([
     getEvent(eventId),
-    signedIn ? getMyHold(eventId) : Promise.resolve({ hold: null }),
+    signedIn ? getMyHold(eventId) : Promise.resolve({ hold: null, purchase: null }),
   ])
-  return { event, hold: mine.hold, offset: clockOffset(serverTime) }
+  // purchase = { bought, limit }: tickets I already bought here, and the per-person limit (Phase 5b)
+  return { event, hold: mine.hold, purchase: mine.purchase, offset: clockOffset(serverTime) }
 }
 
 export function EventPage() {
@@ -32,7 +33,7 @@ export function EventPage() {
   const { status } = useAuth()
   const signedIn = status === 'signed-in'
 
-  const [page, setPage] = useState(null) // { event, hold, offset }
+  const [page, setPage] = useState(null) // { event, hold, purchase, offset }
   const [quantity, setQuantity] = useState(1)
   const [error, setError] = useState(null)
   const [notice, setNotice] = useState(null)
@@ -145,7 +146,9 @@ export function EventPage() {
     )
   }
 
-  const maxChoice = Math.min(MAX_TICKETS_PER_HOLD, event.available)
+  // Offer only what I may still buy: per hold, in stock, and under my per-person limit.
+  const canStillBuy = page.purchase ? page.purchase.limit - page.purchase.bought : MAX_TICKETS_PER_HOLD
+  const maxChoice = Math.min(MAX_TICKETS_PER_HOLD, event.available, canStillBuy)
 
   return (
     <section>
@@ -189,6 +192,11 @@ export function EventPage() {
         <p>On sale in {formatCountdown(saleSecondsLeft)}</p>
       ) : event.available === 0 ? (
         <p>Sold out.</p>
+      ) : canStillBuy <= 0 ? (
+        <p>
+          You've bought the maximum of {page.purchase.limit} tickets for this event.{' '}
+          <Link to="/orders">See your tickets</Link>
+        </p>
       ) : (
         <form onSubmit={handleHold}>
           {admitted && (
@@ -208,7 +216,10 @@ export function EventPage() {
           <button type="submit" disabled={busy}>
             {busy ? 'Holding…' : 'Hold tickets'}
           </button>
-          <p className="muted">Held tickets are yours for 5 minutes. At most {MAX_TICKETS_PER_HOLD} per person.</p>
+          <p className="muted">
+            Held tickets are yours for 5 minutes. At most {page.purchase?.limit ?? MAX_TICKETS_PER_HOLD} per person
+            {page.purchase?.bought > 0 && ` (you already have ${page.purchase.bought})`}.
+          </p>
         </form>
       )}
     </section>

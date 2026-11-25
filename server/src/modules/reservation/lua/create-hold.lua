@@ -3,13 +3,15 @@
 -- KEYS[1] = event:<eventId>:stock                 tickets still available
 -- KEYS[2] = event:<eventId>:user:<userId>:hold    which hold this user has for this event
 -- KEYS[3] = hold:<newHoldId>                      the hold record to create
--- ARGV    = holdId, userId, eventId, quantity, holdSeconds
+-- KEYS[4] = event:<eventId>:user:<userId>:bought  tickets this user has already PAID for (Phase 5b)
+-- ARGV    = holdId, userId, eventId, quantity, holdSeconds, maxTicketsPerUser
 --
 -- Returns:
 --   { 1, expiresAtMs }        held
 --   { 0, ticketsLeft }        not enough tickets (nothing changed)
 --   { -1 }                    no stock key: the event's stock was never loaded
 --   { -2, existingHoldId }    this user already has an ACTIVE hold for this event
+--   { -3, alreadyBought }     bought + this hold would go over the per-person limit (nothing changed)
 --
 -- Also keeps the index 'holds:by-expiry' (a sorted set: member = hold id, score = expiresAt)
 -- up to date in the SAME atomic step, so it can never disagree with the holds themselves.
@@ -46,6 +48,14 @@ if existingId then
 end
 
 local quantity = tonumber(ARGV[4])
+
+-- Purchase cap (Phase 5b): tickets already bought + this hold must stay within the limit.
+-- Checked in the SAME atomic step as the hold, so two quick holds can't both slip under it.
+local bought = tonumber(redis.call('GET', KEYS[4])) or 0
+if bought + quantity > tonumber(ARGV[6]) then
+  return { -3, bought }
+end
+
 if stock < quantity then
   return { 0, stock }
 end

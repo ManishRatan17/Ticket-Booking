@@ -7,7 +7,7 @@ Phases 1–4 make the sale **correct** (never oversell) and **fair** (first come
 | Threat | Defence | Step |
 |---|---|---|
 | A script hammers hold / queue / checkout thousands of times a second | **rate limits** per user (strict) and per IP (generous) | 5a ✅ |
-| One account buys again and again (hold 4 → pay → hold 4 → …) | **purchase cap**: 4 tickets per account per event | 5b ⬜ |
+| One account buys again and again (hold 4 → pay → hold 4 → …) | **purchase cap**: 4 tickets per account per event | 5b ✅ |
 | Thousands of open tabs, each checking Redis every second | **cap on live streams** per user | 5c ⬜ |
 | Thousands of fake accounts made by bots | **bot check** (Cloudflare Turnstile) + honeypot | 5d ⬜ |
 
@@ -68,3 +68,40 @@ If Redis is down, the limiter **lets requests through** (and logs a warning): it
 `req.ip` is the real client only when `TRUST_PROXY` tells Express which proxy to believe (see [06](06-security.md#rate-limiting-in-detail)). Without it, behind a load balancer every request would share the balancer's IP.
 
 *Tested in [ticket-rate-limits.test.js](../server/test/ticket-rate-limits.test.js): 11th hold → 429 with `Retry-After`, another user on the same IP unaffected; **13 accounts × 10 holds from one IP all at once → exactly 10 refused** (130 − 120); another IP unaffected; release 20; join 10 and status 60 (separate budgets); join per IP 60; orders and payments 10; anonymous floods → 401 and don't use anyone's budget. Mutation: hold limiters removed → both hold tests fail.*
+
+## 5b · Purchase cap: 4 tickets per person per event
+
+**The hole:** paying *consumes* your hold, which frees your "one hold per event" slot. So one account could hold 4 → pay → hold 4 → pay … and empty the event. Rate limits only slow that down.
+
+**The rule:** tickets already bought + the new hold ≤ **4** (`MAX_TICKETS_PER_USER` in [holds.js](../server/src/modules/reservation/holds.js)). Same Redis-fast / PostgreSQL-truth pattern as the stock:
+
+```
+ hold request ──► create-hold.lua:  bought + quantity > 4 ?  ──► 409 PURCHASE_LIMIT   (fast, Redis)
+                                    │ no
+                                    ▼
+                                  hold … order … webhook
+                                                   │
+ payment transaction ──► lock the event row ──► SUM(paid orders) + quantity > 4 ?  ──► failed 'purchase_limit', refund logged
+                                                   │ no                                (the truth, PostgreSQL)
+                                                   ▼
+                         consume-hold.lua: delete the hold AND bought += quantity (one atomic step)
+```
+
+| Piece | What it does | Why |
+|---|---|---|
+| Redis key `event:<id>:user:<uid>:bought` | tickets this user has PAID for at this event | read inside the hold's Lua script: one atomic step, so two quick holds can't both slip under the limit |
+| [create-hold.lua](../server/src/modules/reservation/lua/create-hold.lua) | refuses with `{ -3, bought }` before touching stock | a refused hold changes nothing (tested: stock unchanged) |
+| [consume-hold.lua](../server/src/modules/reservation/lua/consume-hold.lua) | deletes the paid hold **and** adds its tickets to `bought` | no moment where the hold is gone but not yet counted (otherwise you could hold again in between) |
+| `addBought` | a **late** payment (hold already released, tickets taken from stock directly) counts its tickets here | no hold was consumed in that case |
+| `ensureBought` ([events.service.js](../server/src/modules/events/events.service.js)) | if Redis has no count, rebuild it from `SUM(quantity)` of paid orders, with `SET NX` | a Redis restart must not reset everyone's count to 0. `NX`: if a payment set it meanwhile, that one wins |
+| Payment transaction ([payments.service.js](../server/src/modules/payments/payments.service.js)) | `SELECT … FOR UPDATE` on the **event** row, then paid + this order ≤ 4, else `failed` (`purchase_limit`) + `[refund]` log + the hold released | catches what Redis can't see (below). The lock makes payments for one event take turns, so two can't both read "0 bought". Payments for one event were already serialised on that row (`tickets_sold`); the lock is now just taken a little earlier |
+
+**What can Redis not see?** Two orders paid at the same moment. Example: order A (4 tickets) is pending and its hold expires; you hold 4 again (allowed: nothing is *bought* yet) → order B. Now both get paid. Redis allowed both holds; only the payment transaction, with the event row locked, sees that A was paid first and fails B. Tested exactly like that: **one paid, one refund_needed, never more than 4 paid tickets**.
+
+**Failed and expired orders don't count**, only `status = 'paid'`.
+
+**Client:** `GET /events/:id/holds/mine` now also returns `purchase: { bought, limit }`. The event page offers only `min(4, in stock, limit − bought)` tickets, says "(you already have 2)", and at the limit shows "You've bought the maximum of 4 tickets for this event" with a link to your tickets.
+
+**Not covered here (that's 5d):** one person with **many accounts**. A per-account limit is only as strong as the cost of making an account.
+
+*Tested in [purchase-limit.test.js](../server/test/purchase-limit.test.js): bought 4 → 1 more refused (`details: { bought: 4, limit: 4 }`); bought 2 → 3 refused (stock untouched), 2 fine; per person and per event; failed payments don't count; `purchase` in "my hold"; Redis loses the count → rebuilt from PostgreSQL; two orders paid at once → exactly 4 tickets. Mutations: Lua check removed → the hold tests fail; PostgreSQL check removed → the simultaneous-payments test fails (8 tickets paid).*

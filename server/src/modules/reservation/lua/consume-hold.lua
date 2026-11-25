@@ -6,9 +6,12 @@
 -- KEYS[1] = hold:<holdId>
 -- ARGV[1] = holdId
 -- Returns 1 consumed · 0 no such hold (already released, consumed or never existed)
+--
+-- Also adds the hold's tickets to the owner's 'bought' count (Phase 5b purchase cap), in the
+-- same atomic step: there is no moment where the hold is gone but not yet counted as bought.
 
-local fields = redis.call('HMGET', KEYS[1], 'userId', 'eventId')
-local ownerId, eventId = fields[1], fields[2]
+local fields = redis.call('HMGET', KEYS[1], 'userId', 'eventId', 'quantity')
+local ownerId, eventId, quantity = fields[1], fields[2], fields[3]
 if not eventId then
   return 0
 end
@@ -19,4 +22,5 @@ local userHoldKey = 'event:' .. eventId .. ':user:' .. ownerId .. ':hold'
 if redis.call('GET', userHoldKey) == ARGV[1] then
   redis.call('DEL', userHoldKey)
 end
+redis.call('INCRBY', 'event:' .. eventId .. ':user:' .. ownerId .. ':bought', quantity)
 return 1

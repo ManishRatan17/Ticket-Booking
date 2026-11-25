@@ -5,7 +5,7 @@ docker compose up -d     # the server tests use the real PostgreSQL and Redis
 npm test                 # server (node:test) then client (Vitest)
 ```
 
-Today: **245 server tests + 34 client tests**, all passing (about 10–15 s for the server suite).
+Today: **252 server tests + 34 client tests**, all passing (about 10–15 s for the server suite).
 
 ## How the server tests run
 
@@ -66,6 +66,7 @@ Kept outside `test/` because Node runs every file inside `test/` as a test.
 | `waiting-room.test.js` | no pass → 403; events without a room unchanged; arrival order and keeping your place on re-join; **300 simultaneous joins → positions 1–300**; N per tick in order; pass lasts 10 min and allows holding; the lobby (queue before the sale, no admission); **fairness under load** (300 people, 6 ticks, nobody overtakes); two admission runs at once never admit anyone twice |
 | `waiting-room-stream.test.js` | reads the raw SSE stream: correct content type; first message = current status; position updates live as people ahead are admitted, then `admitted` and the stream ends; 401 / 409 as plain JSON |
 | `ticket-rate-limits.test.js` | Phase 5a, limits switched on with a private prefix: 11th hold → 429 + `Retry-After`, others on the same IP unaffected; **13 accounts × 10 holds from one IP at once → exactly 10 refused**; release, join, status, orders and payments limits; anonymous floods don't use anyone's budget |
+| `purchase-limit.test.js` | Phase 5b: bought 4 → 1 more refused with `{ bought, limit }`; bought 2 → 3 refused without touching stock, 2 fine; per person and per event; failed payments don't count; `purchase` in my-hold; Redis loses the count → rebuilt from PostgreSQL; **two orders paid at once → exactly 4 tickets** |
 | `holds-http.test.js` | the holds API: every status code, IDOR, CSRF, lazy release on read, **300 users × 100 tickets over HTTP** |
 
 ## Client test files (Vitest)
@@ -109,6 +110,8 @@ A test only proves something once it has been seen to **fail for the right reaso
 | re-joining the queue gives a new (later) place | the keep-your-place test |
 | holds allowed without a waiting-room pass | the NOT_ADMITTED test |
 | hold rate limiters (per user and per IP) removed | both hold rate-limit tests |
+| purchase-cap check removed from `create-hold.lua` | the hold-refused tests |
+| purchase-cap check removed from the payment transaction | the simultaneous-payments test (8 tickets paid) |
 
 ## Lessons from flaky and broken runs
 

@@ -39,6 +39,12 @@ export async function findEventById(id) {
 // The CHECK (tickets_sold <= total_tickets) makes the DATABASE refuse an oversell: if this
 // would go past the total, Postgres throws (constraint events_tickets_sold_within_total).
 // Returns the numbers, e.g. [9, 10].
+// Locks the event row until the transaction ends. Payments for the same event then run one
+// after another, so "how much has this user bought?" can't change while we decide (Phase 5b).
+export async function lockEvent(client, eventId) {
+  await client.query('SELECT id FROM events WHERE id = $1 FOR UPDATE', [eventId]);
+}
+
 export async function takeTicketNumbers(client, eventId, quantity) {
   const { rows } = await client.query(
     'UPDATE events SET tickets_sold = tickets_sold + $2 WHERE id = $1 RETURNING tickets_sold',

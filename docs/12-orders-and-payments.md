@@ -53,9 +53,10 @@ The browser makes **one random key per hold** (`crypto.randomUUID()`) and re-sen
 |---|---|
 | `INSERT INTO processed_webhooks … ON CONFLICT DO NOTHING` | each delivery has a unique id; a repeat does nothing (`duplicate`) |
 | `SELECT … FOR UPDATE` on the order | two *different* deliveries about one order wait for each other (`already_paid`) |
+| `SELECT … FOR UPDATE` on the **event**; paid tickets + this order > 4 → `failed` (`purchase_limit`), refund logged, hold released | the per-person purchase cap's final check (Phase 5b, [15](15-protection.md#5b--purchase-cap-4-tickets-per-person-per-event)) |
 | `payment.failed` → order `failed` (`payment_failed`) | its hold is released **after** the commit → tickets back on sale |
 | amount ≠ order amount → `failed` (`amount_mismatch`), refund logged | never sell for the wrong price |
-| **consume the hold in Redis** | its tickets stay out of stock: they're sold now (a *release* would put them back — mutation-tested: oversold) |
+| **consume the hold in Redis** (and add its tickets to your `bought` count) | its tickets stay out of stock: they're sold now (a *release* would put them back — mutation-tested: oversold) |
 | hold already gone (late payment) → take the tickets from stock again (`hold-stock.lua`) | the blueprint's late-payment policy: confirm if still available… |
 | …not available → `failed` (`sold_out_after_expiry`), `[refund]` logged | …otherwise refund |
 | `UPDATE events SET tickets_sold = tickets_sold + n RETURNING` | ticket numbers, atomically; `CHECK (tickets_sold <= total_tickets)` refuses an oversell |

@@ -16,6 +16,7 @@ const MESSAGES = {
   HOLD_NOT_FOUND: 'That hold no longer exists (it may have expired).',
   SALE_NOT_STARTED: 'Tickets for this event are not on sale yet.',
   HOLD_EXISTS: 'You already have tickets on hold for this event.',
+  // PURCHASE_LIMIT keeps the server's message: it says the limit and how many you have.
   // SOLD_OUT keeps the server's message: it says how many are left.
   // Orders and payment
   HOLD_EXPIRED: 'Your hold expired. Please hold tickets again.',
