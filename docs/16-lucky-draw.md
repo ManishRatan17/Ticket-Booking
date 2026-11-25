@@ -50,7 +50,53 @@ The purchase cap (4 per person, Phase 5b) counts tickets from both pools.
 
 *Tested in [lucky-draw-pool.test.js](../server/test/lucky-draw-pool.test.js): 20 % of 1,000 → pools of 800 and 200; the schema's limits (≤ 50 %, 1–4 per winner, needs a waiting room); the normal sale sells its 5, the 6th → `SOLD_OUT` while the draw's 5 are untouched; a winner holds from the lucky pool without a waiting-room pass, 3 → `LUCKY_DRAW_LIMIT`; released lucky tickets return to the lucky pool; an expired lucky hold replaced by a normal hold returns to the lucky pool; orders keep their pool, and when Redis loses both pools each is rebuilt correctly. Mutation: release always returning to the normal stock → the release test fails.*
 
+## Step L2 · The draw
+
+Code: [modules/lottery/](../server/src/modules/lottery/), migration [008](../server/migrations/008_lucky_draw_results.sql), the `lottery-tick` job (every 5 s).
+
+### Who is entered
+
+Everyone who **joins the waiting room** of an event with a draw: [join-queue.lua](../server/src/modules/waiting-room/lua/join-queue.lua) adds them to the set `wr:<event>:entrants`. One entry per account (it's a set), and they stay entered after being let in by the line. At round 1 the set is **frozen** into `lottery_entries`: joining later doesn't count.
+
+### Provably fair: commit–reveal
+
+```
+event created ──► seed = 32 random bytes (secret)          seedHash = SHA-256(seed)  → shown to everyone
+                                                                       (the COMMIT)
+draw time    ──► entrants frozen; seed REVEALED
+                 each entrant's draw number = HMAC-SHA256(key = seed, "<eventId>:<userId>")
+                 lowest numbers win first
+anyone       ──► SHA-256(revealed seed) = the fingerprint shown before?   → the seed wasn't changed
+                 HMAC(seed, "<eventId>:<my id>") = my number?              → my place is honest
+```
+
+- **Why commit first:** if the seed were chosen at draw time, the admin could try seeds until a friend wins. Publishing its SHA-256 in advance fixes it: a different seed has a different fingerprint, and SHA-256 can't be reversed.
+- **Why HMAC per person, not "shuffle the list":** your number depends only on the seed and your own id, not on who else entered or in what order. Easy to explain, easy to check, and nobody can change anyone else's number by joining.
+- **Honest limits:** you can verify **your own** number and the fingerprint; checking the whole list would need everyone's ids, which we don't publish (privacy). And whoever can read the database could see the seed early; the commit stops them **changing** it, not knowing it.
+
+[lottery.js](../server/src/modules/lottery/lottery.js) is three lines: `makeSeed`, `hashSeed`, `drawNumber`. The seed and its fingerprint are created **in the same transaction as the event** (an event with a draw but no seed can't exist).
+
+### Rounds
+
+| Step | When | What happens |
+|---|---|---|
+| Round 1 | the draw time (sale + `lotteryDrawMinutes`) | freeze the entrants, reveal the seed; winners = the lowest numbers, as many as `ceil(lucky tickets left ÷ per winner)`; each gets a **lucky pass** (`wr:<event>:lucky:<user>`, 10 minutes) |
+| Rounds 2, 3 | a full round (10 min) after the previous one | tickets not taken, or released, go to the **next** numbers in line |
+| Close | a full round after round 3 | [close-lottery.lua](../server/src/modules/lottery/lua/close-lottery.lua) moves what's left to the normal stock and sets `lottery-closed`, atomically; `events.lottery_closed_at` is set |
+
+| Rule | How |
+|---|---|
+| **Nobody wins twice** | `PRIMARY KEY (event_id, user_id)` on `lottery_winners`, and the next-winners query skips existing winners |
+| Skip people at the **4-ticket limit** | the next-winners query skips anyone with 4 paid tickets: the next number wins instead |
+| **Two workers at once** | the draw row is locked (`SELECT … FOR UPDATE`): the second waits, then sees the round already done |
+| A worker that was **down** for a while | each step waits a full round after the PREVIOUS step (`last_round_at`), so winners always get their full 10 minutes |
+| A **crash** between giving passes (Redis) and committing (PostgreSQL) | the round isn't recorded, so the next tick runs it again, and picks the **same** people (numbers are fixed). Nobody is wrongly let in |
+| Lucky tickets released **after** closing | `release-hold.lua` sees `lottery-closed` and returns them to the normal sale |
+
+`LOTTERY_ROUND_SECONDS` (default 600) sets the round length.
+
+*Tested in [lucky-draw.test.js](../server/test/lucky-draw.test.js): before the draw the fingerprint is public and the seed secret, joining = entered, nothing happens before the draw time; round 1 with 12 entrants and 10 tickets → exactly the 5 lowest numbers, and the revealed seed matches the fingerprint and the page's own number; winners hold lucky tickets for 10 minutes, others can't; two jobs at once → one round; round 2 waits a full round, then the next 3 numbers win, nobody twice; someone at the 4-ticket limit is skipped; after 3 rounds the draw closes, 8 leftovers go to the normal sale, and a lucky hold released after closing goes there too; a draw nobody entered returns everything; **fairness: over 2,000 seeds each of 10 entrants has the lowest number about equally often** (chi-square < 27.9, the 0.1 % level). Mutations: winners chosen by user id instead of draw number → 3 tests fail; no wait between rounds → 2 tests fail.*
+
 ## Coming next
 
-- **L2:** the draw itself: who's entered, a provably fair random order, rounds, closing.
 - **L3:** the pages: "You're entered", "You won!", verifying the draw.

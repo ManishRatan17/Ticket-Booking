@@ -122,6 +122,10 @@ export const env = {
     prefix: process.env.JOBS_PREFIX || 'bull', // Redis key prefix for the queues (tests use their own)
   },
   botCheck: botCheckSettings(),
+  lottery: {
+    // How long one lucky-draw round lasts = how long a winner's lucky pass is valid (10 minutes).
+    roundSeconds: Math.max(1, Number(process.env.LOTTERY_ROUND_SECONDS ?? 600)),
+  },
   payments: {
     webhookSecret: paymentWebhookSecret(),
     // How long the fake provider waits before calling our webhook (a real one takes seconds).

@@ -4,7 +4,9 @@
 -- KEYS[2] = wr:<eventId>:seq          counter that hands out arrival numbers (1, 2, 3, …)
 -- KEYS[3] = wr:<eventId>:pass:<user>  exists while this user is admitted
 -- KEYS[4] = wr:active                 set of event ids whose waiting room has people in it
--- ARGV    = userId, eventId, lobbyOpensAtMs, saleStartsAtMs, drawScore (a random number in [0, 1))
+-- KEYS[5] = wr:<eventId>:entrants     everyone who joined (the lucky draw's entrants)
+-- ARGV    = userId, eventId, lobbyOpensAtMs, saleStartsAtMs, drawScore (a random number in [0, 1)),
+--           hasLuckyDraw ('1' = this event has a lucky draw)
 --
 -- Returns { 'admitted', secondsLeftOnPass }
 --      or { 'lobby', people in the lobby }              before the sale: your place isn't shown yet
@@ -45,6 +47,12 @@ if not redis.call('ZSCORE', KEYS[1], ARGV[1]) then
   end
   redis.call('ZADD', KEYS[1], score, ARGV[1])
   redis.call('SADD', KEYS[4], ARGV[2]) -- tell the admission worker this room needs attention
+end
+
+-- Lucky draw: joining the waiting room = being entered (once: it's a set). Kept even after
+-- you're let in, so people who joined early aren't punished for having been admitted.
+if ARGV[6] == '1' then
+  redis.call('SADD', KEYS[5], ARGV[1])
 end
 
 if inLobby then

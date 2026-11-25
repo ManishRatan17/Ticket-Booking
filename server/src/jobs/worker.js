@@ -23,6 +23,7 @@ export function createWorker({ log = console.log } = {}) {
   worker.on('completed', (job, result) => {
     // admit-waiting runs every second: only log it when it actually let someone in.
     if (job.name === 'admit-waiting' && !result?.admitted) return;
+    if (job.name === 'lottery-tick' && !result?.winners && !result?.closed) return; // same for lucky draws
     log(`[worker] ${job.name} ${job.id} → ${JSON.stringify(result)}`);
   });
   worker.on('failed', (job, err) =>

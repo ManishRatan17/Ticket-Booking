@@ -73,11 +73,13 @@ router.get('/events/:id/queue/stream', authenticate, queueStreamPerUser, validat
   let closed = false;
   const send = (status) => {
     // Only send when something visible changed (not just the clock): place, line, tickets left, chance.
-    const key = `${status.status}|${status.position}|${status.total}|${status.ticketsLeft}|${status.chance}`;
+    const draw = status.lottery;
+    const key = `${status.status}|${status.position}|${status.total}|${status.ticketsLeft}|${status.chance}|${draw?.state}|${draw?.entrants}|${draw?.won?.round}|${draw?.ticketsLeft}`;
     if (key === lastKey) return;
     lastKey = key;
     res.write(`event: status\ndata: ${JSON.stringify(status)}\n\n`);
     // Nothing more to wait for: you're in, or every ticket is paid for (none can come back).
+    // (A lucky-draw winner's stream stays open until admitted too: the page shows the win live.)
     if (status.status === 'admitted' || status.chance === 'sold_out') finish();
   };
 

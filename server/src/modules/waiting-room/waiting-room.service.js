@@ -5,6 +5,7 @@ import * as eventsRepository from '../events/events.repository.js';
 import { joinQueue, queueStatus } from './waiting-room.js';
 import { estimateChance } from './chance.js';
 import { ensureStock } from '../events/events.service.js';
+import { lotteryInfo } from '../lottery/lottery.service.js';
 
 async function findEventWithRoom(eventId) {
   const event = await eventsRepository.findEventById(eventId);
@@ -22,7 +23,8 @@ const lobbyOpensAt = (event) => new Date(new Date(event.saleStartsAt).getTime() 
 // Estimate = (seconds until the sale opens, if it hasn't) + position ÷ people let in per second.
 // In the lobby there's no position yet, so no estimate either (the page says "drawn at 11:00").
 // ticketsLeft = the live stock (Redis): it feeds the "what are my chances?" estimate (chance.js).
-function describe(status, event, now, ticketsLeft) {
+// lottery = the lucky draw as this person sees it (lottery.service.js), or null.
+function describe(status, event, now, ticketsLeft, lottery = null) {
   const secondsUntilSale = Math.max(0, Math.ceil((new Date(event.saleStartsAt) - now) / 1000));
   return {
     ...status,
@@ -32,6 +34,7 @@ function describe(status, event, now, ticketsLeft) {
     saleStartsAt: event.saleStartsAt,
     estimatedWaitSeconds:
       status.status === 'waiting' ? secondsUntilSale + Math.ceil(status.position / event.admissionPerSecond) : null,
+    lottery,
     serverTime: now,
   };
 }
@@ -46,6 +49,7 @@ export async function join({ eventId, userId }) {
     joinQueue(event.id, userId, {
       lobbyOpensAtMs: opensAt.getTime(),
       saleStartsAtMs: new Date(event.saleStartsAt).getTime(),
+      hasLuckyDraw: event.lotteryTickets > 0,
     }),
     redisNow(),
     ensureStock(event),
@@ -55,12 +59,12 @@ export async function join({ eventId, userId }) {
       lobbyOpensAt: opensAt,
     });
   }
-  return describe(status, event, now, ticketsLeft);
+  return describe(status, event, now, ticketsLeft, await lotteryInfo(event, userId));
 }
 
 export async function getStatus({ eventId, userId }) {
   const event = await findEventWithRoom(eventId);
-  const [now, ticketsLeft] = await Promise.all([redisNow(), ensureStock(event)]);
+  const [now, ticketsLeft, lottery] = await Promise.all([redisNow(), ensureStock(event), lotteryInfo(event, userId)]);
   const status = await queueStatus(event.id, userId, { inLobby: now < new Date(event.saleStartsAt) });
-  return describe(status, event, now, ticketsLeft);
+  return describe(status, event, now, ticketsLeft, lottery);
 }

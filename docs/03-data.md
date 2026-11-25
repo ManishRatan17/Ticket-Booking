@@ -18,6 +18,7 @@ The database structure lives in numbered SQL files in [server/migrations/](../se
 | `002_auth.sql` | users get `role`, `password_changed_at`, lowercase-email check; new `sessions`, `refresh_tokens`, `password_reset_tokens` |
 | `003_google_login.sql` | `password_hash` becomes optional; users get `email_verified_at`; new `user_identities`; new revoke reason `account_linked` |
 | `005_waiting_room.sql` | events get `admission_per_second` (NULL = no waiting room) |
+| `008_lucky_draw_results.sql` | `lottery_draws` (one per event: `seed`, `seed_hash`, `drawn_at`, `entrants`, `rounds_done`, `last_round_at`), `lottery_entries` (frozen entrants with their `draw_number`; PK event + user), `lottery_winners` (round, `pass_expires_at`; PK event + user = nobody wins twice) |
 | `007_lucky_draw.sql` | events get `lottery_percent` (0–50), `lottery_tickets`, `lottery_draw_minutes`, `lottery_per_winner` (1–4), `lottery_closed_at`, and `CHECK lottery_tickets <= total_tickets`; orders get `pool` (`main` / `lottery`) |
 | `006_lobby_window.sql` | events get `lobby_minutes` (default 15, `CHECK BETWEEN 1 AND 1440`): the waiting room opens that many minutes before the sale |
 | `004_orders_payments.sql` | events get `price_paise` and `tickets_sold` (with `CHECK tickets_sold BETWEEN 0 AND total_tickets`); orders get `hold_id` (unique), `amount_paise`, `paid_at`, `failure_reason` |
@@ -114,6 +115,7 @@ Redis runs every command one at a time, so **one command is atomic**. Several st
 | `wr:streams:<userId>` | integer | how many live queue streams that user has open (Phase 5c, at most 3) | 15 min (safety net if a server crashes; deleted at 0) | `stream-open.lua` / `stream-close.lua` |
 | `event:<eventId>:lottery-stock` | integer | the lucky draw's own tickets ([16](16-lucky-draw.md)) | never | `create-hold.lua` (winners), `release-hold.lua` |
 | `event:<eventId>:lottery-closed` | string | exists once the draw is over: lucky tickets then return to the normal stock | never | the draw's close step |
+| `wr:<eventId>:entrants` | set | the lucky draw's entrants: everyone who joined that waiting room (frozen into `lottery_entries` at the draw) | never (room cleanup) | `join-queue.lua` |
 | `wr:<eventId>:lucky:<userId>` | string with TTL | a lucky-draw winner's pass | 10 min | the draw |
 | `event:<eventId>:user:<userId>:bought` | integer | tickets that user has PAID for at that event (Phase 5b purchase cap; rebuilt from paid orders if missing) | never | `consume-hold.lua` (+quantity), `addBought` for late payments; read by `create-hold.lua` |
 | `holds:by-expiry` | sorted set | member = hold id, score = `expiresAt` (ms): every hold by expiry time | never (entries removed with their hold) | the hold Lua scripts (ZADD on create, ZREM on release/consume, atomically); `indexAllHolds()` at worker start |

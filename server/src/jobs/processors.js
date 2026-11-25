@@ -15,6 +15,7 @@ import {
 import * as ordersRepository from '../modules/orders/orders.repository.js';
 import { activeRooms, admitNext, dropRoom } from '../modules/waiting-room/waiting-room.js';
 import { stockKey } from '../modules/reservation/stock.js';
+import { runLotteryTick } from '../modules/lottery/lottery.service.js';
 
 // "expire-hold": the hold's 5 minutes are over.
 export async function expireHold({ holdId }) {
@@ -114,4 +115,5 @@ export const processors = {
   'expire-hold': expireHold,
   'sweep-expired': sweepExpired,
   'admit-waiting': admitWaiting,
+  'lottery-tick': runLotteryTick, // lucky draws: rounds and closing (lottery.service.js)
 };

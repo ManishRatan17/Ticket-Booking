@@ -1,5 +1,8 @@
 // Events and ticket holds: the rules. No HTTP in here.
 import { redis } from '../../config/redis.js';
+import { withTransaction } from '../../config/db.js';
+import { createDraw } from '../lottery/lottery.repository.js';
+import { hashSeed, makeSeed } from '../lottery/lottery.js';
 import { AppError } from '../../lib/errors.js';
 import { stockKey, lotteryStockKey } from '../reservation/stock.js';
 import {
@@ -96,14 +99,18 @@ export async function createEvent({
     perWinner: lotteryPerWinner,
   };
   // 1. Postgres first: the event exists for real.
-  const event = await eventsRepository.createEvent({
-    name,
-    totalTickets,
-    saleStartsAt,
-    pricePaise,
-    admissionPerSecond,
-    lobbyMinutes,
-    lottery,
+  // The event and its draw (with the secret seed and its public fingerprint) in ONE transaction:
+  // an event with a draw but no seed can't exist.
+  const event = await withTransaction(async (client) => {
+    const created = await eventsRepository.createEvent(
+      { name, totalTickets, saleStartsAt, pricePaise, admissionPerSecond, lobbyMinutes, lottery },
+      client,
+    );
+    if (created.lotteryTickets > 0) {
+      const seed = makeSeed();
+      await createDraw(client, { eventId: created.id, seed, seedHash: hashSeed(seed) });
+    }
+    return created;
   });
   // 2. Then Redis. If this fails, nothing is lost: ensureStock rebuilds it on first use.
   await ensureStock(event).catch((err) => console.warn(`[events] stock for event ${event.id} not loaded yet: ${err.message}`));

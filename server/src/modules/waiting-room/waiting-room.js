@@ -18,10 +18,12 @@ export const ACTIVE_ROOMS = `${PREFIX}:active`;
 export const queueKey = (eventId) => `${PREFIX}:${eventId}:queue`;
 const seqKey = (eventId) => `${PREFIX}:${eventId}:seq`;
 export const passKey = (eventId, userId) => `${PREFIX}:${eventId}:pass:${userId}`;
+// The lucky draw's entrants: everyone who joined this event's waiting room (a set).
+export const entrantsKey = (eventId) => `${PREFIX}:${eventId}:entrants`;
 export const roomKeysPattern = (eventId) => `${PREFIX}:${eventId}:*`; // for cleanup
 const lua = (file) => readFileSync(new URL(`./lua/${file}`, import.meta.url), 'utf8');
 
-redis.defineCommand('wrJoin', { numberOfKeys: 4, lua: lua('join-queue.lua') });
+redis.defineCommand('wrJoin', { numberOfKeys: 5, lua: lua('join-queue.lua') });
 redis.defineCommand('wrAdmit', { numberOfKeys: 2, lua: lua('admit.lua') });
 redis.defineCommand('wrStreamOpen', { numberOfKeys: 1, lua: lua('stream-open.lua') });
 redis.defineCommand('wrStreamClose', { numberOfKeys: 1, lua: lua('stream-close.lua') });
@@ -34,17 +36,19 @@ export const drawScore = () => randomBytes(6).readUIntBE(0, 6) / 2 ** 48;
 
 // Join (or re-join: you keep your place). Returns a status (see describe()), or
 // { status: 'not_open' } before the lobby window opens.
-export async function joinQueue(eventId, userId, { lobbyOpensAtMs, saleStartsAtMs }) {
+export async function joinQueue(eventId, userId, { lobbyOpensAtMs, saleStartsAtMs, hasLuckyDraw = false }) {
   const [status, a, b] = await redis.wrJoin(
     queueKey(eventId),
     seqKey(eventId),
     passKey(eventId, userId),
     ACTIVE_ROOMS,
+    entrantsKey(eventId),
     userId,
     eventId,
     lobbyOpensAtMs,
     saleStartsAtMs,
     drawScore(),
+    hasLuckyDraw ? '1' : '0',
   );
   if (status === 'not_open') return { status };
   if (status === 'admitted') return { status, passExpiresInSeconds: a };

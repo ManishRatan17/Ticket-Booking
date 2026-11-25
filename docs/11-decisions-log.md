@@ -136,6 +136,10 @@ Every significant choice, the alternatives considered, and why. Newest at the bo
 | A separate Redis stock for the draw's tickets | one stock with a "reserved" number | the line physically can't take them; the same atomic Lua scripts work for both pools |
 | Every hold and order records its pool | infer it later | released, expired and late-paid tickets must go back to (or come from) the right pool, and each pool must be rebuildable from PostgreSQL |
 | At most 50 %, needs a waiting room | any % | at 100 % the line is pointless; the entrants are the waiting room |
+| Provably fair draw: commit (SHA-256 of a secret seed, public from the start), reveal at the draw | "trust us" | the admin can't pick winners or re-roll the seed after seeing who entered; anyone can check |
+| Draw number = HMAC-SHA256(seed, "event:user"), lowest wins | shuffle the list with a seeded generator | each number depends only on the seed and that person: simple to check, unaffected by who else joined |
+| Draw at a fixed time, then 2 more rounds and a close, each a full round after the previous | draw when the normal tickets run out | predictable and can't be gamed; winners always get their full 10 minutes, even after a worker outage |
+| Entrants frozen at round 1 | keep adding people | the draw must be reproducible from the seed and a fixed list |
 
 ## Frontend
 

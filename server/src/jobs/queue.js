@@ -70,6 +70,12 @@ export async function scheduleAdmissions() {
   await getQueue().upsertJobScheduler('admit-waiting', { every: ADMIT_EVERY_MS }, { name: 'admit-waiting', data: {} });
 }
 
+// Lucky draws are moved forward every few seconds (a round lasts minutes, so 5 s is precise enough).
+export const LOTTERY_EVERY_MS = 5000;
+export async function scheduleLottery() {
+  await getQueue().upsertJobScheduler('lottery-tick', { every: LOTTERY_EVERY_MS }, { name: 'lottery-tick', data: {} });
+}
+
 export async function closeQueue() {
   if (queue) {
     await queue.close();
