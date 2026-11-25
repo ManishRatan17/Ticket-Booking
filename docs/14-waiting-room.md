@@ -53,7 +53,7 @@ The prefix `wr` is configurable (`WAITING_ROOM_PREFIX`); tests use `test-wr` so 
 
 | Endpoint | Answer |
 |---|---|
-| `POST /api/events/:id/queue` | join (or re-join) → status |
+| `POST /api/events/:id/queue` | join (or re-join) → status. Needs the "are you a person?" token (Phase 5d, [15](15-protection.md#5d--bot-check-cloudflare-turnstile--a-honeypot)) |
 | `GET /api/events/:id/queue` | current status |
 
 Status: `{ "status": "waiting" | "admitted" | "not_in_queue", "position", "total", "passExpiresInSeconds", "admissionPerSecond", "saleStartsAt", "estimatedWaitSeconds", "serverTime" }`. Events without a waiting room → `409 NO_WAITING_ROOM`.

@@ -1,8 +1,13 @@
 // One function per auth endpoint. Pages call these, never fetch() directly.
 import { api } from './client.js'
 
-export const register = (email, password) =>
-  api('/auth/register', { method: 'POST', body: { email, password } })
+// botToken: from the "are you a person?" widget. website: the honeypot field (empty for people).
+export const register = (email, password, { botToken, website } = {}) =>
+  api('/auth/register', {
+    method: 'POST',
+    body: website ? { email, password, website } : { email, password },
+    headers: botToken ? { 'X-Turnstile-Token': botToken } : {},
+  })
 
 export const login = (email, password) =>
   api('/auth/login', { method: 'POST', body: { email, password } })

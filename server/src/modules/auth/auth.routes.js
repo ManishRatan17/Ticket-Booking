@@ -1,6 +1,7 @@
 // URL → middleware → controller. Mounted at /api/auth in app.js.
 import { Router } from 'express';
 import { validate } from '../../middleware/validate.js';
+import { rejectHoneypot, requireHuman } from '../../middleware/botCheck.js';
 import { authenticate } from '../../middleware/authenticate.js';
 import {
   registerSchema,
@@ -26,7 +27,9 @@ const router = Router();
 
 // Middleware order matters: the IP limit runs BEFORE validation (invalid requests count too),
 // the per-email limit AFTER it (it needs the normalised email).
-router.post('/register', registerPerIp, validate({ body: registerSchema }), authController.register);
+// Register: rate limit → honeypot (before validation drops unknown fields) → validation →
+// "are you a person?" (after validation, so a typo doesn't use up the one-time token).
+router.post('/register', registerPerIp, rejectHoneypot, validate({ body: registerSchema }), requireHuman, authController.register);
 router.post('/login', loginPerIp, validate({ body: loginSchema }), loginAttempts, authController.login);
 router.post('/refresh', refreshPerIp, authController.refresh); // authenticated by the refresh cookie
 router.post('/logout', authController.logout); // also by the refresh cookie: works after the JWT expired

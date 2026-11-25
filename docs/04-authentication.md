@@ -32,8 +32,10 @@ All of it lives in [server/src/modules/auth/](../server/src/modules/auth/). Sett
 ## 1. Registration — `POST /api/auth/register`
 
 ```
-registerPerIp (5/hour) → validate(registerSchema) → controller → service.register → repository.createUser
+registerPerIp (5/hour) → rejectHoneypot → validate(registerSchema) → requireHuman (Cloudflare Turnstile) → controller → service.register → repository.createUser
 ```
+
+The honeypot and the "are you a person?" check (Phase 5d) are explained in [15-protection.md](15-protection.md#5d--bot-check-cloudflare-turnstile--a-honeypot).
 
 **Validation** ([auth.schemas.js](../server/src/modules/auth/auth.schemas.js)):
 - email: trimmed, lowercased, ≤ 254 characters, valid format.

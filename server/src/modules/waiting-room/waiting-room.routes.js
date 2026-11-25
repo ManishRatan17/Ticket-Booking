@@ -7,13 +7,23 @@ import { eventIdParamsSchema } from '../events/events.schemas.js';
 import * as waitingRoom from './waiting-room.service.js';
 import { closeStreamSlot, openStreamSlot, MAX_STREAMS_PER_USER } from './waiting-room.js';
 import { AppError } from '../../lib/errors.js';
+import { requireHuman } from '../../middleware/botCheck.js';
 import { queueJoinPerIp, queueJoinPerUser, queueStatusPerUser, queueStreamPerUser } from '../../lib/ticketRateLimits.js';
 
 const router = Router();
 
-router.post('/events/:id/queue', queueJoinPerIp, authenticate, queueJoinPerUser, validate({ params: eventIdParamsSchema }), async (req, res) => {
-  res.json(await waitingRoom.join({ eventId: req.validated.params.id, userId: req.user.id }));
-});
+// Joining a sale's queue is what a ticket bot wants most: it needs the "are you a person?" check (Phase 5d).
+router.post(
+  '/events/:id/queue',
+  queueJoinPerIp,
+  authenticate,
+  queueJoinPerUser,
+  validate({ params: eventIdParamsSchema }),
+  requireHuman,
+  async (req, res) => {
+    res.json(await waitingRoom.join({ eventId: req.validated.params.id, userId: req.user.id }));
+  },
+);
 
 router.get('/events/:id/queue', authenticate, queueStatusPerUser, validate({ params: eventIdParamsSchema }), async (req, res) => {
   res.json(await waitingRoom.getStatus({ eventId: req.validated.params.id, userId: req.user.id }));

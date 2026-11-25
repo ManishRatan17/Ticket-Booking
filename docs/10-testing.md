@@ -5,7 +5,7 @@ docker compose up -d     # the server tests use the real PostgreSQL and Redis
 npm test                 # server (node:test) then client (Vitest)
 ```
 
-Today: **255 server tests + 34 client tests**, all passing (about 10–15 s for the server suite).
+Today: **266 server tests + 37 client tests**, all passing (about 10–15 s for the server suite).
 
 ## How the server tests run
 
@@ -34,6 +34,7 @@ Kept outside `test/` because Node runs every file inside `test/` as a test.
 |---|---|
 | [cookies.js](../server/test-support/cookies.js) | read `Set-Cookie`, build `Cookie` headers, list flags (Node's `fetch` has no cookie jar) |
 | [fake-google.js](../server/test-support/fake-google.js) | a fake OpenID provider: RSA keys, JWKS, codes, PKCE check, signed ID tokens |
+| [fake-turnstile.js](../server/test-support/fake-turnstile.js) | a fake Cloudflare `siteverify`: checks the secret, single-use `human-…` tokens, records every call, and can answer 500 or drop the connection |
 | [users.js](../server/test-support/users.js) | creates hundreds of signed-in users fast (user + session rows + tokens signed by the real code) without 300 argon2 logins |
 | [redis-cleanup.js](../server/test-support/redis-cleanup.js) | `deleteEventKeys(ids)`: removes a test's stock keys, holds, user links and expiry-index entries in one place (replaced 7 hand-written copies; one of them forgot hold keys and left hundreds of stale holds in the dev Redis) |
 | [pooled-http.js](../server/test-support/pooled-http.js) | HTTP client with a connection pool. On Windows, 300 brand-new simultaneous connections to a local port get ~68 refused by the OS (measured; not affected by the server's backlog). A pool of 50 keep-alive connections gets all 300 requests through — still a real race |
@@ -67,6 +68,7 @@ Kept outside `test/` because Node runs every file inside `test/` as a test.
 | `waiting-room-stream.test.js` | reads the raw SSE stream: correct content type; first message = current status; position updates live as people ahead are admitted, then `admitted` and the stream ends; 401 / 409 as plain JSON; Phase 5c: 3 streams per user, the 4th → JSON 429 (not counted), closing a tab frees a slot, key deleted at 0, **10 tabs at once → exactly 3 streams**, an admitted stream gives its slot back |
 | `ticket-rate-limits.test.js` | Phase 5a, limits switched on with a private prefix: 11th hold → 429 + `Retry-After`, others on the same IP unaffected; **13 accounts × 10 holds from one IP at once → exactly 10 refused**; release, join, status, orders and payments limits; anonymous floods don't use anyone's budget |
 | `purchase-limit.test.js` | Phase 5b: bought 4 → 1 more refused with `{ bought, limit }`; bought 2 → 3 refused without touching stock, 2 fine; per person and per event; failed payments don't count; `purchase` in my-hold; Redis loses the count → rebuilt from PostgreSQL; **two orders paid at once → exactly 4 tickets** |
+| `bot-check.test.js` | Phase 5d against the fake Cloudflare: `/api/config` has the site key, not the secret; no / made-up / **replayed** token → 403; good token → 201 with secret, token and visitor IP sent; a typo doesn't use up the token; honeypot → 403, no account; Cloudflare 500 / dropped connection → allowed (fail open); wrong secret → refused; queue join needs a token; 401 before any Cloudflare call |
 | `holds-http.test.js` | the holds API: every status code, IDOR, CSRF, lazy release on read, **300 users × 100 tickets over HTTP** |
 
 ## Client test files (Vitest)
@@ -76,6 +78,7 @@ Kept outside `test/` because Node runs every file inside `test/` as a test.
 | `api/client.test.js` | refresh-and-retry, single shared refresh, 409 handling, session-over codes, retry only once, wrong password not refreshed, error parsing, `Retry-After` |
 | `lib/format.test.js` | device names from real user-agent strings, "time ago" |
 | `lib/serverClock.test.js` | countdowns correct with the device clock fast or slow; formatting |
+| `api/botCheck.test.js` | the "are you a person?" token goes in `X-Turnstile-Token` (register and queue join); no header without a token; the honeypot field is sent only when filled |
 
 ## Mutation testing
 
@@ -114,6 +117,8 @@ A test only proves something once it has been seen to **fail for the right reaso
 | purchase-cap check removed from the payment transaction | the simultaneous-payments test (8 tickets paid) |
 | stream cap removed from `stream-open.lua` | 2 stream-cap tests |
 | stream slot never given back | 3 stream-cap tests |
+| `requireHuman` removed from register | 5 bot-check tests |
+| honeypot check disabled | the honeypot test |
 
 ## Lessons from flaky and broken runs
 

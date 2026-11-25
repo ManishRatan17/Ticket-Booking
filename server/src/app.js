@@ -2,6 +2,7 @@ import express from 'express';
 import helmet from 'helmet';
 import cookieParser from 'cookie-parser';
 import healthRouter from './routes/health.js';
+import configRouter from './routes/config.js';
 import authRouter from './modules/auth/auth.routes.js';
 import adminRouter from './modules/admin/admin.routes.js';
 import eventsRouter from './modules/events/events.routes.js';
@@ -32,6 +33,7 @@ export function createApp() {
   app.use(rejectCrossSiteRequests); // CSRF guard: cookies are sent automatically, so check who's asking
 
   app.use('/api/health', healthRouter);
+  app.use('/api/config', configRouter); // public settings for the page (bot-check site key)
   app.use('/api/auth', authRouter);
   // The guard is applied ONCE, to the whole admin router: no admin route can forget it.
   app.use('/api/admin', authenticate, requireRole('admin'), adminRouter);

@@ -54,8 +54,8 @@ export function useQueueStatus(eventId, enabled) {
     }
   }, [eventId, enabled, version])
 
-  const join = useCallback(async () => {
-    setStatus(await joinQueue(eventId))
+  const join = useCallback(async (botToken) => {
+    setStatus(await joinQueue(eventId, botToken))
     setVersion((v) => v + 1) // start listening for updates
   }, [eventId])
 

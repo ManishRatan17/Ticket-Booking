@@ -4,13 +4,17 @@ import { useAuth } from '../auth/useAuth.js'
 import { FormField } from '../components/FormField.jsx'
 import { Alert } from '../components/Alert.jsx'
 import { GoogleButton } from '../components/GoogleButton.jsx'
+import { TurnstileWidget } from '../components/TurnstileWidget.jsx'
+import { useHumanCheck } from '../hooks/useHumanCheck.js'
 import { errorMessage, fieldErrors } from '../lib/errorMessages.js'
 import { validateEmail, validateNewPassword, validateConfirmation, collectErrors } from '../lib/validation.js'
 
 export function RegisterPage() {
   const { register } = useAuth()
   const navigate = useNavigate()
-  const [form, setForm] = useState({ email: '', password: '', confirm: '' })
+  // website = the honeypot: hidden from people, so only bots fill it in (Phase 5d)
+  const [form, setForm] = useState({ email: '', password: '', confirm: '', website: '' })
+  const human = useHumanCheck()
   const [errors, setErrors] = useState({})
   const [formError, setFormError] = useState(null)
   const [submitting, setSubmitting] = useState(false)
@@ -30,12 +34,14 @@ export function RegisterPage() {
 
     setSubmitting(true)
     try {
-      await register(form.email, form.password) // creates the account, then signs in
+      // creates the account, then signs in
+      await register(form.email, form.password, { botToken: human.token, website: form.website })
       navigate('/', { replace: true })
     } catch (err) {
       // e.g. the server's common-password check, which the browser doesn't have
       setErrors(fieldErrors(err))
       setFormError(errorMessage(err))
+      human.reset() // the token may have been used: get a fresh one for the next try
     } finally {
       setSubmitting(false)
     }
@@ -75,7 +81,13 @@ export function RegisterPage() {
           onChange={update('confirm')}
           error={errors.confirm}
         />
-        <button type="submit" className="button" disabled={submitting}>
+        {/* Honeypot: off-screen and skipped by Tab and screen readers. People leave it empty. */}
+        <div className="honeypot" aria-hidden="true">
+          <label htmlFor="website">Website</label>
+          <input id="website" name="website" tabIndex={-1} autoComplete="off" value={form.website} onChange={update('website')} />
+        </div>
+        {human.siteKey && <TurnstileWidget key={human.round} siteKey={human.siteKey} onToken={human.setToken} />}
+        <button type="submit" className="button" disabled={submitting || !human.ready}>
           {submitting ? 'Creating account…' : 'Create account'}
         </button>
       </form>

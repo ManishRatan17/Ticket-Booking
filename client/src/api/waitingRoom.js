@@ -1,7 +1,12 @@
 // Waiting room (backend Phase 4).
 import { api } from './client.js'
 
-export const joinQueue = (eventId) => api(`/events/${encodeURIComponent(eventId)}/queue`, { method: 'POST' })
+// botToken: from the "are you a person?" widget (Phase 5d).
+export const joinQueue = (eventId, botToken) =>
+  api(`/events/${encodeURIComponent(eventId)}/queue`, {
+    method: 'POST',
+    headers: botToken ? { 'X-Turnstile-Token': botToken } : {},
+  })
 
 export const getQueueStatus = (eventId) => api(`/events/${encodeURIComponent(eventId)}/queue`)
 

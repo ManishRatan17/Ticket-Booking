@@ -40,6 +40,27 @@ function paymentWebhookSecret() {
   return randomBytes(32).toString('hex');
 }
 
+// Cloudflare Turnstile, the "are you a person?" check (Phase 5d). Both keys, or neither.
+//   neither → the check is OFF (development without keys, the test suite)
+//   production → REQUIRED: a missing key must not quietly switch bot protection off.
+function botCheckSettings() {
+  const siteKey = process.env.TURNSTILE_SITE_KEY || '';
+  const secretKey = process.env.TURNSTILE_SECRET_KEY || '';
+  if (Boolean(siteKey) !== Boolean(secretKey)) {
+    throw new Error('Set both TURNSTILE_SITE_KEY and TURNSTILE_SECRET_KEY, or neither (see server/.env.example)');
+  }
+  if (!secretKey && process.env.NODE_ENV === 'production') {
+    throw new Error('Missing required environment variables: TURNSTILE_SITE_KEY and TURNSTILE_SECRET_KEY');
+  }
+  return {
+    enabled: Boolean(secretKey),
+    siteKey, // public: the page needs it to show the widget
+    secretKey, // private: only for asking Cloudflare
+    // Cloudflare's real endpoint; tests point it at a fake Cloudflare.
+    verifyUrl: process.env.TURNSTILE_VERIFY_URL || 'https://challenges.cloudflare.com/turnstile/v0/siteverify',
+  };
+}
+
 // Express "trust proxy": which proxies may tell us the client's real IP (X-Forwarded-For).
 //   unset/"false" → trust nobody: req.ip is whoever connected to us (safe default)
 //   "1"           → trust ONE proxy in front of us (typical on Railway/Render)
@@ -100,6 +121,7 @@ export const env = {
     enabled: process.env.NODE_ENV === 'production' || process.env.JOBS_ENABLED !== 'false',
     prefix: process.env.JOBS_PREFIX || 'bull', // Redis key prefix for the queues (tests use their own)
   },
+  botCheck: botCheckSettings(),
   payments: {
     webhookSecret: paymentWebhookSecret(),
     // How long the fake provider waits before calling our webhook (a real one takes seconds).

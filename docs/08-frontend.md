@@ -74,6 +74,7 @@ A laptop 3 minutes fast or 10 minutes slow still shows 5:00 for a new hold (unit
 5. `SOLD_OUT` / `HOLD_EXISTS` → message, then reload the real stock and your real hold.
 6. Hold expires → "Your hold expired and the tickets went back on sale."
 7. **Waiting room** (events with `admissionPerSecond`, Phase 4): signed out → "Log in to join the queue"; signed in → [WaitingRoom](../client/src/components/WaitingRoom.jsx) ("Join the queue", then "You're #N of M in line", kept live by [useQueueStatus](../client/src/hooks/useQueueStatus.js): Server-Sent Events, falling back to polling every 2 s); admitted → "It's your turn! Choose your tickets within 9:58" + the hold form. Details: [14-waiting-room.md](14-waiting-room.md#the-queue-screen-step-4c).
+8. **Protection** (Phase 5): the quantity list offers only what you may still buy (`purchase: { bought, limit }`), "You've bought the maximum of 4 tickets" at the limit; joining the queue shows the "are you a person?" widget ([TurnstileWidget](../client/src/components/TurnstileWidget.jsx), [useHumanCheck](../client/src/hooks/useHumanCheck.js)), as does the register page (plus a hidden honeypot field). Details: [15-protection.md](15-protection.md).
 
 ## Other details
 

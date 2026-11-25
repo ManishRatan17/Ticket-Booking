@@ -9,7 +9,7 @@ Phases 1–4 make the sale **correct** (never oversell) and **fair** (first come
 | A script hammers hold / queue / checkout thousands of times a second | **rate limits** per user (strict) and per IP (generous) | 5a ✅ |
 | One account buys again and again (hold 4 → pay → hold 4 → …) | **purchase cap**: 4 tickets per account per event | 5b ✅ |
 | Thousands of open tabs, each checking Redis every second | **cap on live streams** per user | 5c ✅ |
-| Thousands of fake accounts made by bots | **bot check** (Cloudflare Turnstile) + honeypot | 5d ⬜ |
+| Thousands of fake accounts made by bots | **bot check** (Cloudflare Turnstile) + honeypot | 5d ✅ |
 
 Already in place before Phase 5:
 
@@ -131,3 +131,75 @@ the stream ends (tab closed, admitted, 10-min limit) ──► stream-close.lua:
 **Options considered:** one stream per user, newer tab wins (more complex: the server must tell the old tab to stop); a counter in server memory (wrong with several API servers, and lost on restart); a `BroadcastChannel` in the browser so tabs share one stream (nice, but a script ignores whatever the browser does, so the server must enforce a limit anyway).
 
 *Tested in [waiting-room-stream.test.js](../server/test/waiting-room-stream.test.js): 3 tabs → 200, the 4th → JSON 429 and not counted, TTL set, another user unaffected, closing a tab frees a slot, all closed → key deleted; **10 tabs at the same instant → exactly 3 streams**; a stream that ends by itself (admitted) gives its slot back. Mutations: cap removed → 2 tests fail; release removed → 3 tests fail.*
+
+## 5d · Bot check: Cloudflare Turnstile + a honeypot
+
+**The hole:** every defence above is *per account*. An account costs a bot one `POST /register`. With 1,000 accounts, the purchase cap becomes 4,000 tickets and the queue holds 1,000 bot places in front of real fans. The register limit (5 an hour per IP) doesn't help against a bot farm with thousands of IPs.
+
+**The fix:** the two doors bots need most, **creating an account** and **joining a sale's queue**, ask "are you a person?" first.
+
+### How Turnstile works
+
+```
+ Browser                                  Our server                          Cloudflare
+ ───────                                  ──────────                          ──────────
+ 1. page loads Cloudflare's widget  ─────────────────────────────────────────► checks the browser
+                                                                               (usually no puzzle)
+ 2. ◄──────────────────────────────────────────────────────────────────────── one-time TOKEN
+ 3. POST /register   X-Turnstile-Token ──► 4. siteverify(SECRET, token, ip) ──►
+                                          ◄── { success: true }  (real, unused, for my site)
+                                          5. continue: create the account
+```
+
+It's the same shape as Google sign-in ([05](05-google-login.md)): the browser only **carries** something, and our server checks it **with the issuer**, using a secret the browser never sees. A token the browser makes up is refused by Cloudflare.
+
+| Detail | Why |
+|---|---|
+| [middleware/botCheck.js](../server/src/middleware/botCheck.js) `requireHuman` on `POST /auth/register` and `POST /events/:id/queue` | the doors that make bots *count*. Holds, orders and payments are already behind an account and an admission pass, the purchase cap and rate limits |
+| token in a **header** (`X-Turnstile-Token`) | works for a JSON body (register) and for no body at all (join) |
+| runs **after** validation (and after `authenticate` on join) | a typo or an expired login costs no Cloudflare call and doesn't use up the visitor's single-use token (tested) |
+| sends the visitor's IP (`remoteip`) | Cloudflare can compare it with the browser that solved the check |
+| tokens are **single-use** | a bot can't solve once and replay it 1,000 times (tested). The page gets a fresh widget after every attempt |
+| 3-second timeout on the call | a slow Cloudflare must not hang our sign-ups |
+| **fails open** when Cloudflare is unreachable (network error, timeout, 5xx), with a warning | the same trade-off as the rate limits: an outage at Cloudflare must not stop a sale for every real fan; the other defences still stand |
+| …but a **wrong secret** is not "unreachable": refused, and logged as an error | our misconfiguration must be loud, not silently switch bot protection off |
+| `GET /api/config` → `{ botCheck: { siteKey } }` | the page learns the PUBLIC site key from the server, so client and server can never disagree about whether the check is on. The secret never leaves the server (tested) |
+| both keys or neither (`TURNSTILE_SITE_KEY`, `TURNSTILE_SECRET_KEY`); **required in production** | neither = off (tests, development without keys); a missing key in production must not quietly switch the check off |
+
+**Development keys:** `server/.env.example` contains Cloudflare's public **test** keys (site `1x00000000000000000000AA`, secret `1x0000000000000000000000000000000AA`). The widget always passes, and the server's check **really** goes to Cloudflare. Checked live: no token → `403`; Cloudflare's dummy test token → `201` after a real round trip of ~450 ms. For production: dash.cloudflare.com → Turnstile → add a widget for your domain → put its two keys in the server's environment.
+
+### The honeypot
+
+The register form has a field called `website` that people never see: it's moved off-screen (not `display: none`, which some bots skip), taken out of the Tab order (`tabIndex=-1`) and hidden from screen readers (`aria-hidden`). Simple bots fill in **every** field. `rejectHoneypot` runs **before** validation (validation drops unknown fields) and answers exactly like a failed check, so it tells a bot nothing. Free and offline, but it only catches simple bots; Turnstile is there for the rest.
+
+### In the browser
+
+| File | What it does |
+|---|---|
+| [hooks/useHumanCheck.js](../client/src/hooks/useHumanCheck.js) | asks `/api/config` once; holds the token; `ready` = check off, or token in hand; `reset()` = fresh widget |
+| [components/TurnstileWidget.jsx](../client/src/components/TurnstileWidget.jsx) | loads Cloudflare's script **once** (`?render=explicit`), draws the widget, token → `onToken`; expired or error → `null`; removes the widget on unmount |
+| [RegisterPage](../client/src/pages/RegisterPage.jsx), [WaitingRoom](../client/src/components/WaitingRoom.jsx) | the widget above the button; the button waits for a token; after a failed attempt, a fresh widget |
+
+**Deployment note (Phase 7):** if the page is served with a Content-Security-Policy, it must allow `https://challenges.cloudflare.com` in `script-src` and `frame-src`.
+
+### Options considered
+
+| Option | Verdict |
+|---|---|
+| **Cloudflare Turnstile** ✅ | free, usually invisible, used in real ticketing, stops automated browsers; Cloudflare decides who's a bot (a black box) |
+| Proof-of-work (the browser burns ~1 s of CPU on SHA-256) | no outside service and fully understandable, but only a **cost**: a bot farm pays it |
+| Honeypot alone | catches simple bots only. Kept, as a free extra layer |
+| Email verification before buying | makes throwaway accounts expensive too; needs a real mail provider → Phase 7 idea |
+
+**Not covered:** Google sign-in creates accounts without `/register`; Google's own sign-up is the barrier there. A determined attacker can pay humans to solve checks: Phase 5 raises the **cost** of abuse, it can't make it impossible.
+
+*Tested in [bot-check.test.js](../server/test/bot-check.test.js) against a fake Cloudflare ([fake-turnstile.js](../server/test-support/fake-turnstile.js)): `/api/config` has the site key and not the secret; no token / made-up token / replayed token → 403; good token → 201 and Cloudflare got our secret, the token and the visitor's IP; a form with a typo → 400 without using the token; honeypot → 403 with no account; Cloudflare 500 or dropped connection → allowed; wrong secret → refused; joining a queue needs a token, reading status doesn't; not signed in → 401 before any Cloudflare call. Client: [api/botCheck.test.js](../client/src/api/botCheck.test.js) (the header and the honeypot field are sent). Mutations: `requireHuman` removed from register → 5 tests fail; honeypot disabled → the honeypot test fails.*
+
+## Phase 5 in one picture
+
+```
+request ──► per-IP limit ──► authenticate ──► per-user limit ──► validate ──► "are you a person?" ──► …
+                                                                               (register, join only)
+join the queue (one place per account) ──► admitted (pass) ──► hold (one per account, ≤ 4 bought+held)
+     └─ live position: ≤ 3 streams per account, extra tabs poll                  └─ payment: PostgreSQL re-checks ≤ 4
+```

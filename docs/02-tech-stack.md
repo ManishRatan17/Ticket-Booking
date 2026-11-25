@@ -47,12 +47,12 @@ Node built-ins used heavily: `node:crypto` (random tokens, SHA-256, `timingSafeE
 | Postman | Trying endpoints by hand (cookies: see `COOKIE_SECURE` in [06-security](06-security.md#cookies)) |
 | `docker exec … psql` / `redis-cli` | Looking inside the databases |
 | Google Cloud Console | The OAuth client for "Continue with Google" |
+| Cloudflare Turnstile | The "are you a person?" check (Phase 5d): free, no package needed (a script tag in the page, one HTTPS call from the server). Development uses Cloudflare's public test keys |
 
 ## Planned (not installed yet)
 
 | Tool | Phase | For |
 |---|---|---|
-| Socket.IO or Server-Sent Events | 4 | Live waiting-room position |
 | k6 | 6 | Load tests with thousands of virtual users |
 | Razorpay (test mode) | 7 | Realistic payment flow |
 | A real email provider (Resend / SES / SMTP) | 7 | Replaces the console mailer |

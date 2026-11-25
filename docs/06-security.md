@@ -35,6 +35,10 @@ Every defence in the project, the attack it stops, and where it lives. Most have
 | Duplicate webhooks / double charges | `processed_webhooks` + order row lock + `already_paid` check; `Idempotency-Key` on order creation | payments.service.js, orders.service.js |
 | Client choosing the price | amount computed on the server from `price_paise`; a body field is ignored | orders.service.js |
 | Selling more tickets than exist | atomic Lua scripts; `UNIQUE (event_id, ticket_number)` in PostgreSQL | [07](07-tickets-and-holds.md) |
+| Scripts hammering the sale | per-user and per-IP rate limits on the ticket path | [15 § 5a](15-protection.md#5a--rate-limits-on-the-ticket-path) |
+| One account buying everything | 4 tickets per person per event (Redis + PostgreSQL) | [15 § 5b](15-protection.md#5b--purchase-cap-4-tickets-per-person-per-event) |
+| Thousands of open tabs | at most 3 live streams per user | [15 § 5c](15-protection.md#5c--duplicate-tabs-at-most-3-live-streams-per-user) |
+| Bot-made accounts, bots in the queue | Cloudflare Turnstile on register and queue join; register honeypot | [15 § 5d](15-protection.md#5d--bot-check-cloudflare-turnstile--a-honeypot) |
 
 ## CSRF in detail
 
@@ -78,6 +82,7 @@ Cookies are attached by the browser **automatically** — including to requests 
 |---|---|---|
 | Session revoked? | **closed** → `503 AUTH_UNAVAILABLE` | a security decision: never let a possibly-revoked token through |
 | Rate limit | **open** → allowed, warning logged | a protection: refusing everyone hurts more |
+| Bot check (if **Cloudflare** is unreachable) | **open** → allowed, warning logged | same reasoning; but a wrong secret key is refused and logged as an error |
 
 ## Cookies
 

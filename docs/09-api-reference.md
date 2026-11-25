@@ -45,13 +45,17 @@ Base URL in development: `http://localhost:5173/api` (through Vite) or `http://l
 `200 { "status": "ok", "uptime": 12.3, "services": { "postgres": { "status": "up" }, "redis": { "status": "up" } } }`
 or `503` with `"status": "degraded"` and the failing service's `error`.
 
+### `GET /api/config`
+Public settings for the page: `200 { "botCheck": { "siteKey": "…" | null } }` (`null` = the "are you a person?" check is off). Never contains secrets.
+
 ---
 
 ## Auth — `/api/auth`
 
-### `POST /register`  · limit 5/hour per IP
-Body `{ "email": "ann@example.com", "password": "at least ten characters" }` (unknown fields are dropped)
-→ `201 { "user": { "id", "email", "role", "createdAt" } }` · `400` · `409 EMAIL_TAKEN` · `429`
+### `POST /register`  · limit 5/hour per IP · bot check
+Body `{ "email": "ann@example.com", "password": "at least ten characters" }` (unknown fields are dropped; a non-empty `website` = the honeypot → `403`)
+Header `X-Turnstile-Token: <token from the widget>` when the bot check is on (see `GET /api/config`)
+→ `201 { "user": { "id", "email", "role", "createdAt" } }` · `400` · `403 BOT_CHECK_FAILED` · `409 EMAIL_TAKEN` · `429`
 
 ### `POST /login`  · limits 30/15 min per IP, 5 failures/15 min per IP+email
 Body `{ email, password }`
@@ -134,7 +138,7 @@ Body `{ "quantity": 1 }` (JSON integer 1–4)
 ### `DELETE /holds/:holdId`  · signed in · limit 20/min per user
 `holdId` must be a UUID → `204` · `404 HOLD_NOT_FOUND` (not yours, unknown, or already released)
 
-### `POST /events/:id/queue`  · signed in · limits 10/min per user, 60/min per IP — join the waiting room (or re-join: you keep your place)
+### `POST /events/:id/queue`  · signed in · limits 10/min per user, 60/min per IP · bot check (header `X-Turnstile-Token`, else `403 BOT_CHECK_FAILED`) — join the waiting room (or re-join: you keep your place)
 ### `GET /events/:id/queue`  · signed in · limit 60/min per user — your status
 → `200 { "status": "waiting" | "admitted" | "not_in_queue", "position", "total", "passExpiresInSeconds", "admissionPerSecond", "saleStartsAt", "estimatedWaitSeconds", "serverTime" }` · `404 EVENT_NOT_FOUND` · `409 NO_WAITING_ROOM`
 

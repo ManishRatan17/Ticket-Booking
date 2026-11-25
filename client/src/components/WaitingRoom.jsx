@@ -1,7 +1,9 @@
 // What you see while you wait for your turn.
 import { formatCountdown } from '../lib/serverClock.js'
+import { TurnstileWidget } from './TurnstileWidget.jsx'
 
-export function WaitingRoom({ status, onJoin, saleOpensIn }) {
+// human = useHumanCheck() from the page: joining needs the "are you a person?" check (Phase 5d).
+export function WaitingRoom({ status, onJoin, saleOpensIn, human }) {
   if (!status) return <p className="muted">Checking the waiting room…</p>
 
   if (status.status === 'not_in_queue') {
@@ -11,7 +13,8 @@ export function WaitingRoom({ status, onJoin, saleOpensIn }) {
           This sale has a <strong>waiting room</strong>: people are let in a few at a time, in the order they
           joined.
         </p>
-        <button type="button" onClick={onJoin}>
+        {human.siteKey && <TurnstileWidget key={human.round} siteKey={human.siteKey} onToken={human.setToken} />}
+        <button type="button" onClick={onJoin} disabled={!human.ready}>
           Join the queue
         </button>
       </div>

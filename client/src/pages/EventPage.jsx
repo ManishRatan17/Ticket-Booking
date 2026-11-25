@@ -12,6 +12,7 @@ import { errorMessage } from '../lib/errorMessages.js'
 import { clockOffset, formatCountdown } from '../lib/serverClock.js'
 import { useQueueStatus } from '../hooks/useQueueStatus.js'
 import { WaitingRoom } from '../components/WaitingRoom.jsx'
+import { useHumanCheck } from '../hooks/useHumanCheck.js'
 
 // Loads the event, plus my hold if I'm signed in. Returns everything the page shows.
 async function loadPage(eventId, signedIn) {
@@ -75,13 +76,15 @@ export function EventPage() {
   const hasRoom = Boolean(event?.admissionPerSecond)
   const queue = useQueueStatus(id, signedIn && hasRoom && !page?.hold)
   const admitted = queue.status?.status === 'admitted'
+  const human = useHumanCheck() // joining the queue needs the "are you a person?" check
 
   async function handleJoin() {
     setError(null)
     try {
-      await queue.join()
+      await queue.join(human.token)
     } catch (err) {
       setError(errorMessage(err))
+      human.reset() // the token may have been used: a fresh widget for the next try
     }
   }
 
@@ -187,7 +190,12 @@ export function EventPage() {
         </p>
       ) : hasRoom && !admitted ? (
         // You can queue before the sale opens; admission starts when it does.
-        <WaitingRoom status={queue.status} onJoin={handleJoin} saleOpensIn={event.onSale ? 0 : saleSecondsLeft} />
+        <WaitingRoom
+          status={queue.status}
+          onJoin={handleJoin}
+          saleOpensIn={event.onSale ? 0 : saleSecondsLeft}
+          human={human}
+        />
       ) : !event.onSale ? (
         <p>On sale in {formatCountdown(saleSecondsLeft)}</p>
       ) : event.available === 0 ? (

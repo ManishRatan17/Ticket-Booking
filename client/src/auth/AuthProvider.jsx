@@ -50,8 +50,8 @@ export function AuthProvider({ children }) {
 
   // Register does not sign in by itself (server design), so sign in right after.
   const register = useCallback(
-    async (email, password) => {
-      await authApi.register(email, password)
+    async (email, password, botCheck) => {
+      await authApi.register(email, password, botCheck)
       return login(email, password)
     },
     [login],

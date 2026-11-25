@@ -109,6 +109,11 @@ Every significant choice, the alternatives considered, and why. Newest at the bo
 | Over the cap at payment → `failed` + refund logged | reject the webhook | the money already moved; same policy as a late payment that finds no tickets |
 | At most 3 live streams per user, extra tabs poll | one stream (newest wins); counter in server memory; browser-only `BroadcastChannel` | simple, works with several servers, and the server enforces it (a script ignores the browser) |
 | Stream count with a 15-min TTL, deleted at 0 | no TTL | a crashed server can't leave slots taken forever, and the count can never go negative |
+| Cloudflare Turnstile on register and queue join | proof-of-work; honeypot only; email verification | stops automated browsers, free, invisible for most people; PoW only adds cost; email verification needs a real mail provider (Phase 7) |
+| Bot check fails **open** when Cloudflare is unreachable, closed on a wrong secret | always closed | an outage elsewhere must not stop a sale; our own misconfiguration must be loud |
+| Site key served by `GET /api/config` | a Vite env variable | one place to configure; client and server can't disagree |
+| Bot check after validation | before | a typo doesn't use up the single-use token |
+| Honeypot answers like a failed check | pretend success | tells a bot nothing, and keeps the code simple |
 
 ## Frontend
 
