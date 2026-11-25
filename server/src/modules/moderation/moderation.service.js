@@ -18,6 +18,7 @@ import { releaseHold } from '../reservation/holds.js';
 import { removeUserFromWaitingRooms } from '../waiting-room/waiting-room.js';
 import * as repo from './moderation.repository.js';
 import { createShortCache } from '../../lib/shortCache.js';
+import { sendMail } from '../../lib/mailer.js';
 
 const { prefix: PREFIX, threshold: THRESHOLD, windowSeconds: WINDOW_SECONDS, suspensionDays: SUSPENSION_DAYS } = env.moderation;
 
@@ -113,7 +114,28 @@ export async function strike(userId, { reason, evidence = {}, adminId = null, ki
     `[moderation] user ${userId} ${restriction.kind}${restriction.endsAt ? ` until ${restriction.endsAt.toISOString()}` : ''}` +
       ` (${adminId ? `by admin ${adminId}` : 'automatic'}): ${JSON.stringify(evidence)}`,
   );
+  // An AUTOMATIC strike: tell every admin, by email too (Phase 7), naming the account. Not awaited:
+  // a mail problem must not undo the restriction.
+  if (!adminId) emailAdmins(restriction).catch((err) => console.warn(`[mail] admin alert: ${err.message}`));
   return restriction;
+}
+
+async function emailAdmins(r) {
+  const { rows } = await pool.query("SELECT email FROM users WHERE role = 'admin'");
+  const signals = Object.entries(r.evidence?.signals ?? {})
+    .map(([kind, count]) => `${count} × ${kind}`)
+    .join(', ');
+  for (const { email } of rows) {
+    await sendMail({
+      to: email,
+      subject: `⚠ Bot detected: ${r.userEmail} was ${r.kind}`,
+      text:
+        `${r.userEmail} was ${r.kind} automatically for bot-like activity.\n\n` +
+        `Evidence: score ${r.evidence?.score} in ${r.evidence?.windowMinutes} minutes (${signals}).\n` +
+        (r.endsAt ? `Booking is paused until ${new Date(r.endsAt).toUTCString()}.\n` : 'The account is banned.\n') +
+        `\nReview it on the admin Restrictions page (lift it, or overturn it if it was a mistake).`,
+    });
+  }
 }
 
 // A restricted person gives up what they were holding on to, so real fans get it:

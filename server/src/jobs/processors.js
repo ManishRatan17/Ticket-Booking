@@ -16,6 +16,7 @@ import * as ordersRepository from '../modules/orders/orders.repository.js';
 import { activeRooms, admitNext, dropRoom } from '../modules/waiting-room/waiting-room.js';
 import { stockKey } from '../modules/reservation/stock.js';
 import { runLotteryTick } from '../modules/lottery/lottery.service.js';
+import { deliverMail } from '../lib/mailer.js';
 
 // "expire-hold": the hold's 5 minutes are over.
 export async function expireHold({ holdId }) {
@@ -116,4 +117,9 @@ export const processors = {
   'sweep-expired': sweepExpired,
   'admit-waiting': admitWaiting,
   'lottery-tick': runLotteryTick, // lucky draws: rounds and closing (lottery.service.js)
+  // An email (Phase 7). Returns nothing that could show its content in the logs.
+  'send-email': async (message) => {
+    await deliverMail(message);
+    return { sent: true };
+  },
 };

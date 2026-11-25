@@ -28,6 +28,7 @@ Every defence in the project, the attack it stops, and where it lives. Most have
 | Huge request bodies (DoS) | 10 KB JSON limit; 128-char password max | app.js |
 | Information leaks in errors | bugs → generic `500 INTERNAL_ERROR`; details only in server logs | [errorHandler.js](../server/src/middleware/errorHandler.js) |
 | Clickjacking, MIME sniffing, framework fingerprinting | helmet headers; `X-Powered-By` removed | app.js |
+| Scripts injected into the website (XSS) | Content-Security-Policy: scripts and frames only from our own origin and Cloudflare's widget (when the API serves the website, Phase 7) | app.js, [21](21-deployment.md) |
 | Secrets in git | `.env` ignored; `.env.example` has empty values; checked before every commit | `.gitignore` |
 | Malicious install scripts (supply chain) | npm `allowScripts`: argon2's compile script denied | root `package.json` |
 | Fake "I paid" from the browser | the browser can only START a payment; only a signed webhook marks an order paid | [payments/](../server/src/modules/payments/) |

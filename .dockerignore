@@ -2,10 +2,11 @@
 **/node_modules
 **/.env
 **/.env.*
+!**/.env.example
 .git
 docs
 loadtest
-client/*
-!client/package.json
+client/dist
 server/test
 server/test-support
+project.txt

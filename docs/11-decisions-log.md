@@ -184,6 +184,16 @@ Every significant choice, the alternatives considered, and why. Newest at the bo
 | "Jobs" renamed "System" with a worker light | remove the page | an admin must notice when nothing releases holds or admits people |
 | Bot notifications: a badge + list with the email, "mark as seen"; hand-made restrictions start as seen | emails now; live pop-ups | works without an email provider (Phase 7); accounts have only an email to identify them |
 
+## Deployment (Phase 7)
+
+| Decision | Rejected | Why |
+|---|---|---|
+| One service serves the API and the website | a separate static site | same origin: `SameSite=Strict` cookies and the CSRF check work as in development; one address |
+| Multi-stage Docker image; migrations at start | build tools in the image; migrations by hand | small image; the database is always current |
+| Resend over its HTTP API | SMTP; an SDK | one `fetch`, no new dependency; free tier |
+| Emails through the job queue | send inline | retries and crash-safety (a reset email used to be lost on a crash) |
+| Railway recommended | Render free tier; Fly.io; a VPS | Dockerfile from GitHub, managed PostgreSQL + Redis, a worker service, simple |
+
 ## Frontend
 
 | Decision | Alternatives | Why |
@@ -207,7 +217,6 @@ Every significant choice, the alternatives considered, and why. Newest at the bo
 
 - Other users' expired holds wait for the Phase 3 worker.
 - Holds are lost if Redis loses its data.
-- Password-reset emails can be lost if the server crashes at that moment (Phase 3 queue).
 - Tests share the development database.
 - Lua scripts are single-Redis (no Cluster hash tags).
 - Role changes are audited only in the console log.

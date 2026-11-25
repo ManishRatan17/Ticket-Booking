@@ -54,6 +54,13 @@ export async function scheduleHoldExpiry(hold) {
   );
 }
 
+// An email, delivered by the worker (lib/mailer.js). Retried with growing pauses if the provider is
+// down. removeOnComplete: true — emails can hold one-time links (password reset), so a delivered one
+// isn't kept in Redis. One that fails every attempt stays in the dead-letter queue (System page).
+export async function queueEmail(message) {
+  await getQueue().add('send-email', message, { removeOnComplete: true });
+}
+
 export const SWEEP_EVERY_MS = 60_000;
 
 // The safety-net sweep runs every 60 s. A job SCHEDULER (stored in Redis) creates the jobs, so

@@ -7,6 +7,10 @@ import { keepRevocationsInSync } from './modules/auth/revocation.js';
 // Redis reconnects (it may have restarted empty).
 keepRevocationsInSync();
 
+if (env.isProduction && !env.mail.resendApiKey) {
+  console.warn('[mail] RESEND_API_KEY is not set: emails (password resets, receipts, admin alerts) are only PRINTED in the logs');
+}
+
 const server = createApp().listen(env.port, () => {
   console.log(`API listening on http://localhost:${env.port}`);
 });

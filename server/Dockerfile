@@ -1,15 +1,25 @@
-# The API (and the worker: same code, other command) as a Linux container.
-# Build from the REPO ROOT (npm workspaces need the root package files):
+# The whole app as ONE Linux container: the API, which also serves the built website.
+# (The worker is the same image with another command.) Build from the REPO ROOT:
 #
 #   docker build -f server/Dockerfile -t ticketing-api .
-#   docker run … ticketing-api                       (the API)
-#   docker run … ticketing-api node src/worker.js    (the worker)
+#   docker run … ticketing-api                       (API + website: runs migrations, then starts)
+#   docker run … ticketing-api node src/worker.js    (the background worker)
 #
-# Used by the Phase 6 load test (so the API runs on Linux like a real server, next to PostgreSQL,
-# Redis and k6), and the starting point for deployment in Phase 7. Configuration comes from the
-# environment (DATABASE_URL, REDIS_URL, JWT_ACCESS_SECRET, …): nothing secret is baked in.
-FROM node:24-slim
+# Configuration comes from the environment (DATABASE_URL, REDIS_URL, JWT_ACCESS_SECRET, …): nothing
+# secret is baked in. See docs/21-deployment.md.
 
+# ---------- stage 1: build the website (React → static files) ----------
+FROM node:24-slim AS website
+WORKDIR /app
+COPY package.json package-lock.json ./
+COPY server/package.json server/
+COPY client/package.json client/
+RUN npm ci --ignore-scripts
+COPY client/ client/
+RUN npm run build -w client
+
+# ---------- stage 2: the server (only what runs; the build tools stay in stage 1) ----------
+FROM node:24-slim
 WORKDIR /app
 # Dependencies first (their own layer: rebuilt only when the package files change).
 COPY package.json package-lock.json ./
@@ -20,7 +30,11 @@ COPY client/package.json client/
 RUN npm ci --omit=dev --ignore-scripts && npm cache clean --force
 
 COPY server/ server/
+COPY --from=website /app/client/dist client/dist
+ENV CLIENT_DIST=/app/client/dist
 WORKDIR /app/server
 USER node
 EXPOSE 5000
-CMD ["node", "src/index.js"]
+# Bring the database up to date, then start. (Migrations are recorded, so this is a no-op when
+# there's nothing new; the worker doesn't migrate.)
+CMD ["sh", "-c", "node src/db/migrate.js && node src/index.js"]

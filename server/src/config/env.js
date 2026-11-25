@@ -146,6 +146,16 @@ export const env = {
     // How long the fake provider waits before calling our webhook (a real one takes seconds).
     fakeDelayMs: Number(process.env.FAKE_PAYMENT_DELAY_MS ?? 800),
   },
+  // Email (Phase 7). Without a Resend key, emails are printed in the console (development).
+  mail: {
+    resendApiKey: process.env.RESEND_API_KEY || null,
+    // Resend's shared test sender works without your own domain, but only delivers to YOUR address.
+    from: process.env.MAIL_FROM || 'Flash-Sale Tickets <onboarding@resend.dev>',
+    resendUrl: process.env.RESEND_API_URL || 'https://api.resend.com/emails', // tests point it at a fake
+  },
+  // The built React app (client/dist). When set, the API also serves the website: ONE service, one
+  // address, so the login cookies and CSRF checks work as in development. The Docker image sets it.
+  clientDist: process.env.CLIENT_DIST || null,
   // Where the browser is sent after Google sign-in (the React app).
   clientUrl: process.env.CLIENT_URL || 'http://localhost:5173',
   // "Continue with Google". OPTIONAL: without a client id/secret the Google routes answer 503.

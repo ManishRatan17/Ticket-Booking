@@ -8,6 +8,8 @@ import { ensureStock } from '../events/events.service.js';
 import * as eventsRepository from '../events/events.repository.js';
 import * as ordersRepository from '../orders/orders.repository.js';
 import { startPayment } from './fake-provider.js';
+import { sendMail } from '../../lib/mailer.js';
+import { formatRupees } from '../../lib/money.js';
 
 // ---------------------------------------------------------------------------
 // Starting a (fake) payment — called by the browser's "Pay" button
@@ -111,6 +113,25 @@ export async function handlePaymentEvent(event, provider = 'fake') {
   // After the commit: give a failed order's held tickets back. (If this fails, the hold simply
   // expires and is released later — tickets come back either way.)
   if (result.releaseHoldId) await releaseHold(result.releaseHoldId);
+  // A receipt (Phase 7). Not awaited: the provider's webhook gets its answer at once, and a mail
+  // problem can't undo a payment (sendMail queues it; the worker retries).
+  if (result.outcome === 'paid') sendReceipt(orderId).catch((err) => console.warn(`[mail] receipt for order ${orderId}: ${err.message}`));
   const { releaseHoldId: _, ...answer } = result;
   return answer;
+}
+
+async function sendReceipt(orderId) {
+  const order = await ordersRepository.findOrderById(pool, orderId);
+  const { rows } = await pool.query('SELECT email FROM users WHERE id = $1', [order.userId]);
+  if (!rows[0]) return;
+  await sendMail({
+    to: rows[0].email,
+    subject: `Your tickets for ${order.eventName}`,
+    text:
+      `Thank you! Your payment of ${formatRupees(order.amountPaise)} is confirmed.\n\n` +
+      `Event: ${order.eventName}\n` +
+      `Tickets: ${order.quantity} — number${order.quantity > 1 ? 's' : ''} ${order.ticketNumbers.map((t) => `#${t}`).join(', ')}\n` +
+      `Order: ${order.id}\n\n` +
+      `You can see your tickets any time under "My orders".`,
+  });
 }

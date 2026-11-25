@@ -14,6 +14,7 @@ import { signPayload, SIGNATURE_HEADER } from '../src/modules/payments/signature
 import { createSignedInUsers } from '../test-support/users.js';
 import { deleteEventKeys } from '../test-support/redis-cleanup.js';
 import { holdWhileCreatingAdmins } from '../test-support/admin-lock.js';
+import { setMailTransport } from '../src/lib/mailer.js';
 
 const RUN = `test-adminc-${randomUUID().slice(0, 8)}`;
 let server, baseUrl, admin, releaseAdminsLock;
@@ -183,4 +184,27 @@ test('a NEW bot strike shows up for admins (with the email) until an admin marks
   const list = (await api('GET', '/api/admin/restrictions', { as: admin })).body.restrictions;
   assert.ok(list.find((r) => r.userEmail === bot.email).acknowledgedAt);
   assert.equal((await api('GET', '/api/admin/notifications', { as: bot })).status, 403);
+});
+
+// ---------- emails (Phase 7) ----------
+
+test('emails: a RECEIPT to the buyer after paying, and an ALERT to admins when an account is struck automatically', async (t) => {
+  const mails = [];
+  setMailTransport(async (m) => mails.push(m));
+  t.after(() => setMailTransport(null));
+  const e = await event();
+  const [ann, bot] = await users(2);
+
+  await buy(ann, e, 2);
+  for (let i = 0; i < 50 && !mails.some((m) => m.to === ann.email); i++) await new Promise((r) => setTimeout(r, 20));
+  const receipt = mails.find((m) => m.to === ann.email);
+  assert.match(receipt.subject, /Your tickets for/);
+  assert.match(receipt.text, /₹1,000.00/);
+  assert.match(receipt.text, /#1, #2/);
+
+  await strike(bot.id, { reason: 'Automated', evidence: { score: 20, windowMinutes: 10, signals: { rate_limited: 20 } } });
+  for (let i = 0; i < 50 && !mails.some((m) => m.to === admin.email); i++) await new Promise((r) => setTimeout(r, 20));
+  const alert = mails.find((m) => m.to === admin.email);
+  assert.equal(alert.subject, `⚠ Bot detected: ${bot.email} was suspended`);
+  assert.match(alert.text, /20 × rate_limited/);
 });

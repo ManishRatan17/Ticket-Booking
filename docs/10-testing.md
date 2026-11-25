@@ -5,7 +5,7 @@ docker compose up -d     # the server tests use the real PostgreSQL and Redis
 npm test                 # server (node:test) then client (Vitest)
 ```
 
-Today: **344 server tests + 40 client tests**, all passing (about 10–15 s for the server suite).
+Today: **352 server tests + 40 client tests**, all passing (about 10–15 s for the server suite).
 
 ## How the server tests run
 
@@ -77,6 +77,8 @@ Kept outside `test/` because Node runs every file inside `test/` as a test.
 | `bot-strikes.test.js` | Phase 5e with rate limits, the bot check and moderation on (private prefixes, fake Cloudflare): normal use → no signal; **a shared IP never gets anyone a signal**; a script → suspended 15 days with evidence; cleanup after a strike and booking blocked everywhere; restricted people can still sign in and use the support inbox; missing / fake tokens; second strike → banned; old or overturned strikes don't count; a suspension ends by itself; two strikes at once → one; appeals; admin restrict / lift; login returns the restriction |
 | `short-cache.test.js` | the in-memory cache for hot data (Phase 6): **1,000 simultaneous misses → ONE query** (single-flight), reuse within the time limit, delete, failures not cached, off at 0 |
 | `admin-console.test.js` | admins can't buy (hold, join, order, pay → 403) or send support requests; Manage events live numbers and statuses; editing before / after the sale; a lucky draw keeps its waiting room; admins only; bot-strike notifications with the email, hand-made restrictions not "new", mark as seen |
+| `website.test.js` | the API serving the built website (Phase 7): pages → index.html, `/api` stays JSON (JSON 404), year-long caching of built files, the security policy |
+| `mail.test.js` | real email against a fake Resend: the request it receives, a 500 makes delivery fail (so the job retries), `sendMail` queues a `send-email` job that isn't kept after delivery |
 | `holds-http.test.js` | the holds API: every status code, IDOR, CSRF, lazy release on read, **300 users × 100 tickets over HTTP** |
 
 ## Client test files (Vitest)
@@ -135,6 +137,7 @@ A test only proves something once it has been seen to **fail for the right reaso
 | restriction check removed from the hold route | 3 strike tests |
 | sold-out fast path ignoring the person's own (expired) hold | the fast-path test |
 | "admins can't buy" removed from the hold route | the admin-booking test |
+| the admin email alert after an automatic strike removed | the email test |
 | "already restricted" guard removed from `strike()` | the two-strikes-at-once test |
 | payment check ignoring a raised limit | the approval test |
 | client createEvent sending only name/tickets/sale time (the old code) | the client createEvent test |

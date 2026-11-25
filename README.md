@@ -16,7 +16,7 @@ Load-tested with [k6](https://k6.io) against the real system (Linux containers, 
 
 Never oversold in any run, including the first one, before the bottlenecks it found were fixed. The load test exposed a database bottleneck on the hot path (790 errors in the first run → **0**, throughput **×1.9**). Details, before/after numbers and honest limits: [docs/19-load-testing.md](docs/19-load-testing.md).
 
-**384 automated tests** (344 server tests against real PostgreSQL and Redis, 40 client tests with Vitest), with **mutation testing**: every important protection was deliberately broken to prove a test catches it.
+**392 automated tests** (352 server tests against real PostgreSQL and Redis, 40 client tests with Vitest), with **mutation testing**: every important protection was deliberately broken to prove a test catches it.
 
 ## How it works
 
@@ -68,7 +68,7 @@ npm run seed:demo                          # optional: demo events (one with a w
 npm run dev                                # API + worker + React → http://localhost:5173
 ```
 
-Make yourself an admin: `npm run set-role -- you@example.com admin` (then log out and in). Tests: `npm test`. Load test: [docs/19](docs/19-load-testing.md#run-it-yourself).
+Make yourself an admin: `npm run set-role -- you@example.com admin` (then log out and in). Tests: `npm test`. Load test: [docs/19](docs/19-load-testing.md#run-it-yourself). **Deploy:** one Docker image (API + website + worker), step by step in [docs/21](docs/21-deployment.md).
 
 ## Documentation
 
@@ -77,6 +77,6 @@ Everything is in [docs/](docs/README.md): architecture, every table and Redis ke
 ## Honest limits
 
 - Load-tested on one laptop with one API process; the API is stateless, so it scales out behind a load balancer, but that's not measured yet. 10,000 simultaneous live-update connections weren't tested.
-- Payments use a built-in fake provider (signed webhooks, retries); Razorpay test mode is next. Emails are printed to the console in development.
+- Payments use a built-in fake provider (signed webhooks, retries); Razorpay test mode is next. Emails go through Resend in production and are printed to the console in development.
 - Styling is deliberately minimal for now.
 - Out of scope: seat maps, a refunds UI, multi-region, a mobile app, real money.

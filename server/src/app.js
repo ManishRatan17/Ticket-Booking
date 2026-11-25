@@ -1,5 +1,7 @@
 import express from 'express';
 import helmet from 'helmet';
+import { existsSync } from 'node:fs';
+import path from 'node:path';
 import cookieParser from 'cookie-parser';
 import healthRouter from './routes/health.js';
 import configRouter from './routes/config.js';
@@ -23,7 +25,19 @@ export function createApp() {
   app.set('trust proxy', env.trustProxy);
 
   // Middleware runs top to bottom for every request.
-  app.use(helmet()); // security-related HTTP response headers
+  // Security headers. The Content-Security-Policy (which scripts and frames a page may load) is
+  // helmet's strict default, plus Cloudflare's "are you a person?" widget: its script, and the frame
+  // it draws in. (Matters once the API serves the website itself, in production.)
+  app.use(
+    helmet({
+      contentSecurityPolicy: {
+        directives: {
+          scriptSrc: ["'self'", 'https://challenges.cloudflare.com'],
+          frameSrc: ["'self'", 'https://challenges.cloudflare.com'],
+        },
+      },
+    }),
+  );
 
   // Payment webhooks BEFORE express.json(): their signature covers the exact raw bytes,
   // so the body must reach the handler unparsed. (Server-to-server: no cookies involved.)
@@ -43,6 +57,17 @@ export function createApp() {
   app.use('/api', paymentsRouter); // /api/payments/fake/…
   app.use('/api', waitingRoomRouter); // /api/events/:id/queue
   app.use('/api', supportRouter); // /api/support/requests…
+
+  // The website (production): the built React app, from the same server and address as the API.
+  // Any other GET that isn't /api is a page of the app (React Router decides which): send index.html.
+  if (env.clientDist) {
+    const index = path.join(env.clientDist, 'index.html');
+    if (!existsSync(index)) console.warn(`[app] CLIENT_DIST is set but ${index} doesn't exist: no website served`);
+    // Built files have a fingerprint in their name (index-3fa9c1.js): they never change, cache for a year.
+    app.use('/assets', express.static(path.join(env.clientDist, 'assets'), { immutable: true, maxAge: '1y' }));
+    app.use(express.static(env.clientDist, { index: false }));
+    app.get(/^\/(?!api(\/|$)).*/, (req, res) => res.sendFile(index));
+  }
 
   // These two must be LAST: nothing above matched → 404; anything threw → error handler.
   app.use(notFound);

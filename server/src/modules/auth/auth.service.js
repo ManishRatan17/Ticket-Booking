@@ -306,8 +306,7 @@ export function requestPasswordReset(email) {
   sendResetEmailIfAccountExists(email).catch((err) =>
     console.error('[password-reset] could not send reset email:', err.message),
   );
-  // ⚠️ If the server crashed right now, this email would be lost. A production system
-  // would put it on a job queue (BullMQ, Phase 3) that retries until it's delivered.
+  // (sendMail puts the email on the job queue: retried until delivered, and a crash can't lose it.)
 }
 
 async function sendResetEmailIfAccountExists(email) {
