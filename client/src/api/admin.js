@@ -7,8 +7,9 @@ export const listUsers = ({ limit, offset }) =>
 export const changeRole = (userId, role) =>
   api(`/admin/users/${encodeURIComponent(userId)}/role`, { method: 'PATCH', body: { role } })
 
-export const createEvent = ({ name, totalTickets, saleStartsAt }) =>
-  api('/admin/events', { method: 'POST', body: { name, totalTickets, saleStartsAt } })
+// Sends EVERY field of the form (price, waiting room, lobby, lucky draw …). It used to pick only
+// name/totalTickets/saleStartsAt, which silently dropped the rest; the server validates the body.
+export const createEvent = (event) => api('/admin/events', { method: 'POST', body: event })
 
 // Background jobs (Phase 3): counts, workers, schedules, failed jobs (dead-letter queue).
 export const getJobsOverview = () => api('/admin/jobs')
