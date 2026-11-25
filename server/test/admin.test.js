@@ -64,8 +64,11 @@ const setRole = (actor, targetId, role) =>
   api('PATCH', `/api/admin/users/${targetId}/role`, { token: actor.accessToken, body: { role } });
 
 // "Last admin" depends on EVERY admin in the database. Tests share the dev database,
-// so: demote this run's leftover admins, then check nobody else is an admin.
+// so: wait until no other TEST FILE has admins (and keep them from making any: admin-lock.js),
+// demote this run's leftover admins, then check nobody else (a real dev admin) is an admin.
 async function noOtherAdmins(t) {
+  const { holdAsOnlyAdmins } = await import('../test-support/admin-lock.js');
+  t.after(await holdAsOnlyAdmins());
   await pool.query(`UPDATE users SET role = 'user' WHERE email LIKE $1`, [`${RUN}-%`]);
   const { rows } = await pool.query(`SELECT count(*)::int AS n FROM users WHERE role = 'admin'`);
   if (rows[0].n > 0) {

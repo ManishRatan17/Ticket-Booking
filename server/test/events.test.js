@@ -14,12 +14,14 @@ import { deleteEventKeys } from '../test-support/redis-cleanup.js';
 
 
 const RUN = `test-events-${randomUUID().slice(0, 8)}`;
-let server, baseUrl, admin, user;
+let server, baseUrl, admin, user, releaseAdminsLock;
 
 before(async () => {
   await runMigrations({ log: () => {} });
   server = createApp().listen(0);
   baseUrl = `http://localhost:${server.address().port}`;
+  const { holdWhileCreatingAdmins } = await import('../test-support/admin-lock.js');
+  releaseAdminsLock = await holdWhileCreatingAdmins(); // see admin-lock.js
   [admin] = await createSignedInUsers(1, { prefix: `${RUN}-admin`, role: 'admin' });
   [user] = await createSignedInUsers(1, { prefix: `${RUN}-user` });
 });
@@ -35,6 +37,7 @@ after(async () => {
     await deleteEventKeys(ids);
   }
   await pool.query('DELETE FROM users WHERE email LIKE $1', [`${RUN}%`]);
+  await releaseAdminsLock?.(); // our admin is gone
   server.close();
   await closeConnections();
 });

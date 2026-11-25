@@ -25,6 +25,8 @@ const baseUrl = `http://localhost:${server.address().port}`;
 const worker = createWorker({ log: () => {} });
 
 const RUN = `test-adminjobs-${randomUUID().slice(0, 8)}`;
+const { holdWhileCreatingAdmins } = await import('../test-support/admin-lock.js');
+const releaseAdminsLock = await holdWhileCreatingAdmins(); // see admin-lock.js
 const [admin] = await createSignedInUsers(1, { prefix: `${RUN}-admin`, role: 'admin' });
 const [user] = await createSignedInUsers(1, { prefix: `${RUN}-user` });
 
@@ -39,6 +41,7 @@ after(async () => {
     await pool.query('DELETE FROM events WHERE id = ANY($1)', [ids]);
   }
   await pool.query('DELETE FROM users WHERE email LIKE $1', [`${RUN}%`]);
+  await releaseAdminsLock(); // our admin is gone
   server.close();
   await closeConnections();
 });
