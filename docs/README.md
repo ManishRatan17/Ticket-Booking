@@ -28,6 +28,7 @@ A ticketing platform built to stay **correct** (never sell a ticket twice) and *
 | 15 | [Protection](15-protection.md) | Abuse defences: rate limits on the ticket path, purchase cap, stream cap, bot check |
 | 16 | [Lucky draw](16-lucky-draw.md) | Part of the tickets given away by a provably fair random draw among the waiting room |
 | 17 | [Support inbox](17-support-inbox.md) | People ask the organisers (e.g. for more tickets); admins answer, approve, decline |
+| 18 | [Bot strikes](18-bot-strikes.md) | Bot signals → strikes → 15-day suspension → ban; appeals; the admin Restrictions page |
 
 ---
 
@@ -47,11 +48,12 @@ Roadmap from the original blueprint. ✅ done · 🟡 partly done · ⬜ not sta
 | 5 | Protection: rate limit on holds, duplicate-tab and bot defence | ✅ (5a rate limits on the ticket path · 5b purchase cap of 4 per person · 5c at most 3 live streams per person · 5d bot check: Cloudflare Turnstile + honeypot) |
 | Lucky draw | (added after Phase 5) a % of the tickets in their own pool, drawn among everyone in the waiting room | ✅ (L1 settings + separate pool · L2 the draw: provably fair, rounds, closing · L3 pages + verify in the browser) |
 | Support inbox | (added after the lucky draw) requests to the organisers; approved "more tickets" raises that person's limit for that event | ✅ |
+| 5e | Bot strikes: suspicion score from bot signals, 1st strike = booking paused 15 days, 2nd within a year = banned; appeals; admin page | ✅ |
 | 6 | Proof: k6 load tests with thousands of users, SQL verification | ⬜ |
 | 7 | Polish: styling, Razorpay test mode, deployment, demo video | ⬜ |
 | 8 | Stretch: numbered seats, multiple servers, metrics | ⬜ |
 
-**Numbers today:** 315 server tests + 40 frontend tests, all passing. 300 signed-in users racing for 100 tickets over real HTTP → exactly 100 holds.
+**Numbers today:** 329 server tests + 40 frontend tests, all passing. 300 signed-in users racing for 100 tickets over real HTTP → exactly 100 holds.
 
 ---
 

@@ -200,6 +200,18 @@ Admins (`/api/admin`, role admin):
 ### `POST /admin/support/:id/decision`
 Body `{ "decision": "approved" | "declined" | "closed", "message"?: "…" }` → `200 { "request" }` · `409 REQUEST_NOT_OPEN` (already decided) · `409 NOT_APPROVABLE` (only more_tickets can be approved). Approving a `more_tickets` request raises that person's purchase limit for that event to 4 + extraTickets, in the same transaction.
 
+## Moderation (bot strikes)
+
+Booking actions (`POST /events/:id/holds`, `POST /events/:id/queue`, `POST /orders`, `POST /payments/fake/:orderId`) of a suspended or banned account → `403 ACCOUNT_RESTRICTED` with `details: { kind: "suspended" | "banned", until, reason }`. `GET /auth/me` and `POST /auth/login` return `user.restriction` (`null` or `{ id, kind, until, reason, since }`). Appeals: `POST /support/requests` with `{ "kind": "appeal", "message" }` (`409 NOT_RESTRICTED` if there's nothing to appeal); an admin approving it overturns the restriction. See [18](18-bot-strikes.md).
+
+Admins:
+
+### `GET /admin/restrictions?active=true|false` → `200 { "restrictions": [ { "id", "userId", "userEmail", "kind", "reason", "evidence", "startsAt", "endsAt", "automatic", "liftedAt", "overturned" } ] }`
+### `POST /admin/restrictions`
+Body `{ "email", "kind": "suspended" | "banned", "days": 1–365 (default 15), "reason" }` → `201 { "restriction" }` · `404 USER_NOT_FOUND` · `409 CANNOT_RESTRICT_SELF`
+### `POST /admin/restrictions/:id/lift`
+Body `{ "reason", "overturn": false }` (`true` = it was a mistake: doesn't count as a strike) → `200 { "restriction" }` · `404 RESTRICTION_NOT_FOUND` · `409 NOT_IN_FORCE`
+
 ## Trying it with curl
 
 ```bash

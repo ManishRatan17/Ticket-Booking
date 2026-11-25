@@ -1,6 +1,6 @@
 # 17 · The support inbox
 
-People can write to the organisers, and admins answer and decide. The first use is the most important one: **"may I buy more than the 4-ticket limit?"** (a family of 6, a school group). Approving it really raises that person's limit for that event. Later, ban appeals will use the same inbox.
+People can write to the organisers, and admins answer and decide. The first use is the most important one: **"may I buy more than the 4-ticket limit?"** (a family of 6, a school group). Approving it really raises that person's limit for that event. Appeals against a suspension or ban (`kind: "appeal"`, [18](18-bot-strikes.md)) use the same inbox: upholding one overturns the restriction in the same transaction.
 
 ```
 person ── "Help" → new request (more tickets for event X, +2, "we're a family of 6") ──► OPEN

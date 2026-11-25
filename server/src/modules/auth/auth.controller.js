@@ -2,6 +2,7 @@
 import { env } from '../../config/env.js';
 import { AppError } from '../../lib/errors.js';
 import * as authService from './auth.service.js';
+import { restrictionFor } from '../moderation/moderation.service.js';
 import { isGoogleConfigured, createAuthRequest } from './google.js';
 import { saveTransaction, takeTransaction, OAUTH_TX_TTL_SECONDS } from './oauth-transactions.js';
 import {
@@ -31,7 +32,7 @@ export async function login(req, res) {
     ip: req.ip,
   });
   setAuthCookies(res, tokens);
-  res.json({ user, expiresIn }); // 200 OK
+  res.json({ user: { ...user, restriction: await restrictionFor(user.id) }, expiresIn }); // 200 OK
 }
 
 export async function refresh(req, res) {
@@ -124,5 +125,6 @@ export async function resetPassword(req, res) {
 
 export async function me(req, res) {
   const user = await authService.getMe(req.user.id); // req.user was set by authenticate
-  res.json({ user });
+  // A suspension or ban (Phase 5e), so every page can show it: null, or { kind, until, reason }.
+  res.json({ user: { ...user, restriction: await restrictionFor(req.user.id) } });
 }

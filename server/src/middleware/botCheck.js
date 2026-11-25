@@ -14,6 +14,7 @@
 // Like Google sign-in, the browser only CARRIES something; our server checks it with the issuer.
 import { env } from '../config/env.js';
 import { AppError } from '../lib/errors.js';
+import { recordSignal } from '../modules/moderation/moderation.service.js';
 
 export const TOKEN_HEADER = 'x-turnstile-token';
 const VERIFY_TIMEOUT_MS = 3000;
@@ -55,7 +56,8 @@ const refuse = () =>
 export async function requireHuman(req, res, next) {
   if (!env.botCheck.enabled) return next(); // no keys configured (development without keys, the test suite)
 
-  const verdict = await verifyHumanToken(req.get(TOKEN_HEADER), req.ip);
+  const token = req.get(TOKEN_HEADER);
+  const verdict = await verifyHumanToken(token, req.ip);
   if (verdict === 'human') return next();
   if (verdict === 'unavailable') {
     // FAIL OPEN, like the rate limits: if Cloudflare is down during a sale, refusing everyone
@@ -64,6 +66,8 @@ export async function requireHuman(req, res, next) {
     console.warn(`[bot-check] Cloudflare unavailable, allowing ${req.method} ${req.originalUrl}`);
     return next();
   }
+  // A signed-in person failing the check is a bot signal (Phase 5e). Not on register: no account yet.
+  if (req.user) await recordSignal(req.user.id, token ? 'bad_bot_token' : 'missing_bot_token');
   throw refuse();
 }
 

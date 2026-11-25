@@ -39,6 +39,7 @@ Every defence in the project, the attack it stops, and where it lives. Most have
 | One account buying everything | 4 tickets per person per event (Redis + PostgreSQL) | [15 § 5b](15-protection.md#5b--purchase-cap-4-tickets-per-person-per-event) |
 | Thousands of open tabs | at most 3 live streams per user | [15 § 5c](15-protection.md#5c--duplicate-tabs-at-most-3-live-streams-per-user) |
 | Bot-made accounts, bots in the queue | Cloudflare Turnstile on register and queue join; register honeypot | [15 § 5d](15-protection.md#5d--bot-check-cloudflare-turnstile--a-honeypot) |
+| Accounts that keep behaving like bots | signals → strikes → booking paused 15 days → banned; never on IP alone; appeals | [18](18-bot-strikes.md) |
 
 ## CSRF in detail
 

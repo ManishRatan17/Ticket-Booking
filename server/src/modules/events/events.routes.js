@@ -3,6 +3,7 @@
 import { Router } from 'express';
 import { validate } from '../../middleware/validate.js';
 import { authenticate } from '../../middleware/authenticate.js';
+import { requireNotRestricted } from '../../middleware/requireNotRestricted.js';
 import { eventIdParamsSchema, holdBodySchema, holdIdParamsSchema } from './events.schemas.js';
 import * as eventsController from './events.controller.js';
 import { holdPerIp, holdPerUser, releasePerUser } from '../../lib/ticketRateLimits.js';
@@ -18,6 +19,7 @@ router.post(
   '/events/:id/holds',
   holdPerIp, // before authenticate: turn a flood away cheaply
   authenticate,
+  requireNotRestricted, // suspended/banned accounts can't book (Phase 5e)
   holdPerUser,
   validate({ params: eventIdParamsSchema, body: holdBodySchema }),
   eventsController.holdTickets,

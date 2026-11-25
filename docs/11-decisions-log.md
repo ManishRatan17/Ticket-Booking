@@ -151,6 +151,18 @@ Every significant choice, the alternatives considered, and why. Newest at the bo
 | Decisions only from `open` (`UPDATE … WHERE status = 'open'`), approval + raise in one transaction | check then update | two admins can't both decide; never an approval without its raise |
 | Requests kept (event set NULL) if an event is deleted | cascade delete | the conversation is a record |
 
+## Bot strikes (Phase 5e)
+
+| Decision | Rejected | Why |
+|---|---|---|
+| Strikes only from per-account evidence (refused actions, missing/fake bot tokens), scored over 10 minutes | instant ban on one signal; IP-based signals | detection is never certain; one IP is shared by many real people |
+| 20 points / 10 min; missing token 5, fake token 2, refused action 1 | one fixed rule | weights match how sure each signal is (an expired token can happen to a person) |
+| Suspension 15 days, ban on a 2nd strike within a year; overturned strikes don't count | permanent ban at once | proportional, and mistakes can be undone |
+| Restricted = booking paused, account still usable | log them out | they must see why and be able to appeal |
+| Restriction checked in PostgreSQL; expiry by date, no job | a Redis flag + a reopen job | always right; nothing to forget to run |
+| Cleanup on a strike (holds, orders, queue, passes) | leave them | a bot account must not keep tickets tied up |
+| Appeals in the support inbox; upholding overturns in the same transaction | a separate appeals system | one inbox for people and admins |
+
 ## Frontend
 
 | Decision | Alternatives | Why |

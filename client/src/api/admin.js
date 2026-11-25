@@ -16,6 +16,12 @@ export const getJobsOverview = () => api('/admin/jobs')
 
 export const retryJob = (jobId) => api(`/admin/jobs/${encodeURIComponent(jobId)}/retry`, { method: 'POST' })
 
+// Restrictions (Phase 5e: bot strikes).
+export const listRestrictions = (activeOnly) => api(`/admin/restrictions?active=${activeOnly ? 'true' : 'false'}`)
+export const restrictUser = (body) => api('/admin/restrictions', { method: 'POST', body })
+export const liftRestriction = (id, { reason, overturn }) =>
+  api(`/admin/restrictions/${encodeURIComponent(id)}/lift`, { method: 'POST', body: { reason, overturn } })
+
 // The admin API checks the role inside the ACCESS TOKEN, which was made at the last refresh.
 // Someone promoted a moment ago still holds a token that says "user" → 403. One refresh gets a
 // token with the role from the database (A6: "promotion takes effect at the next refresh").

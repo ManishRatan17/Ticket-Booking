@@ -49,7 +49,8 @@ function humanize(seconds) {
 //   key(req)        → what to count by (IP, IP + email, …)
 //   resetOnSuccess  → a successful request clears the counter. For login: only FAILED
 //                     attempts should pile up; a user who logs in fine starts from zero.
-export function rateLimit({ name, limit, windowSeconds, key, resetOnSuccess = false }) {
+//   onRefused(req)  → called when a request is refused (bot strikes count these; never blocks)
+export function rateLimit({ name, limit, windowSeconds, key, resetOnSuccess = false, onRefused }) {
   const limiter = createLimiter({ name, limit, windowSeconds });
 
   return async (req, res, next) => {
@@ -75,6 +76,7 @@ export function rateLimit({ name, limit, windowSeconds, key, resetOnSuccess = fa
     });
 
     if (!result.allowed) {
+      if (onRefused) await onRefused(req);
       res.set('Retry-After', String(result.resetSeconds)); // the official "come back in N seconds"
       throw new AppError(429, 'RATE_LIMITED', `Too many attempts. Try again in ${humanize(result.resetSeconds)}.`, {
         retryAfterSeconds: result.resetSeconds,

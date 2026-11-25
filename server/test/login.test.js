@@ -82,7 +82,9 @@ test('login: 200 with a correctly built HS256 access token', async () => {
 
   assert.equal(status, 200);
   assert.equal(body.expiresIn, 900);
-  assert.deepEqual(Object.keys(body.user).sort(), ['createdAt', 'email', 'id', 'role']);
+  // Exactly these fields (nothing like a password hash can slip in). restriction: Phase 5e, null for most people.
+  assert.deepEqual(Object.keys(body.user).sort(), ['createdAt', 'email', 'id', 'restriction', 'role']);
+  assert.equal(body.user.restriction, null);
 
   // A JWT's header and payload are readable by ANYONE, no secret needed:
   const header = decodeProtectedHeader(accessToken);

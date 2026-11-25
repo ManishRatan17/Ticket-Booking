@@ -64,7 +64,9 @@ export function AdminSupportPage() {
       const { request } = await decideSupport(selected.id, decision, decisionNote.trim() || undefined)
       setSelected(request)
       setNotice(
-        decision === 'approved'
+        decision === 'approved' && request.kind === 'appeal'
+          ? `Appeal upheld: ${request.userEmail}'s restriction is overturned.`
+          : decision === 'approved'
           ? `Approved: ${request.userEmail} may now buy up to ${4 + request.extraTickets} tickets for ${request.eventName}.`
           : `Request ${STATUS_TEXT[decision].toLowerCase()}.`,
       )
@@ -126,10 +128,10 @@ export function AdminSupportPage() {
             <div>
               <label htmlFor="decisionNote">Message with the decision (optional)</label>
               <textarea id="decisionNote" rows={2} maxLength={2000} value={decisionNote} onChange={(e) => setDecisionNote(e.target.value)} />
-              {selected.kind === 'more_tickets' && (
+              {selected.kind !== 'question' && (
                 <>
                   <button type="button" onClick={() => decide('approved')} disabled={busy}>
-                    Approve (+{selected.extraTickets})
+                    {selected.kind === 'appeal' ? 'Uphold appeal (lift the restriction)' : `Approve (+${selected.extraTickets})`}
                   </button>{' '}
                   <button type="button" onClick={() => decide('declined')} disabled={busy}>
                     Decline

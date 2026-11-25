@@ -32,7 +32,7 @@ export function EventPage() {
   // One idempotency key per hold: clicking Checkout twice (or a retry) sends the SAME key,
   // so the server returns the same order instead of making a second one.
   const checkoutKey = useRef(null)
-  const { status, user } = useAuth()
+  const { status, user, reload: reloadMe } = useAuth()
   const signedIn = status === 'signed-in'
 
   const [page, setPage] = useState(null) // { event, hold, purchase, offset }
@@ -92,6 +92,7 @@ export function EventPage() {
     try {
       await queue.join(human.token)
     } catch (err) {
+      if (err.code === 'ACCOUNT_RESTRICTED') reloadMe() // show the banner everywhere
       setError(errorMessage(err))
       human.reset() // the token may have been used: a fresh widget for the next try
     }
@@ -106,6 +107,7 @@ export function EventPage() {
       const { hold, serverTime } = await holdTickets(id, quantity)
       setPage((p) => ({ ...p, hold, offset: clockOffset(serverTime), event: { ...p.event, available: p.event.available - hold.quantity } }))
     } catch (err) {
+      if (err.code === 'ACCOUNT_RESTRICTED') reloadMe() // show the banner everywhere
       setError(errorMessage(err))
       await reload() // SOLD_OUT / HOLD_EXISTS: show the real stock and my real hold
     } finally {

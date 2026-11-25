@@ -8,8 +8,10 @@ import * as adminController from './admin.controller.js';
 import { createEventSchema } from '../events/events.schemas.js';
 import * as eventsController from '../events/events.controller.js';
 import { z } from 'zod';
+import { AppError } from '../../lib/errors.js';
 import * as adminJobs from './admin.jobs.js';
 import * as support from '../support/support.service.js';
+import * as moderation from '../moderation/moderation.service.js';
 import { decisionSchema, listQuerySchema, messageSchema, requestIdParamsSchema } from '../support/support.schemas.js';
 
 const router = Router();
@@ -50,5 +52,36 @@ router.post('/support/:id/messages', validate({ params: requestIdParamsSchema, b
 router.post('/support/:id/decision', validate({ params: requestIdParamsSchema, body: decisionSchema }), async (req, res) => {
   res.json({ request: await support.decide(req.user.id, req.validated.params.id, req.validated.body) });
 });
+
+// Moderation (Phase 5e): restrictions in force (or all), restricting by hand, lifting.
+router.get('/restrictions', validate({ query: z.object({ active: z.enum(['true', 'false']).default('true') }) }), async (req, res) => {
+  res.json({ restrictions: await moderation.listRestrictions({ activeOnly: req.validated.query.active === 'true' }) });
+});
+router.post(
+  '/restrictions',
+  validate({
+    body: z.object({
+      email: z.string().trim().toLowerCase().email(),
+      kind: z.enum(['suspended', 'banned']),
+      days: z.number().int().min(1).max(365).default(15),
+      reason: z.string().trim().min(3).max(500),
+    }),
+  }),
+  async (req, res) => {
+    const restriction = await moderation.restrictByEmail({ adminId: req.user.id, ...req.validated.body });
+    if (!restriction) throw new AppError(409, 'ALREADY_RESTRICTED', 'This account is already restricted');
+    res.status(201).json({ restriction });
+  },
+);
+router.post(
+  '/restrictions/:id/lift',
+  validate({
+    params: z.object({ id: z.coerce.number().int().positive() }),
+    body: z.object({ reason: z.string().trim().min(3).max(500), overturn: z.boolean().default(false) }),
+  }),
+  async (req, res) => {
+    res.json({ restriction: await moderation.lift({ adminId: req.user.id, restrictionId: req.validated.params.id, ...req.validated.body }) });
+  },
+);
 
 export default router;

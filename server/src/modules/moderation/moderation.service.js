@@ -1,0 +1,129 @@
+// Moderation: bot signals → suspicion score → strikes → restrictions.
+//
+//   signal (a refused action, a missing / bad "are you a person?" token)
+//        │  points, in Redis, fading after a window (add-signal.lua)
+//        ▼
+//   score ≥ threshold in the window ──► STRIKE
+//        1st strike (in a year) → SUSPENDED: no ticket booking for SUSPENSION_DAYS (default 15)
+//        2nd strike (in a year) → BANNED for good
+//   The person can still log in: to see why, and to APPEAL (support inbox, kind "appeal").
+//
+// Only signals tied to an ACCOUNT count, never an IP alone: a whole college shares one IP.
+import { readFileSync } from 'node:fs';
+import { pool, withTransaction } from '../../config/db.js';
+import { redis } from '../../config/redis.js';
+import { env } from '../../config/env.js';
+import { AppError } from '../../lib/errors.js';
+import { releaseHold } from '../reservation/holds.js';
+import { removeUserFromWaitingRooms } from '../waiting-room/waiting-room.js';
+import * as repo from './moderation.repository.js';
+
+const { prefix: PREFIX, threshold: THRESHOLD, windowSeconds: WINDOW_SECONDS, suspensionDays: SUSPENSION_DAYS } = env.moderation;
+
+// How suspicious each signal is. A person using the site normally never produces any of them;
+// a script produces dozens a minute.
+export const SIGNAL_POINTS = {
+  rate_limited: 1, // an ACTION refused by a per-user rate limit (hold, join, order, pay, release)
+  bad_bot_token: 2, // "are you a person?" token rejected by Cloudflare (fake, replayed, or expired)
+  missing_bot_token: 5, // no token at all: our page never sends a join without one
+};
+export const keys = (userId) => ({
+  score: `${PREFIX}:score:${userId}`,
+  signals: `${PREFIX}:signals:${userId}`,
+  flagged: `${PREFIX}:flagged:${userId}`,
+});
+
+redis.defineCommand('addBotSignal', {
+  numberOfKeys: 3,
+  lua: readFileSync(new URL('./lua/add-signal.lua', import.meta.url), 'utf8'),
+});
+
+// Record a signal. Never throws (a protection must not break the request that triggered it).
+export async function recordSignal(userId, kind) {
+  if (!env.moderation.enabled || !userId || !SIGNAL_POINTS[kind]) return null;
+  try {
+    const k = keys(userId);
+    const [score, crossed] = await redis.addBotSignal(k.score, k.signals, k.flagged, SIGNAL_POINTS[kind], kind, WINDOW_SECONDS, THRESHOLD);
+    if (crossed !== 1) return { score, strike: null };
+
+    const signals = Object.fromEntries(Object.entries(await redis.hgetall(k.signals)).map(([s, n]) => [s, Number(n)]));
+    await redis.del(k.score, k.signals); // the evidence is now kept with the restriction
+    const restriction = await strike(userId, {
+      reason: 'Automated (bot-like) activity was detected on this account',
+      evidence: { score, threshold: THRESHOLD, windowMinutes: Math.round(WINDOW_SECONDS / 60), signals },
+    });
+    return { score, strike: restriction };
+  } catch (err) {
+    console.warn(`[moderation] could not record ${kind} for user ${userId}: ${err.message}`);
+    return null;
+  }
+}
+
+// A strike. Automatic (adminId null) or by an admin, who may choose the kind and the days.
+// Returns the new restriction, or null if one was already in force (no double punishment).
+export async function strike(userId, { reason, evidence = {}, adminId = null, kind = null, days = SUSPENSION_DAYS }) {
+  const id = await withTransaction(async (client) => {
+    // One person at a time: two strikes racing can't both read "0 earlier strikes".
+    if (!(await repo.lockUser(client, userId))) throw new AppError(404, 'USER_NOT_FOUND', 'That user no longer exists');
+    if (!kind && (await repo.activeRestriction(client, userId))) return null;
+    const earlier = await repo.countStrikes(client, userId);
+    const finalKind = kind ?? (earlier > 0 ? 'banned' : 'suspended');
+    return repo.insertRestriction(client, { userId, kind: finalKind, reason, evidence, days, createdBy: adminId });
+  });
+  if (id === null) return null;
+
+  await cleanUpAfterRestriction(userId);
+  const restriction = await repo.findRestriction(pool, id);
+  console.warn(
+    `[moderation] user ${userId} ${restriction.kind}${restriction.endsAt ? ` until ${restriction.endsAt.toISOString()}` : ''}` +
+      ` (${adminId ? `by admin ${adminId}` : 'automatic'}): ${JSON.stringify(evidence)}`,
+  );
+  return restriction;
+}
+
+// A restricted person gives up what they were holding on to, so real fans get it:
+// unpaid orders and holds (tickets back on sale), places in waiting rooms, passes.
+async function cleanUpAfterRestriction(userId) {
+  const holdIds = new Set(await repo.expirePendingOrders(pool, userId));
+  for await (const batch of redis.scanStream({ match: `event:*:user:${userId}:hold`, count: 500 })) {
+    for (const key of batch) {
+      const holdId = await redis.get(key);
+      if (holdId) holdIds.add(holdId);
+    }
+  }
+  for (const holdId of holdIds) await releaseHold(holdId);
+  await removeUserFromWaitingRooms(userId);
+}
+
+// What the site tells a person (and enforces): null, or { kind, until, reason }.
+export async function restrictionFor(userId, client = pool) {
+  const r = await repo.activeRestriction(client, userId);
+  return r && { id: r.id, kind: r.kind, until: r.endsAt, reason: r.reason, since: r.startsAt };
+}
+
+// ---------- admins ----------
+
+export const listRestrictions = ({ activeOnly }) => repo.listRestrictions(pool, { activeOnly });
+
+export async function restrictByEmail({ adminId, email, kind, days, reason }) {
+  const userId = await repo.findUserIdByEmail(pool, email);
+  if (!userId) throw new AppError(404, 'USER_NOT_FOUND', 'No user with this email');
+  if (userId === adminId) throw new AppError(409, 'CANNOT_RESTRICT_SELF', 'You cannot restrict your own account');
+  const restriction = await strike(userId, { reason, adminId, kind, days, evidence: { manual: true } });
+  return restriction;
+}
+
+// Lift (end early). overturn = it was a MISTAKE: then it doesn't count as a strike either.
+export async function lift({ adminId, restrictionId, reason, overturn }) {
+  const r = await repo.findRestriction(pool, restrictionId);
+  if (!r) throw new AppError(404, 'RESTRICTION_NOT_FOUND', 'No restriction with this id');
+  const lifted = await repo.liftActive(pool, { userId: r.userId, adminId, reason, overturn });
+  if (lifted === 0) throw new AppError(409, 'NOT_IN_FORCE', 'This restriction is no longer in force');
+  console.warn(`[moderation] admin ${adminId} lifted restrictions of user ${r.userId}${overturn ? ' (overturned)' : ''}: ${reason}`);
+  return repo.findRestriction(pool, restrictionId);
+}
+
+// An upheld appeal (support inbox): overturn, inside the caller's transaction.
+export async function overturnForAppeal(client, { userId, adminId }) {
+  return repo.liftActive(client, { userId, adminId, reason: 'Appeal upheld', overturn: true });
+}

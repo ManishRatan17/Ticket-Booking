@@ -103,6 +103,14 @@ export async function closeStreamSlot(userId) {
   await redis.wrStreamClose(streamsKey(userId));
 }
 
+// A restricted person leaves every waiting room: their places, passes and lucky passes go.
+export async function removeUserFromWaitingRooms(userId) {
+  for (const eventId of await redis.smembers(ACTIVE_ROOMS)) await redis.zrem(queueKey(eventId), String(userId));
+  for (const pattern of [`${PREFIX}:*:pass:${userId}`, `${PREFIX}:*:lucky:${userId}`]) {
+    for await (const batch of redis.scanStream({ match: pattern, count: 500 })) if (batch.length) await redis.del(...batch);
+  }
+}
+
 export async function activeRooms() {
   return redis.smembers(ACTIVE_ROOMS);
 }

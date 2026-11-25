@@ -22,6 +22,7 @@ import { OrdersPage } from './pages/OrdersPage.jsx'
 import { SupportPage } from './pages/SupportPage.jsx'
 import { SupportRequestPage } from './pages/SupportRequestPage.jsx'
 import { AdminSupportPage } from './pages/AdminSupportPage.jsx'
+import { AdminRestrictionsPage } from './pages/AdminRestrictionsPage.jsx'
 
 function App() {
   return (
@@ -57,6 +58,7 @@ function App() {
               <Route path="admin/events" element={<AdminEventsPage />} />
               <Route path="admin/jobs" element={<AdminJobsPage />} />
               <Route path="admin/support" element={<AdminSupportPage />} />
+              <Route path="admin/restrictions" element={<AdminRestrictionsPage />} />
             </Route>
 
             {/* Reachable either way: the link comes from an email */}

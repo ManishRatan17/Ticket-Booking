@@ -9,6 +9,7 @@ import { AppError } from '../../lib/errors.js';
 import { isUniqueViolation } from '../../lib/db-errors.js';
 import * as eventsRepository from '../events/events.repository.js';
 import * as repo from './support.repository.js';
+import { overturnForAppeal, restrictionFor } from '../moderation/moderation.service.js';
 
 const notFound = () => new AppError(404, 'REQUEST_NOT_FOUND', 'No support request with this id');
 
@@ -25,6 +26,9 @@ function forPerson(request) {
 // ---------- the person ----------
 
 export async function createRequest({ userId, kind, eventId = null, extraTickets = null, message }) {
+  if (kind === 'appeal' && !(await restrictionFor(userId))) {
+    throw new AppError(409, 'NOT_RESTRICTED', 'Your account is not restricted, so there is nothing to appeal');
+  }
   if (eventId !== null && !(await eventsRepository.findEventById(eventId))) {
     throw new AppError(404, 'EVENT_NOT_FOUND', 'No event with this id');
   }
@@ -86,15 +90,20 @@ export async function addAdminMessage(adminId, id, body) {
 export async function decide(adminId, id, { decision, message }) {
   const request = await repo.findRequest(pool, id);
   if (!request) throw notFound();
-  if (decision === 'approved' && request.kind !== 'more_tickets') {
-    throw new AppError(409, 'NOT_APPROVABLE', 'Only "more tickets" requests can be approved; close this one instead');
+  if (decision === 'approved' && request.kind === 'question') {
+    throw new AppError(409, 'NOT_APPROVABLE', 'Questions can\'t be approved; close this one instead');
   }
 
   await withTransaction(async (client) => {
     const decided = await repo.decide(client, { id, status: decision, adminId });
     if (!decided) throw new AppError(409, 'REQUEST_NOT_OPEN', 'This request was already decided');
     // Approving raises the limit IN THE SAME TRANSACTION: "approved" and "limit raised" happen together.
-    if (decision === 'approved') {
+    // Approving an APPEAL overturns the restriction: booking works again, and it isn't counted
+    // as a strike (a mistake isn't the person's fault). Same transaction as the decision.
+    if (decision === 'approved' && decided.kind === 'appeal') {
+      await overturnForAppeal(client, { userId: decided.user_id, adminId });
+    }
+    if (decision === 'approved' && decided.kind === 'more_tickets') {
       await repo.grantExtraTickets(client, {
         eventId: decided.event_id,
         userId: decided.user_id,

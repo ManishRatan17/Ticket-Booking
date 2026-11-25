@@ -122,6 +122,16 @@ export const env = {
     prefix: process.env.JOBS_PREFIX || 'bull', // Redis key prefix for the queues (tests use their own)
   },
   botCheck: botCheckSettings(),
+  moderation: {
+    // Bot signals → strikes → suspensions/bans (Phase 5e). Off only for the general test suite
+    // (.env.test), whose hundreds of requests from one process would look like a bot. Never off in production.
+    enabled: process.env.NODE_ENV === 'production' || process.env.MODERATION_ENABLED !== 'false',
+    prefix: process.env.MODERATION_PREFIX || 'bot', // Redis key prefix (tests use their own)
+    threshold: 20, // points within the window → a strike
+    windowSeconds: 10 * 60,
+    // A first strike pauses booking for this many days (15–30 per the plan; default 15).
+    suspensionDays: Math.min(30, Math.max(1, Number(process.env.BOT_SUSPENSION_DAYS ?? 15))),
+  },
   lottery: {
     // How long one lucky-draw round lasts = how long a winner's lucky pass is valid (10 minutes).
     roundSeconds: Math.max(1, Number(process.env.LOTTERY_ROUND_SECONDS ?? 600)),

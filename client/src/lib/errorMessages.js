@@ -32,7 +32,13 @@ const MESSAGES = {
   REQUEST_NOT_FOUND: 'That request does not exist.',
   REQUEST_CLOSED: 'This request has been answered and closed. Start a new one if you need more help.',
   REQUEST_NOT_OPEN: 'This request was already decided (maybe by another admin). Reload to see it.',
-  NOT_APPROVABLE: 'Only "more tickets" requests can be approved. Close this one instead.',
+  NOT_APPROVABLE: "Questions can't be approved. Close this one instead.",
+  // Bot strikes (ACCOUNT_RESTRICTED keeps the server's message: it has the date)
+  NOT_RESTRICTED: 'Your account is not restricted, so there is nothing to appeal.',
+  ALREADY_RESTRICTED: 'This account is already restricted.',
+  CANNOT_RESTRICT_SELF: 'You cannot restrict your own account.',
+  NOT_IN_FORCE: 'This restriction is no longer in force.',
+  RESTRICTION_NOT_FOUND: 'That restriction no longer exists.',
   // Admin
   FORBIDDEN: 'You do not have permission to do this.',
   LAST_ADMIN: 'This is the only admin left. Make someone else an admin first.',

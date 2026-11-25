@@ -197,6 +197,10 @@ The register form has a field called `website` that people never see: it's moved
 
 *Tested in [bot-check.test.js](../server/test/bot-check.test.js) against a fake Cloudflare ([fake-turnstile.js](../server/test-support/fake-turnstile.js)): `/api/config` has the site key and not the secret; no token / made-up token / replayed token → 403; good token → 201 and Cloudflare got our secret, the token and the visitor's IP; a form with a typo → 400 without using the token; honeypot → 403 with no account; Cloudflare 500 or dropped connection → allowed; wrong secret → refused; joining a queue needs a token, reading status doesn't; not signed in → 401 before any Cloudflare call. Client: [api/botCheck.test.js](../client/src/api/botCheck.test.js) (the header and the honeypot field are sent). Mutations: `requireHuman` removed from register → 5 tests fail; honeypot disabled → the honeypot test fails.*
 
+## 5e · Strikes: suspensions and bans
+
+Accounts that keep producing bot signals (refused actions, missing or fake "are you a person?" tokens) get a strike: booking paused for 15 days, banned on a second strike within a year, with appeals through the support inbox. It has its own page: [18-bot-strikes.md](18-bot-strikes.md).
+
 ## Phase 5 in one picture
 
 ```

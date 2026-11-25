@@ -8,14 +8,17 @@ import { Alert } from '../components/Alert.jsx'
 import { errorMessage, fieldErrors } from '../lib/errorMessages.js'
 import { timeAgo } from '../lib/format.js'
 import { KIND_TEXT, STATUS_TEXT } from '../lib/supportText.js'
+import { useAuth } from '../auth/useAuth.js'
 
 export function SupportPage() {
   const [params] = useSearchParams()
   const navigate = useNavigate()
+  const { user } = useAuth()
+  const restricted = Boolean(user?.restriction)
   const [requests, setRequests] = useState(null)
   const [events, setEvents] = useState([])
   const [form, setForm] = useState({
-    kind: params.get('kind') === 'more_tickets' ? 'more_tickets' : 'question',
+    kind: ['more_tickets', 'appeal'].includes(params.get('kind')) ? params.get('kind') : 'question',
     eventId: params.get('event') ?? '',
     extraTickets: '2',
     message: '',
@@ -51,7 +54,9 @@ export function SupportPage() {
       const body =
         form.kind === 'more_tickets'
           ? { kind: 'more_tickets', eventId, extraTickets: Number(form.extraTickets), message: form.message }
-          : { kind: 'question', eventId, message: form.message }
+          : form.kind === 'appeal'
+            ? { kind: 'appeal', message: form.message }
+            : { kind: 'question', eventId, message: form.message }
       const { request } = await createRequest(body)
       navigate(`/support/${request.id}`)
     } catch (err) {
@@ -78,8 +83,10 @@ export function SupportPage() {
           <select id="kind" value={form.kind} onChange={update('kind')}>
             <option value="more_tickets">I'd like to buy more tickets than the limit</option>
             <option value="question">A question</option>
+            {(restricted || form.kind === 'appeal') && <option value="appeal">Appeal: my account was restricted by mistake</option>}
           </select>
         </div>
+        {form.kind !== 'appeal' && (
         <div className="field">
           <label htmlFor="eventId">Event{form.kind === 'question' && ' (optional)'}</label>
           <select id="eventId" value={form.eventId} onChange={update('eventId')}>
@@ -92,6 +99,7 @@ export function SupportPage() {
           </select>
           {errors.eventId && <p className="field-error">{errors.eventId}</p>}
         </div>
+        )}
         {form.kind === 'more_tickets' && (
           <div className="field">
             <label htmlFor="extraTickets">How many more (on top of the normal 4)?</label>
@@ -108,7 +116,11 @@ export function SupportPage() {
           <label htmlFor="message">Message</label>
           <textarea id="message" rows={4} maxLength={2000} value={form.message} onChange={update('message')} />
           {errors.message && <p className="field-error">{errors.message}</p>}
-          <p className="field-hint">For more tickets, tell us why (for example: a family of 6).</p>
+          <p className="field-hint">
+            {form.kind === 'appeal'
+              ? 'Tell us what happened (for example: several people booking from one account, or a browser extension).'
+              : 'For more tickets, tell us why (for example: a family of 6).'}
+          </p>
         </div>
         <button type="submit" disabled={busy}>
           {busy ? 'Sending…' : 'Send'}

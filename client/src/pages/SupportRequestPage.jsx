@@ -58,6 +58,9 @@ export function SupportRequestPage() {
               {request.eventId && <Link to={`/events/${request.eventId}`}>Go to the event</Link>}
             </Alert>
           )}
+          {request.status === 'approved' && request.kind === 'appeal' && (
+            <Alert kind="success">Your appeal was upheld: ticket booking works again on your account.</Alert>
+          )}
           <SupportThread request={request} onSend={send} canWrite={request.status === 'open'} />
         </>
       )}

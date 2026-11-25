@@ -15,6 +15,8 @@ export const createRequestSchema = z.discriminatedUnion('kind', [
     eventId: z.number().int().positive().nullable().default(null),
     message,
   }),
+  // "My account was restricted by mistake" (Phase 5e). Only while a restriction is in force.
+  z.object({ kind: z.literal('appeal'), message }),
 ]);
 
 export const messageSchema = z.object({ body: message });

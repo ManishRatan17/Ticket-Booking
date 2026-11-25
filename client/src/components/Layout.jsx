@@ -1,6 +1,7 @@
 // The frame around every page: navigation bar, Google sign-in result, then the page itself.
 import { useEffect, useState } from 'react'
 import { Link, NavLink, Outlet, useNavigate, useSearchParams } from 'react-router-dom'
+import { RestrictionBanner } from './RestrictionBanner.jsx'
 import { useAuth } from '../auth/useAuth.js'
 import { Alert } from './Alert.jsx'
 import { errorMessage } from '../lib/errorMessages.js'
@@ -32,6 +33,7 @@ function NavBar() {
                 <NavLink to="/admin/events">Manage events</NavLink>
                 <NavLink to="/admin/jobs">Jobs</NavLink>
                 <NavLink to="/admin/support">Support inbox</NavLink>
+                <NavLink to="/admin/restrictions">Restrictions</NavLink>
               </>
             )}
             <NavLink to="/account" title="My account and devices">
@@ -75,11 +77,13 @@ function GoogleResult() {
 }
 
 export function Layout() {
+  const { user } = useAuth() // for the "account restricted" banner on every page (Phase 5e)
   return (
     <>
       <NavBar />
       <main className="app">
         <GoogleResult />
+        <RestrictionBanner restriction={user?.restriction} />
         <Outlet />
       </main>
     </>
