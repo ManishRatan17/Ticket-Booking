@@ -1,7 +1,7 @@
 // "Help": my requests to the organisers, and a form for a new one.
 // /support?kind=more_tickets&event=12 fills in the form (the event page links here at the limit).
 import { useEffect, useState } from 'react'
-import { Link, useNavigate, useSearchParams } from 'react-router-dom'
+import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom'
 import { createRequest, listMyRequests } from '../api/support.js'
 import { listEvents } from '../api/events.js'
 import { Alert } from '../components/Alert.jsx'
@@ -43,6 +43,9 @@ export function SupportPage() {
   }, [])
 
   const update = (name) => (e) => setForm({ ...form, [name]: e.target.value })
+
+  // Admins answer requests; they don't send them.
+  if (user?.role === 'admin') return <Navigate to="/admin/support" replace />
 
   async function handleSubmit(e) {
     e.preventDefault()

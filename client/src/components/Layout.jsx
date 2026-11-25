@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react'
 import { Link, NavLink, Outlet, useNavigate, useSearchParams } from 'react-router-dom'
 import { RestrictionBanner } from './RestrictionBanner.jsx'
+import { RestrictionsLink } from './RestrictionsLink.jsx'
 import { useAuth } from '../auth/useAuth.js'
 import { Alert } from './Alert.jsx'
 import { errorMessage } from '../lib/errorMessages.js'
@@ -24,16 +25,19 @@ function NavBar() {
         <NavLink to="/events">Events</NavLink>
         {status === 'signed-in' ? (
           <>
-            <NavLink to="/orders">My orders</NavLink>
-            <NavLink to="/support">Help</NavLink>
-            {/* Only a convenience: hiding the links is not what protects the admin API */}
-            {user.role === 'admin' && (
+            {/* Admins run the sale, they don't buy or ask for help (the server refuses it too). */}
+            {user.role === 'admin' ? (
               <>
-                <NavLink to="/admin/users">Users</NavLink>
                 <NavLink to="/admin/events">Manage events</NavLink>
-                <NavLink to="/admin/jobs">Jobs</NavLink>
                 <NavLink to="/admin/support">Support inbox</NavLink>
-                <NavLink to="/admin/restrictions">Restrictions</NavLink>
+                <RestrictionsLink />
+                <NavLink to="/admin/users">Users</NavLink>
+                <NavLink to="/admin/system">System</NavLink>
+              </>
+            ) : (
+              <>
+                <NavLink to="/orders">My orders</NavLink>
+                <NavLink to="/support">Help</NavLink>
               </>
             )}
             <NavLink to="/account" title="My account and devices">

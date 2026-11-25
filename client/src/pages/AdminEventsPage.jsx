@@ -1,12 +1,10 @@
-// Admin → Events: create an event and see all events (backend step 4b).
+// Admin → Manage events: every event with live numbers (click one to see or edit it), and creating events.
 import { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
-import { createEvent, withFreshRole } from '../api/admin.js'
-import { listEvents } from '../api/events.js'
+import { createEvent, listAdminEvents, withFreshRole } from '../api/admin.js'
+import { AdminEventsTable } from '../components/AdminEventsTable.jsx'
 import { Alert } from '../components/Alert.jsx'
 import { FormField } from '../components/FormField.jsx'
 import { errorMessage, fieldErrors } from '../lib/errorMessages.js'
-import { formatDate, formatMoney } from '../lib/format.js'
 
 const EMPTY_FORM = { name: '', totalTickets: '100', price: '499', admissionPerSecond: '', lobbyMinutes: '15', lotteryPercent: '0', lotteryDrawMinutes: '30', lotteryPerWinner: '2', saleStartsAt: '' }
 
@@ -18,14 +16,19 @@ export function AdminEventsPage() {
   const [notice, setNotice] = useState(null)
   const [busy, setBusy] = useState(false)
 
+  // First load, then live numbers every 5 seconds while the page is open.
   useEffect(() => {
     let active = true
-    listEvents().then(
-      (result) => active && setEvents(result.events),
-      (err) => active && setError(errorMessage(err)),
-    )
+    const refresh = () =>
+      withFreshRole(listAdminEvents).then(
+        (result) => active && setEvents(result.events),
+        (err) => active && setError(errorMessage(err)),
+      )
+    refresh()
+    const timer = setInterval(refresh, 5000)
     return () => {
       active = false
+      clearInterval(timer)
     }
   }, [])
 
@@ -59,7 +62,7 @@ export function AdminEventsPage() {
         }),
       )
       setNotice(`Created "${event.name}" with ${event.totalTickets} tickets.`)
-      setEvents((list) => [...(list ?? []), event])
+      setEvents((await listAdminEvents()).events)
       setForm(EMPTY_FORM)
     } catch (err) {
       setErrors(fieldErrors(err))
@@ -71,11 +74,18 @@ export function AdminEventsPage() {
 
   return (
     <section>
-      <h1>Events (admin)</h1>
+      <h1>Manage events</h1>
       <Alert>{error}</Alert>
       <Alert kind="success">{notice}</Alert>
 
-      <h2>Create an event</h2>
+      {events === null && !error && <p className="muted">Loading…</p>}
+      {events && <AdminEventsTable events={events} />}
+      <p className="muted">Live: refreshed every 5 seconds. Click an event to see it or edit it.</p>
+
+      <details className="panel">
+        <summary>
+          <strong>Create an event</strong>
+        </summary>
       <form onSubmit={handleSubmit} noValidate>
         <FormField id="name" label="Name" value={form.name} onChange={update('name')} error={errors.name} />
         <FormField
@@ -167,19 +177,7 @@ export function AdminEventsPage() {
           {busy ? 'Creating…' : 'Create event'}
         </button>
       </form>
-
-      <h2>All events</h2>
-      {events === null && !error && <p className="muted">Loading…</p>}
-      {events?.length === 0 && <p className="muted">No events yet.</p>}
-      <ul>
-        {events?.map((event) => (
-          <li key={event.id}>
-            <Link to={`/events/${event.id}`}>{event.name}</Link> — {formatMoney(event.pricePaise)} ·{' '}
-            {event.available}/{event.totalTickets} left · sale
-            starts {formatDate(event.saleStartsAt)}
-          </li>
-        ))}
-      </ul>
+      </details>
     </section>
   )
 }

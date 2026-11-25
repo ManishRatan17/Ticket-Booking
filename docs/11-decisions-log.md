@@ -174,6 +174,16 @@ Every significant choice, the alternatives considered, and why. Newest at the bo
 | Sold-out fast path from Redis before per-person work | the full path for every click | ~97 % of clicks in a sell-out are "sold out"; they shouldn't cost database queries |
 | Restricted accounts listed in a Redis set (rebuilt from PostgreSQL, hourly too) | ask PostgreSQL for every new person | a cache can't help people it has never seen |
 
+## The admin side
+
+| Decision | Rejected | Why |
+|---|---|---|
+| Admins can't buy or send support requests (server 403 + hidden in the page) | only hide the buttons; let admins buy | organisers mustn't compete with fans; hiding alone protects nothing |
+| Manage events shows live numbers from where they live (sold: PostgreSQL; left/held/in line: Redis) | a nightly report | admins watch a sale as it happens |
+| Edit: name any time; price, time, waiting room only before the sale; tickets and lucky-draw settings never | edit anything | fairness to people who already queued or paid; stock and the draw's seed are built on the fixed values |
+| "Jobs" renamed "System" with a worker light | remove the page | an admin must notice when nothing releases holds or admits people |
+| Bot notifications: a badge + list with the email, "mark as seen"; hand-made restrictions start as seen | emails now; live pop-ups | works without an email provider (Phase 7); accounts have only an email to identify them |
+
 ## Frontend
 
 | Decision | Alternatives | Why |

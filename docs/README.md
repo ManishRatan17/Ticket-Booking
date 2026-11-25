@@ -30,6 +30,7 @@ A ticketing platform built to stay **correct** (never sell a ticket twice) and *
 | 17 | [Support inbox](17-support-inbox.md) | People ask the organisers (e.g. for more tickets); admins answer, approve, decline |
 | 18 | [Bot strikes](18-bot-strikes.md) | Bot signals → strikes → 15-day suspension → ban; appeals; the admin Restrictions page |
 | 19 | [Load testing](19-load-testing.md) | 10,000 people, 300 tickets: k6, the results, what it found and what was fixed |
+| 20 | [The admin side](20-admin-side.md) | Admins don't buy; Manage events with live numbers and editing; System; bot notifications |
 
 ---
 
@@ -50,13 +51,14 @@ Roadmap from the original blueprint. ✅ done · 🟡 partly done · ⬜ not sta
 | Lucky draw | (added after Phase 5) a % of the tickets in their own pool, drawn among everyone in the waiting room | ✅ (L1 settings + separate pool · L2 the draw: provably fair, rounds, closing · L3 pages + verify in the browser) |
 | Support inbox | (added after the lucky draw) requests to the organisers; approved "more tickets" raises that person's limit for that event | ✅ |
 | 5e | Bot strikes: suspicion score from bot signals, 1st strike = booking paused 15 days, 2nd within a year = banned; appeals; admin page | ✅ |
+| Admin side | admins can't buy or ask for help; Manage events (live numbers, editing); "Jobs" → System with a worker light; bot notifications with the person's email | ✅ |
 | 6 | Proof: k6 load tests with thousands of users, SQL verification | ✅ (10,000 people → exactly 300 sold, 0 failed requests; waiting room: median 3 ms, p95 48 ms; found and fixed a database bottleneck on the hold path) |
 | 7 | Polish: styling, Razorpay test mode, deployment, demo video | ⬜ |
 | 8 | Stretch: numbered seats, multiple servers, metrics | ⬜ |
 
 **Load test (laptop, one API process):** 10,000 people for 300 tickets → **exactly 300 sold, 0 duplicates, 0 failed requests**. Through the waiting room: median **3 ms**, p95 **48 ms**. With no waiting room at all, 500 clicks a second: median 6 ms, p95 327 ms. Details: [19](19-load-testing.md).
 
-**Numbers today:** 336 server tests + 40 frontend tests, all passing. 300 signed-in users racing for 100 tickets over real HTTP → exactly 100 holds.
+**Numbers today:** 344 server tests + 40 frontend tests, all passing. 300 signed-in users racing for 100 tickets over real HTTP → exactly 100 holds.
 
 ---
 

@@ -1,7 +1,7 @@
 // Admin: accounts restricted for bot-like activity (Phase 5e). See the evidence, lift (or overturn
 // a mistake), or restrict someone by hand.
 import { useCallback, useEffect, useState } from 'react'
-import { liftRestriction, listRestrictions, restrictUser, withFreshRole } from '../api/admin.js'
+import { acknowledgeRestrictions, liftRestriction, listRestrictions, restrictUser, withFreshRole } from '../api/admin.js'
 import { Alert } from '../components/Alert.jsx'
 import { errorMessage } from '../lib/errorMessages.js'
 import { timeAgo } from '../lib/format.js'
@@ -47,6 +47,19 @@ export function AdminRestrictionsPage() {
     }
   }, [activeOnly])
 
+  // NEW = automatic restrictions no admin has marked as seen yet.
+  const unseen = (list ?? []).filter((r) => r.automatic && !r.acknowledgedAt)
+
+  async function markSeen() {
+    try {
+      await acknowledgeRestrictions()
+      window.dispatchEvent(new Event('restrictions-seen')) // the nav badge updates at once
+      await load()
+    } catch (err) {
+      setError(errorMessage(err))
+    }
+  }
+
   async function lift(r, overturn) {
     const reason = window.prompt(overturn ? 'Why was this a mistake?' : 'Why lift it early?')
     if (!reason) return
@@ -90,6 +103,25 @@ export function AdminRestrictionsPage() {
       <Alert>{error}</Alert>
       <Alert kind="success">{notice}</Alert>
 
+      {unseen.length > 0 && (
+        <div className="alert alert-error" role="alert">
+          <strong>
+            {unseen.length} new account{unseen.length > 1 ? 's' : ''} caught using a bot:
+          </strong>
+          <ul>
+            {unseen.map((r) => (
+              <li key={r.id}>
+                ⚠ <strong>{r.userEmail}</strong> was {r.kind === 'banned' ? 'banned' : 'suspended'} for bot-like activity
+                ({timeAgo(r.startsAt)}): <Evidence evidence={r.evidence} />
+              </li>
+            ))}
+          </ul>
+          <button type="button" onClick={markSeen}>
+            Mark as seen
+          </button>
+        </div>
+      )}
+
       <label>
         <input type="checkbox" checked={activeOnly} onChange={(e) => setActiveOnly(e.target.checked)} /> Only those in force
       </label>
@@ -100,7 +132,7 @@ export function AdminRestrictionsPage() {
         <ul>
           {list.map((r) => (
             <li key={r.id}>
-              <strong>{r.userEmail}</strong> — {r.kind}
+              {r.automatic && !r.acknowledgedAt && <span className="badge">new</span>} <strong>{r.userEmail}</strong> — {r.kind}
               {r.endsAt ? ` until ${new Date(r.endsAt).toLocaleDateString()}` : ' (permanent)'} · {r.automatic ? 'automatic' : 'by an admin'} ·{' '}
               {timeAgo(r.startsAt)}
               {r.liftedAt && <> · lifted{r.overturned && ' (overturned)'}</>}

@@ -8,6 +8,7 @@ import { AppError } from '../../lib/errors.js';
 import { validate } from '../../middleware/validate.js';
 import { authenticate } from '../../middleware/authenticate.js';
 import { requireNotRestricted } from '../../middleware/requireNotRestricted.js';
+import { customersOnly } from '../../middleware/customersOnly.js';
 import { isValidSignature, SIGNATURE_HEADER } from './signature.js';
 import * as paymentsService from './payments.service.js';
 import { payPerUser } from '../../lib/ticketRateLimits.js';
@@ -19,6 +20,7 @@ export const paymentsRouter = Router();
 paymentsRouter.post(
   '/payments/fake/:orderId',
   authenticate,
+  customersOnly,
   requireNotRestricted,
   payPerUser,
   validate({

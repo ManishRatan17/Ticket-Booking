@@ -5,7 +5,8 @@ import { Router } from 'express';
 import { validate } from '../../middleware/validate.js';
 import { listUsersQuerySchema, userIdParamsSchema, changeRoleBodySchema } from './admin.schemas.js';
 import * as adminController from './admin.controller.js';
-import { createEventSchema } from '../events/events.schemas.js';
+import { createEventSchema, updateEventSchema } from '../events/events.schemas.js';
+import * as adminEvents from './admin.events.js';
 import * as eventsController from '../events/events.controller.js';
 import { z } from 'zod';
 import { AppError } from '../../lib/errors.js';
@@ -25,6 +26,17 @@ router.patch(
 
 // Events: protected by the same router-level admin guard as everything in this file.
 router.post('/events', validate({ body: createEventSchema }), eventsController.createEvent);
+// Manage events: every event with live numbers (sold, held, left, revenue, in line…), one event, edit.
+const eventIdParams = z.object({ id: z.coerce.number().int().positive() });
+router.get('/events', async (req, res) => {
+  res.json(await adminEvents.listEventsWithNumbers());
+});
+router.get('/events/:id', validate({ params: eventIdParams }), async (req, res) => {
+  res.json(await adminEvents.getEventWithNumbers(req.validated.params.id));
+});
+router.patch('/events/:id', validate({ params: eventIdParams, body: updateEventSchema }), async (req, res) => {
+  res.json(await adminEvents.updateEvent(req.validated.params.id, req.validated.body));
+});
 
 // Background jobs (Phase 3): overview + retrying a failed job from the dead-letter queue.
 router.get('/jobs', async (req, res) => {
@@ -51,6 +63,14 @@ router.post('/support/:id/messages', validate({ params: requestIdParamsSchema, b
 });
 router.post('/support/:id/decision', validate({ params: requestIdParamsSchema, body: decisionSchema }), async (req, res) => {
   res.json({ request: await support.decide(req.user.id, req.validated.params.id, req.validated.body) });
+});
+
+// Notifications for admins: new automatic restrictions (bot strikes) nobody has looked at yet.
+router.get('/notifications', async (req, res) => {
+  res.json(await moderation.unseenRestrictions());
+});
+router.post('/restrictions/acknowledge', async (req, res) => {
+  res.json({ acknowledged: await moderation.acknowledgeRestrictions(req.user.id) });
 });
 
 // Moderation (Phase 5e): restrictions in force (or all), restricting by hand, lifting.

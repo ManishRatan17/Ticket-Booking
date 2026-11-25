@@ -39,6 +39,11 @@ const MESSAGES = {
   CANNOT_RESTRICT_SELF: 'You cannot restrict your own account.',
   NOT_IN_FORCE: 'This restriction is no longer in force.',
   RESTRICTION_NOT_FOUND: 'That restriction no longer exists.',
+  // Admins run the sale
+  ADMINS_CANNOT_BUY: "Admin accounts can't buy tickets. Use a normal account to buy.",
+  ADMINS_USE_INBOX: 'Admins answer requests in the Support inbox.',
+  SALE_STARTED: 'The sale has started: only the name can be changed now.',
+  LOTTERY_NEEDS_ROOM: 'This event has a lucky draw, which needs its waiting room.',
   // Admin
   FORBIDDEN: 'You do not have permission to do this.',
   LAST_ADMIN: 'This is the only admin left. Make someone else an admin first.',

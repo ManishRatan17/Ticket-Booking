@@ -99,5 +99,6 @@ API: `GET /api/admin/jobs`, `POST /api/admin/jobs/:id/retry` (`404 JOB_NOT_FOUND
 ## Coming next
 
 - **Phase 4 — waiting room (built):** a third job, `admit-waiting`, runs every second and lets N people per second in; it **pauses** a room while its stock is 0 (every ticket sold or held), so returned tickets go to the next people in line. See [14](14-waiting-room.md).
+- **The admin page** is now called **System** (`/admin/system`), with a green / red "worker running" light and a plain explanation of each job ([20](20-admin-side.md)).
 - **Lucky draw (built):** a fourth job, `lottery-tick`, runs every 5 seconds and moves every due draw forward by one step (round 1, 2, 3, close). It's only logged when it picks winners or closes a draw. See [16](16-lucky-draw.md).
 - Moving password-reset emails onto the job queue, so a crash can no longer lose one.

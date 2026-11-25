@@ -1,6 +1,6 @@
 // The app's pages and who may see them. Everything about HOW we talk to the server lives
 // in src/api/; everything about WHO is signed in lives in src/auth/.
-import { BrowserRouter, Route, Routes } from 'react-router-dom'
+import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import './App.css'
 import { AuthProvider } from './auth/AuthProvider.jsx'
 import { GuestOnly, RequireAdmin, RequireAuth } from './auth/guards.jsx'
@@ -23,6 +23,7 @@ import { SupportPage } from './pages/SupportPage.jsx'
 import { SupportRequestPage } from './pages/SupportRequestPage.jsx'
 import { AdminSupportPage } from './pages/AdminSupportPage.jsx'
 import { AdminRestrictionsPage } from './pages/AdminRestrictionsPage.jsx'
+import { AdminEventPage } from './pages/AdminEventPage.jsx'
 
 function App() {
   return (
@@ -56,7 +57,9 @@ function App() {
             <Route element={<RequireAdmin />}>
               <Route path="admin/users" element={<AdminUsersPage />} />
               <Route path="admin/events" element={<AdminEventsPage />} />
-              <Route path="admin/jobs" element={<AdminJobsPage />} />
+              <Route path="admin/events/:id" element={<AdminEventPage />} />
+              <Route path="admin/system" element={<AdminJobsPage />} />
+              <Route path="admin/jobs" element={<Navigate to="/admin/system" replace />} />
               <Route path="admin/support" element={<AdminSupportPage />} />
               <Route path="admin/restrictions" element={<AdminRestrictionsPage />} />
             </Route>

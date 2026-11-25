@@ -45,6 +45,15 @@ export async function listEvents() {
   return rows.map(toEvent);
 }
 
+// Admin edits (admin.events.js decides what may change when). Only the given fields change.
+const EDITABLE = { name: 'name', pricePaise: 'price_paise', saleStartsAt: 'sale_starts_at', admissionPerSecond: 'admission_per_second', lobbyMinutes: 'lobby_minutes' };
+export async function updateEvent(id, changes) {
+  const fields = Object.keys(changes).filter((k) => k in EDITABLE);
+  if (fields.length === 0) return;
+  const sets = fields.map((k, i) => `${EDITABLE[k]} = $${i + 2}`).join(', ');
+  await pool.query(`UPDATE events SET ${sets} WHERE id = $1`, [id, ...fields.map((k) => changes[k])]);
+}
+
 export async function findEventById(id) {
   const { rows } = await pool.query(`SELECT ${COLUMNS} FROM events WHERE id = $1`, [id]);
   return rows.length === 0 ? null : toEvent(rows[0]);

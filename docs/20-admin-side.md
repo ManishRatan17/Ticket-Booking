@@ -1,0 +1,68 @@
+# 20 · The admin side
+
+Admins **run** the sale; they don't take part in it. This page covers what an admin sees and can do, and the rules behind it.
+
+```
+Admin nav:  Manage events · Support inbox · Restrictions (2 new) · Users · System
+Customer:   Events · My orders · Help
+```
+
+## Admins don't buy, and don't ask for help
+
+| Rule | How it's enforced | Why |
+|---|---|---|
+| Admins can't hold, join a queue, order or pay | [customersOnly](../server/src/middleware/customersOnly.js) right after `authenticate` on those four routes → **`403 ADMINS_CANNOT_BUY`** | the people who set the rules shouldn't compete with fans for tickets, or ever be suspected of it. An admin who wants tickets uses a normal account |
+| Admins don't send support requests | `notForAdmins` on creating a request and on writing in one → **`403 ADMINS_USE_INBOX`** | admins *answer* requests (Support inbox); there's no one above them to ask |
+| The page doesn't offer it | the event page shows "You're signed in as an admin. Admin accounts can't buy tickets…" with a link to the event's live numbers; "My orders" and "Help" aren't in an admin's nav; `/support` sends admins to the inbox | hiding buttons is only a convenience: the server rule is what protects it (tested by removing it: the test fails) |
+
+## Manage events
+
+`/admin/events`: **every event with live numbers**, refreshed every 5 seconds ([admin.events.js](../server/src/modules/admin/admin.events.js)):
+
+| Column | Where it comes from |
+|---|---|
+| Status: Upcoming · On sale · All held · Sold out | the sale time; sold = total → sold out; nothing left but not all paid → all held |
+| Sold | PostgreSQL `tickets_sold` (paid tickets: the record) |
+| Left | Redis: the normal stock + what the lucky draw still has |
+| Held | total − sold − left: in someone's hold right now |
+| Revenue, paid orders | PostgreSQL: the paid orders |
+| Waiting room: in line, rate | Redis: the queue's size |
+| Lucky draw: left, entered | Redis: the draw's stock and its entrants |
+
+The "Create an event" form is folded below the table.
+
+**One event** (`/admin/events/:id`): the same numbers as cards, a link to the shop page, and **editing**:
+
+| Field | Can change |
+|---|---|
+| Name | any time |
+| Price, sale time, waiting-room rate, lobby window | **only before the sale opens** (`409 SALE_STARTED`): changing the price after people paid, or the time after people queued, would be unfair |
+| Removing the waiting room of an event with a lucky draw | never (`409 LOTTERY_NEEDS_ROOM`: the draw's entrants are the waiting room) |
+| Number of tickets, lucky-draw settings | never: the stock and the draw's committed seed are built on them |
+
+An edit clears this server's 1-second copy of the event ([19](19-load-testing.md)), so the shop shows it at once.
+
+## System (was "Jobs")
+
+`/admin/system` is the control room for work that happens **without anyone clicking** ([13](13-background-jobs.md)):
+
+- releasing holds nobody paid for within 5 minutes
+- a safety sweep every 60 seconds
+- letting people in from waiting rooms every second
+- running lucky draws every 5 seconds
+
+A **green / red light** says whether the background worker is running (red: "expired holds are NOT released, nobody is let in, lucky draws don't happen"). Failed jobs are listed with **Retry**.
+
+## Bot notifications
+
+When the system strikes an account automatically ([18](18-bot-strikes.md)), the admins should know, and know **who**:
+
+- The nav shows **Restrictions (2 new)** (asked every 30 seconds).
+- The Restrictions page opens with a red box: *"⚠ **ann@example.com** was suspended for bot-like activity (3 minutes ago): score 20 in 10 min: 20 × actions refused by rate limits"*, and a **Mark as seen** button.
+- Restrictions an admin made **by hand** aren't "new" (the admin already knows).
+
+Accounts have no names, only an email, so the email identifies the person. Migration [011](../server/migrations/011_admin_notifications.sql) adds `acknowledged_at` / `acknowledged_by` to `account_restrictions`. Endpoints: `GET /api/admin/notifications` → `{ count, latest }`, `POST /api/admin/restrictions/acknowledge`.
+
+Email notifications to admins need a real email provider: Phase 7.
+
+*Tested in [admin-console.test.js](../server/test/admin-console.test.js): admins → 403 on hold, join, order and pay (normal people unaffected); admins → 403 on sending support requests; the live numbers (3 sold, 2 held, 5 left, ₹1,500 revenue, 1 paid order) and every status; editing before the sale (price, time, waiting room; the shop sees it at once); after the sale only the name (`SALE_STARTED`); a lucky draw keeps its waiting room; validation; admins only; a new automatic strike shows up with the person's email and evidence, a hand-made one doesn't, "mark as seen" clears it. Mutation: the admin rule removed from holds → the test fails.*

@@ -16,6 +16,15 @@ export const getJobsOverview = () => api('/admin/jobs')
 
 export const retryJob = (jobId) => api(`/admin/jobs/${encodeURIComponent(jobId)}/retry`, { method: 'POST' })
 
+// Manage events: every event with live numbers, one event, edit.
+export const listAdminEvents = () => api('/admin/events')
+export const getAdminEvent = (id) => api(`/admin/events/${encodeURIComponent(id)}`)
+export const updateEvent = (id, changes) => api(`/admin/events/${encodeURIComponent(id)}`, { method: 'PATCH', body: changes })
+
+// Notifications: new automatic restrictions (bot strikes) no admin has seen yet.
+export const getNotifications = () => api('/admin/notifications')
+export const acknowledgeRestrictions = () => api('/admin/restrictions/acknowledge', { method: 'POST' })
+
 // Restrictions (Phase 5e: bot strikes).
 export const listRestrictions = (activeOnly) => api(`/admin/restrictions?active=${activeOnly ? 'true' : 'false'}`)
 export const restrictUser = (body) => api('/admin/restrictions', { method: 'POST', body })

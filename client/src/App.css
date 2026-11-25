@@ -343,3 +343,50 @@ textarea {
   text-decoration: underline;
   cursor: pointer;
 }
+
+/* Admin console */
+.badge {
+  display: inline-block;
+  margin-left: 0.35rem;
+  padding: 0 0.4rem;
+  border-radius: 999px;
+  background: #c53030;
+  color: #fff;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+.table-wrap {
+  overflow-x: auto;
+}
+.admin-table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 0.9rem;
+}
+.admin-table th,
+.admin-table td {
+  border-bottom: 1px solid #ddd;
+  padding: 0.4rem 0.5rem;
+  text-align: left;
+  vertical-align: top;
+}
+.status-on_sale { color: #1d6b34; font-weight: 600; }
+.status-sold_out { color: #9b1c1c; font-weight: 600; }
+.status-all_held { color: #7a5a00; font-weight: 600; }
+.stat-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin: 0.75rem 0;
+}
+.stat {
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  padding: 0.5rem 0.75rem;
+  min-width: 8rem;
+}
+.stat strong { display: block; font-size: 1.2rem; }
+.stat span { font-size: 0.8rem; color: #666; }
+.light { font-weight: 600; }
+.light-ok { color: #1d6b34; }
+.light-bad { color: #c53030; }

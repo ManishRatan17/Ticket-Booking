@@ -144,6 +144,10 @@ export async function restrictionFor(userId, client = null) {
 
 export const listRestrictions = ({ activeOnly }) => repo.listRestrictions(pool, { activeOnly });
 
+// The admin's notification: "2 new" + who (email) and why, until an admin marks them as seen.
+export const unseenRestrictions = () => repo.unseenRestrictions(pool);
+export const acknowledgeRestrictions = (adminId) => repo.acknowledgeAll(pool, adminId);
+
 export async function restrictByEmail({ adminId, email, kind, days, reason }) {
   const userId = await repo.findUserIdByEmail(pool, email);
   if (!userId) throw new AppError(404, 'USER_NOT_FOUND', 'No user with this email');

@@ -1,4 +1,5 @@
-// Admin → Background jobs: is the worker alive, how much work is waiting, and what FAILED.
+// Admin → System: the work that happens in the background, without anyone clicking. Is the worker
+// alive, how much work is waiting, and what FAILED (with Retry).
 import { useCallback, useEffect, useState } from 'react'
 import { getJobsOverview, retryJob, withFreshRole } from '../api/admin.js'
 import { Alert } from '../components/Alert.jsx'
@@ -57,7 +58,7 @@ export function AdminJobsPage() {
   if (!data) {
     return (
       <section>
-        <h1>Background jobs</h1>
+        <h1>System</h1>
         <Alert>{error}</Alert>
         {!error && <p className="muted">Loading…</p>}
       </section>
@@ -66,13 +67,35 @@ export function AdminJobsPage() {
 
   return (
     <section>
-      <h1>Background jobs</h1>
+      <h1>System</h1>
       <Alert>{error}</Alert>
       <Alert kind="success">{notice}</Alert>
 
-      <p>
-        Workers online: <strong>{data.workersOnline}</strong>
-        {data.workersOnline === 0 && ' — expired holds are NOT being released. Start one with npm run worker.'}
+      <p className={data.workersOnline > 0 ? 'light light-ok' : 'light light-bad'}>
+        {data.workersOnline > 0
+          ? `● Background worker running (${data.workersOnline}). Everything below happens automatically.`
+          : '● No background worker is running! Expired holds are NOT released, nobody is let in from waiting rooms, and lucky draws don\'t happen. Start it with npm run dev (or npm run worker).'}
+      </p>
+
+      <h2>What the background worker does</h2>
+      <ul>
+        <li>
+          <strong>Releases abandoned holds</strong>: when someone holds tickets and doesn't pay within 5 minutes, the
+          tickets go back on sale (one delayed job per hold).
+        </li>
+        <li>
+          <strong>Safety sweep</strong> every 60 seconds: catches any expired hold that was missed.
+        </li>
+        <li>
+          <strong>Waiting rooms</strong> every second: lets the next people in line in.
+        </li>
+        <li>
+          <strong>Lucky draws</strong> every 5 seconds: runs draws and their rounds when it's time.
+        </li>
+      </ul>
+      <p className="muted">
+        A job that fails is retried with growing pauses; if it fails every time it's kept below (the
+        "dead-letter queue") so nothing is silently lost. Fix the cause, then press Retry.
       </p>
 
       <h2>Jobs by state</h2>

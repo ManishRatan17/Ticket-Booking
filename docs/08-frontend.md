@@ -15,6 +15,8 @@ Everything lives in [client/src/](../client/src/). Styling is deliberately minim
 | `/reset-password#token=…` | [ResetPasswordPage](../client/src/pages/ResetPasswordPage.jsx) | anyone (link from email) | reset-password |
 | `/checkout/:id` | [CheckoutPage](../client/src/pages/CheckoutPage.jsx) | signed in | `GET /api/orders/:id`, `POST /api/payments/fake/:id`, then polls the order until the webhook has settled it |
 | `/support`, `/support/:id` | [SupportPage](../client/src/pages/SupportPage.jsx), [SupportRequestPage](../client/src/pages/SupportRequestPage.jsx) | signed in | ask the organisers (more tickets / question), my requests, the conversation |
+| `/admin/events/:id` | [AdminEventPage](../client/src/pages/AdminEventPage.jsx) | admin | one event's live numbers; edit (name any time; price, time, waiting room before the sale) |
+| `/admin/system` (was `/admin/jobs`, which redirects) | [AdminJobsPage](../client/src/pages/AdminJobsPage.jsx) | admin | the background worker: a green/red light, what it does, failed jobs with Retry |
 | `/admin/restrictions` | [AdminRestrictionsPage](../client/src/pages/AdminRestrictionsPage.jsx) | admin | bot-strike restrictions with their evidence; lift, overturn, restrict by hand |
 | `/admin/support` | [AdminSupportPage](../client/src/pages/AdminSupportPage.jsx) | admin | the support inbox: reply, approve, decline, close |
 | `/orders` | [OrdersPage](../client/src/pages/OrdersPage.jsx) | signed in | `GET /api/orders` (ticket numbers for paid orders, "pay now" for pending ones) |
@@ -80,6 +82,7 @@ A laptop 3 minutes fast or 10 minutes slow still shows 5:00 for a new hold (unit
 8. **Protection** (Phase 5): the quantity list offers only what you may still buy (`purchase: { bought, limit }`), "You've bought the maximum of 4 tickets" at the limit; joining the queue shows the "are you a person?" widget ([TurnstileWidget](../client/src/components/TurnstileWidget.jsx), [useHumanCheck](../client/src/hooks/useHumanCheck.js)), as does the register page (plus a hidden honeypot field). Details: [15-protection.md](15-protection.md).
 9. **Lucky draw**: [LuckyDrawPanel](../client/src/components/LuckyDrawPanel.jsx) shows the draw (entered, odds, "You won!", "Not this time", closed) and, after the draw, the seed, your draw number and a "Verify the draw in my browser" button ([lib/verifyDraw.js](../client/src/lib/verifyDraw.js), Web Crypto). A winner gets the hold form for lucky-draw tickets (max per winner). My orders marks lucky-draw orders. Details: [16-lucky-draw.md](16-lucky-draw.md).
 10. **Restricted accounts**: [RestrictionBanner](../client/src/components/RestrictionBanner.jsx) on every page ("Unusual, automated activity was detected … booking paused until … appeal"), from `user.restriction` (login and `/me`). A refused booking with `ACCOUNT_RESTRICTED` reloads "who am I" so the banner appears at once. Help offers "Appeal" while restricted. Details: [18-bot-strikes.md](18-bot-strikes.md).
+11. **Admins**: the nav shows only admin pages (Manage events · Support inbox · Restrictions with a "2 new" badge · Users · System); the event page tells an admin they can't buy; `/support` sends admins to the inbox. Details: [20-admin-side.md](20-admin-side.md).
 
 ## Other details
 

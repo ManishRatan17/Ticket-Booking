@@ -4,6 +4,7 @@ import { Router } from 'express';
 import { validate } from '../../middleware/validate.js';
 import { authenticate } from '../../middleware/authenticate.js';
 import { requireNotRestricted } from '../../middleware/requireNotRestricted.js';
+import { customersOnly } from '../../middleware/customersOnly.js';
 import { eventIdParamsSchema } from '../events/events.schemas.js';
 import * as waitingRoom from './waiting-room.service.js';
 import { closeStreamSlot, openStreamSlot, MAX_STREAMS_PER_USER } from './waiting-room.js';
@@ -18,6 +19,7 @@ router.post(
   '/events/:id/queue',
   queueJoinPerIp,
   authenticate,
+  customersOnly,
   requireNotRestricted,
   queueJoinPerUser,
   validate({ params: eventIdParamsSchema }),

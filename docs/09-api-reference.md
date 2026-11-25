@@ -200,6 +200,17 @@ Admins (`/api/admin`, role admin):
 ### `POST /admin/support/:id/decision`
 Body `{ "decision": "approved" | "declined" | "closed", "message"?: "…" }` → `200 { "request" }` · `409 REQUEST_NOT_OPEN` (already decided) · `409 NOT_APPROVABLE` (only more_tickets can be approved). Approving a `more_tickets` request raises that person's purchase limit for that event to 4 + extraTickets, in the same transaction.
 
+## Admins run the sale
+
+Admins → `403 ADMINS_CANNOT_BUY` on `POST /events/:id/holds`, `POST /events/:id/queue`, `POST /orders`, `POST /payments/fake/:orderId`; `403 ADMINS_USE_INBOX` on `POST /support/requests` and `POST /support/requests/:id/messages`. See [20](20-admin-side.md).
+
+### `GET /admin/events` → `200 { "events": [ { …event, "status": "upcoming" | "on_sale" | "all_held" | "sold_out", "sold", "held", "available", "revenuePaise", "paidOrders", "inLine", "luckyDraw": null | { "tickets", "left", "entered", "open" } } ], "serverTime" }`
+### `GET /admin/events/:id` → `200 { "event": { …the same } }` · `404 EVENT_NOT_FOUND`
+### `PATCH /admin/events/:id`
+Body: any of `{ "name", "pricePaise", "saleStartsAt", "admissionPerSecond" (null = no waiting room), "lobbyMinutes" }` → `200 { "event" }` · `400` (nothing to change, invalid) · `409 SALE_STARTED` (after the sale opened only the name may change) · `409 LOTTERY_NEEDS_ROOM`
+### `GET /admin/notifications` → `200 { "count", "latest": [ restriction… ] }` (automatic restrictions no admin has marked as seen)
+### `POST /admin/restrictions/acknowledge` → `200 { "acknowledged": n }`
+
 ## Moderation (bot strikes)
 
 Booking actions (`POST /events/:id/holds`, `POST /events/:id/queue`, `POST /orders`, `POST /payments/fake/:orderId`) of a suspended or banned account → `403 ACCOUNT_RESTRICTED` with `details: { kind: "suspended" | "banned", until, reason }`. `GET /auth/me` and `POST /auth/login` return `user.restriction` (`null` or `{ id, kind, until, reason, since }`). Appeals: `POST /support/requests` with `{ "kind": "appeal", "message" }` (`409 NOT_RESTRICTED` if there's nothing to appeal); an admin approving it overturns the restriction. See [18](18-bot-strikes.md).

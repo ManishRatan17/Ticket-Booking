@@ -27,6 +27,18 @@ export const createEventSchema = z
     path: ['lotteryPercent'],
   });
 
+// Admin edits: any subset of these (what may change WHEN is decided in admin.events.js).
+export const updateEventSchema = z
+  .object({
+    name: z.string().trim().min(3, 'Use at least 3 characters').max(120, 'Use at most 120 characters'),
+    pricePaise: z.number().int().min(0).max(10_000_000),
+    saleStartsAt: z.coerce.date(),
+    admissionPerSecond: z.number().int().min(1).max(10_000).nullable(),
+    lobbyMinutes: z.number().int().min(1).max(1440),
+  })
+  .partial()
+  .refine((c) => Object.keys(c).length > 0, { message: 'Nothing to change' });
+
 export const eventIdParamsSchema = z.object({
   id: z.coerce.number().int().positive(),
 });

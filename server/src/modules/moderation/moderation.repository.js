@@ -1,7 +1,7 @@
 // SQL for account restrictions (migration 010). Functions take a `client` (the pool, or a transaction).
 
 const COLUMNS = `r.id, r.user_id, u.email AS user_email, r.kind, r.reason, r.evidence, r.starts_at, r.ends_at,
-                 r.created_by, r.lifted_at, r.lift_reason, r.overturned`;
+                 r.created_by, r.lifted_at, r.lift_reason, r.overturned, r.acknowledged_at`;
 
 function toRestriction(row) {
   return {
@@ -17,6 +17,7 @@ function toRestriction(row) {
     liftedAt: row.lifted_at,
     liftReason: row.lift_reason,
     overturned: row.overturned,
+    acknowledgedAt: row.acknowledged_at, // null = a NEW automatic restriction no admin has seen yet
   };
 }
 
@@ -46,8 +47,9 @@ export async function countStrikes(client, userId) {
 
 export async function insertRestriction(client, { userId, kind, reason, evidence, days, createdBy }) {
   const { rows } = await client.query(
-    `INSERT INTO account_restrictions (user_id, kind, reason, evidence, ends_at, created_by)
-     VALUES ($1, $2, $3, $4, CASE WHEN $2 = 'banned' THEN NULL ELSE now() + make_interval(days => $5::int) END, $6)
+    `INSERT INTO account_restrictions (user_id, kind, reason, evidence, ends_at, created_by, acknowledged_at)
+     VALUES ($1, $2, $3, $4, CASE WHEN $2 = 'banned' THEN NULL ELSE now() + make_interval(days => $5::int) END, $6,
+             CASE WHEN $6::bigint IS NULL THEN NULL ELSE now() END)  -- an admin's own restriction is already "seen"
      RETURNING id`,
     [userId, kind, reason, evidence, days, createdBy],
   );
@@ -78,6 +80,26 @@ export async function liftActive(client, { userId, adminId, reason, overturn }) 
     `UPDATE account_restrictions AS r SET lifted_at = now(), lifted_by = $2, lift_reason = $3, overturned = $4
       WHERE r.user_id = $1 AND ${IN_FORCE}`,
     [userId, adminId, reason, overturn],
+  );
+  return rowCount;
+}
+
+// New automatic restrictions: how many, and the latest few (for the admin's notification badge).
+export async function unseenRestrictions(client, limit = 5) {
+  const { rows } = await client.query(
+    `SELECT ${COLUMNS}, count(*) OVER ()::int AS total
+       FROM account_restrictions AS r JOIN users AS u ON u.id = r.user_id
+      WHERE r.acknowledged_at IS NULL
+      ORDER BY r.starts_at DESC LIMIT $1`,
+    [limit],
+  );
+  return { count: rows[0]?.total ?? 0, latest: rows.map(toRestriction) };
+}
+
+export async function acknowledgeAll(client, adminId) {
+  const { rowCount } = await client.query(
+    'UPDATE account_restrictions SET acknowledged_at = now(), acknowledged_by = $1 WHERE acknowledged_at IS NULL',
+    [adminId],
   );
   return rowCount;
 }

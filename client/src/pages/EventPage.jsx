@@ -75,7 +75,8 @@ export function EventPage() {
 
   // Waiting room (Phase 4): only for events with an admission rate. Not needed once you hold tickets.
   const hasRoom = Boolean(event?.admissionPerSecond)
-  const queue = useQueueStatus(id, signedIn && hasRoom && !page?.hold)
+  const isAdmin = user?.role === 'admin' // admins run the sale, they don't buy (the server refuses too)
+  const queue = useQueueStatus(id, signedIn && !isAdmin && hasRoom && !page?.hold)
   const admitted = queue.status?.status === 'admitted'
   // A lucky-draw winner may hold lucky-draw tickets while their lucky pass lasts, line or no line.
   const draw = queue.status?.lottery
@@ -203,6 +204,16 @@ export function EventPage() {
           <button type="button" onClick={handleRelease} disabled={busy}>
             Release tickets
           </button>
+        </div>
+      ) : isAdmin ? (
+        <div className="panel">
+          <p>
+            You're signed in as an <strong>admin</strong>. Admin accounts can't buy tickets: the people who run the
+            sale don't compete with fans for it. To buy, use a normal account.
+          </p>
+          <p>
+            <Link to={`/admin/events/${event.id}`}>See this event's live numbers</Link>
+          </p>
         </div>
       ) : !signedIn ? (
         <p>

@@ -2,6 +2,7 @@
 import { Router } from 'express';
 import { validate } from '../../middleware/validate.js';
 import { authenticate } from '../../middleware/authenticate.js';
+import { notForAdmins } from '../../middleware/customersOnly.js';
 import { rateLimit } from '../../lib/rateLimiter.js';
 import { createRequestSchema, messageSchema, requestIdParamsSchema } from './support.schemas.js';
 import * as support from './support.service.js';
@@ -14,7 +15,7 @@ const messagePerUser = rateLimit({ name: 'support-message-user', limit: 30, wind
 
 const router = Router();
 
-router.post('/support/requests', authenticate, createPerUser, validate({ body: createRequestSchema }), async (req, res) => {
+router.post('/support/requests', authenticate, notForAdmins, createPerUser, validate({ body: createRequestSchema }), async (req, res) => {
   res.status(201).json({ request: await support.createRequest({ userId: req.user.id, ...req.validated.body }) });
 });
 
@@ -29,6 +30,7 @@ router.get('/support/requests/:id', authenticate, validate({ params: requestIdPa
 router.post(
   '/support/requests/:id/messages',
   authenticate,
+  notForAdmins,
   messagePerUser,
   validate({ params: requestIdParamsSchema, body: messageSchema }),
   async (req, res) => {

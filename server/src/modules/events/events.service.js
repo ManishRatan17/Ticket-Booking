@@ -128,6 +128,7 @@ export async function listEvents() {
 // The event as read by the HOT paths (every hold, every queue status check, every live-stream tick):
 // reused for HOT_CACHE_MS (1 s), and 1,000 simultaneous misses share ONE query (shortCache.js).
 const eventCache = createShortCache({ ttlMs: env.hotCacheMs });
+export const forgetEvent = (eventId) => eventCache.delete(String(eventId));
 export async function findEventCached(eventId) {
   return eventCache.get(String(eventId), () => eventsRepository.findEventById(eventId));
 }
