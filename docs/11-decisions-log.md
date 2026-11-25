@@ -142,4 +142,3 @@ Every significant choice, the alternatives considered, and why. Newest at the bo
 - Tests share the development database.
 - Lua scripts are single-Redis (no Cluster hash tags).
 - Role changes are audited only in the console log.
-- A stray file from a mistyped command was committed in `85b42e8` (`- error handling, …`, the `less` pager's help text) — to be removed.
