@@ -26,7 +26,7 @@ function describe(status, event, now, ticketsLeft) {
   const secondsUntilSale = Math.max(0, Math.ceil((new Date(event.saleStartsAt) - now) / 1000));
   return {
     ...status,
-    ...estimateChance({ ...status, ticketsLeft }),
+    ...estimateChance({ ...status, ticketsLeft, soldOutForGood: event.ticketsSold >= event.totalTickets }),
     admissionPerSecond: event.admissionPerSecond,
     lobbyOpensAt: lobbyOpensAt(event),
     saleStartsAt: event.saleStartsAt,

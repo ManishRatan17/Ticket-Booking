@@ -311,3 +311,38 @@ test('chance in the lobby: 20 people and 10 tickets (≈ 5 buyers) → unlikely 
   const s = (await status(crowd[0], e.id)).body;
   assert.deepEqual([s.status, s.total, s.buyersLeft, s.chance], ['lobby', 20, 5, 'unlikely']);
 });
+
+// ---------- sold out ----------
+
+test('all held: admission PAUSES while no tickets are left, and resumes for the next in line when some come back', async () => {
+  const e = await event({ rate: 5, tickets: 2 });
+  const [ann, bob, cat] = await users(3);
+  await join(ann, e.id);
+  await admitWaiting({ eventIds: [e.id] });
+  const held = await api('POST', `/api/events/${e.id}/holds`, { as: ann, body: { quantity: 2 } }); // every ticket held
+  assert.equal(held.status, 201);
+
+  await join(bob, e.id);
+  await join(cat, e.id);
+  await admitWaiting({ eventIds: [e.id] });
+  const b = (await status(bob, e.id)).body;
+  assert.deepEqual([b.status, b.position, b.chance], ['waiting', 1, 'all_held'], 'nobody is let in while nothing is left');
+
+  // Ann lets her tickets go: they're back on sale, and the next people in line are let in.
+  assert.equal((await api('DELETE', `/api/holds/${held.body.hold.id}`, { as: ann })).status, 204);
+  await admitWaiting({ eventIds: [e.id] });
+  assert.equal((await status(bob, e.id)).body.status, 'admitted');
+  assert.equal((await status(cat, e.id)).body.status, 'admitted');
+});
+
+test('sold out for good (every ticket PAID) → chance "sold_out" for everyone, in line or not', async () => {
+  const e = await event({ rate: 1, tickets: 3 });
+  const [ann, bob] = await users(2);
+  await join(ann, e.id);
+  // As if all 3 were paid for: PostgreSQL says so, and Redis has none left.
+  await pool.query('UPDATE events SET tickets_sold = total_tickets WHERE id = $1', [e.id]);
+  await redis.set(`event:${e.id}:stock`, 0);
+
+  assert.equal((await status(ann, e.id)).body.chance, 'sold_out');
+  assert.equal((await status(bob, e.id)).body.chance, 'sold_out', 'also shown before joining');
+});

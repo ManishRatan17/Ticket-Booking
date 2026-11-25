@@ -7,6 +7,16 @@ const LEVELS = {
 }
 
 export function ChanceNote({ status }) {
+  // None left right now, but some are only held: they come back if they aren't paid for.
+  if (status.chance === 'all_held') {
+    return (
+      <p>
+        <span className="chance chance-unlikely">Sold out for now</span> Every ticket is sold or held by someone
+        checking out. Tickets that aren't paid for within 5 minutes go back on sale, and the line moves again.
+        {status.status !== 'not_in_queue' && ' You keep your place.'}
+      </p>
+    )
+  }
   const level = LEVELS[status.chance]
   if (!level) return null
   const tickets = status.ticketsLeft.toLocaleString()

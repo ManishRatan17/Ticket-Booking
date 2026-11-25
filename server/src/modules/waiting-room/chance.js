@@ -14,18 +14,24 @@
 //   buyersLeft with the lobby's size: share = buyersLeft ÷ people in the lobby
 //       share ≥ 0.8 → good · share ≥ 0.3 → maybe · otherwise → unlikely
 //
+// And two answers that are not estimates (step 4g), for everyone, whatever their status:
+//   sold_out   every ticket is PAID for (PostgreSQL: tickets_sold = total): nothing can come back
+//   all_held   none left right now, but some are only HELD: unpaid holds expire and return to sale
+//
 // Known optimism: people already admitted but not yet holding tickets will take some too.
 // The level is recomputed every second as tickets are held and sold, so it corrects itself.
 export const ASSUMED_TICKETS_PER_BUYER = 2;
 
-export function estimateChance({ status, position, total, ticketsLeft }) {
+export function estimateChance({ status, position, total, ticketsLeft, soldOutForGood = false }) {
+  if (soldOutForGood) return { chance: 'sold_out', ticketsLeft: 0, buyersLeft: 0 };
   const left = Math.max(0, ticketsLeft ?? 0);
   const buyersLeft = Math.ceil(left / ASSUMED_TICKETS_PER_BUYER);
+  if (left === 0) return { chance: 'all_held', ticketsLeft: 0, buyersLeft: 0 };
 
   let chance = null; // not in line, or already admitted: no estimate needed
   if (status === 'waiting') {
     const ahead = position - 1;
-    chance = left === 0 ? 'unlikely' : ahead < 0.7 * buyersLeft ? 'good' : ahead < 1.3 * buyersLeft ? 'maybe' : 'unlikely';
+    chance = ahead < 0.7 * buyersLeft ? 'good' : ahead < 1.3 * buyersLeft ? 'maybe' : 'unlikely';
   } else if (status === 'lobby') {
     const share = total > 0 ? buyersLeft / total : 1;
     chance = share >= 0.8 ? 'good' : share >= 0.3 ? 'maybe' : 'unlikely';

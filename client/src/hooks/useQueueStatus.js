@@ -22,7 +22,7 @@ export function useQueueStatus(eventId, enabled) {
     const apply = (next) => {
       if (!active) return
       setStatus(next)
-      if (next.status === 'admitted') {
+      if (next.status === 'admitted' || next.chance === 'sold_out') {
         source?.close() // nothing more to wait for
         clearInterval(poller)
       }

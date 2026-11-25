@@ -188,3 +188,16 @@ test('a stream that ends by itself (you were admitted) gives its slot back too',
   assert.equal(await stream.next(), null);
   assert.equal(await waitForStreamCount(ann.id, 0), 0);
 });
+
+test('sold out for good → the stream says so and ENDS (nothing left to wait for)', async () => {
+  const e = await event();
+  const [ann] = await users(1);
+  await join(ann, e.id);
+  const stream = await openStream(ann, e.id);
+  assert.equal((await stream.next()).status, 'waiting');
+
+  await pool.query('UPDATE events SET tickets_sold = total_tickets WHERE id = $1', [e.id]);
+  await redis.set(`event:${e.id}:stock`, 0);
+  assert.equal((await stream.next()).chance, 'sold_out');
+  assert.equal(await stream.next(), null, 'the server closed the stream');
+});

@@ -125,6 +125,8 @@ Every significant choice, the alternatives considered, and why. Newest at the bo
 | Random score at join time (lobby < 1, later arrivals ≥ 1) | a shuffle job at the sale's start | no extra moving part that could fail or run late at the busiest second; admission and positions work unchanged |
 | Random numbers from Node `crypto.randomBytes`, passed to Lua | Lua `math.random` | a proper random source, nothing predictable |
 | Chance shown as a level (good / maybe / unlikely), assuming 2 tickets per buyer | an exact percentage | the inputs are guesses; a precise-looking number would mislead |
+| Two kinds of sold out: `all_held` (stock 0, holds may come back) and `sold_out` (every ticket paid, from PostgreSQL) | one "sold out" | telling people to leave while tickets may still come back would be wrong, and so would making them wait when none can |
+| Admission pauses while the stock is 0 | keep admitting | a pass with nothing to buy is wasted; returned tickets should go to the next people in line |
 | Positions hidden in the lobby | show the drawn place early | "drawn at 11:00" is clearer, and nobody refreshes hoping for a better number (re-joining keeps the score anyway) |
 
 ## Frontend

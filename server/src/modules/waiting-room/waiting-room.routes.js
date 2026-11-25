@@ -77,7 +77,8 @@ router.get('/events/:id/queue/stream', authenticate, queueStreamPerUser, validat
     if (key === lastKey) return;
     lastKey = key;
     res.write(`event: status\ndata: ${JSON.stringify(status)}\n\n`);
-    if (status.status === 'admitted') finish(); // nothing more to wait for
+    // Nothing more to wait for: you're in, or every ticket is paid for (none can come back).
+    if (status.status === 'admitted' || status.chance === 'sold_out') finish();
   };
 
   const timer = setInterval(async () => {

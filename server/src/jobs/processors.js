@@ -4,6 +4,7 @@
 // BullMQ guarantees "at least once", not "exactly once": a worker that crashes halfway through
 // a job gets the job again after a restart.
 import { pool } from '../config/db.js';
+import { redis } from '../config/redis.js';
 import {
   getHold,
   releaseHold,
@@ -13,6 +14,7 @@ import {
 } from '../modules/reservation/holds.js';
 import * as ordersRepository from '../modules/orders/orders.repository.js';
 import { activeRooms, admitNext, dropRoom } from '../modules/waiting-room/waiting-room.js';
+import { stockKey } from '../modules/reservation/stock.js';
 
 // "expire-hold": the hold's 5 minutes are over.
 export async function expireHold({ holdId }) {
@@ -95,6 +97,11 @@ export async function admitWaiting({ eventIds } = {}) {
   let admitted = 0;
   for (const event of rows) {
     if (!event.admission_per_second || new Date(event.sale_starts_at) > now) continue; // still the lobby
+    // No tickets left right now (all sold or held): PAUSE. A pass would be useless — and when
+    // unpaid holds expire and tickets come back, the next people in line should get them, not
+    // people who were let in earlier with nothing to buy. (Unknown stock → admit as usual.)
+    const stock = await redis.get(stockKey(event.id));
+    if (stock !== null && Number(stock) <= 0) continue;
     admitted += (await admitNext(event.id, event.admission_per_second)).length;
   }
   // Rooms of events that no longer exist: clean them up.

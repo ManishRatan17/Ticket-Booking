@@ -87,6 +87,17 @@ Known optimism: people already admitted but not yet holding tickets will take so
 
 *Tested: [chance.test.js](../server/test/chance.test.js) checks the exact boundaries (349 ahead of 500 buyers → good, 350 → maybe, 649 → maybe, 650 → unlikely), the lobby shares, rounding (3 tickets → 2 buyers) and "no estimate when not in line"; over HTTP, statuses carry the numbers and follow the stock when someone holds tickets; a lobby of 20 with 10 tickets is "unlikely". Mutation: "good" never given → 4 tests fail.*
 
+**Sold out (step 4g):** two different situations, told apart honestly:
+
+| `chance` | When | What the page says | What the system does |
+|---|---|---|---|
+| `all_held` | the Redis stock is 0, but not every ticket is paid | "Sold out for now: every ticket is sold or held by someone checking out. Tickets that aren't paid within 5 minutes go back on sale. You keep your place." | the admission worker **pauses** this room |
+| `sold_out` | PostgreSQL: `tickets_sold = total_tickets` (every ticket PAID: nothing can come back) | "Sold out. Every ticket for this event has been sold." No Join button | the live stream sends it and **ends**; the page stops polling |
+
+**Why pause admission while everything is held?** A pass would be useless: there's nothing to hold. And when unpaid holds expire and tickets come back, they should go to the **next people in line**, not to people let in earlier who had nothing to buy and may have left. As soon as the stock is above 0, admission continues where it stopped. (Unknown stock, e.g. Redis just restarted → admit as usual.) Both answers come for **every** status, so someone who hasn't joined yet sees "Sold out" instead of a Join button.
+
+*Tested: 2 tickets, both held → the next two in line stay waiting with `all_held`; the hold is released → both are let in; every ticket paid → `sold_out` for people in line and not in line; the live stream sends `sold_out` and closes. Mutation: the pause removed → the all-held test fails.*
+
 **The lobby window (step 4d):** the lobby opens only **`lobby_minutes`** before the sale (migration [006](../server/migrations/006_lobby_window.sql), default **15**, 1–1440, set by the admin per event). Joining earlier → **`409 LOBBY_NOT_OPEN`** with `details.lobbyOpensAt`, and the status says `not_in_queue` with `lobbyOpensAt`, so the page can count down: "The waiting room opens in 12:30 (at 10:45)". Without a window, a bot (or a superfan) could take place #1 three days early. The check is inside [join-queue.lua](../server/src/modules/waiting-room/lua/join-queue.lua) using **Redis's clock** (`TIME`), the same clock as holds and passes, so every server gives the same answer at the same moment. Someone already in the line is never refused. *Tested: too early → 409 and nobody added; `lobbyMinutes: 60` lets people in 30 minutes ahead; the schema accepts 1–1440 and defaults to 15. Mutation: window check removed → the too-early test fails.*
 
 *Tested: 300 people, rate 50 → after each of 6 ticks exactly the first 50, 100, … 300 are in — nobody ever overtakes anybody — and the empty room is no longer checked.*
@@ -102,7 +113,7 @@ Known optimism: people already admitted but not yet holding tickets will take so
 | `POST /api/events/:id/queue` | join (or re-join) → status. Needs the "are you a person?" token (Phase 5d, [15](15-protection.md#5d--bot-check-cloudflare-turnstile--a-honeypot)) |
 | `GET /api/events/:id/queue` | current status |
 
-Status: `{ "status": "lobby" | "waiting" | "admitted" | "not_in_queue", "position", "total", "ticketsLeft", "buyersLeft", "chance": "good" | "maybe" | "unlikely" | null, "passExpiresInSeconds", "admissionPerSecond", "saleStartsAt", "estimatedWaitSeconds", "serverTime" }`. Events without a waiting room → `409 NO_WAITING_ROOM`.
+Status: `{ "status": "lobby" | "waiting" | "admitted" | "not_in_queue", "position", "total", "ticketsLeft", "buyersLeft", "chance": "good" | "maybe" | "unlikely" | "all_held" | "sold_out" | null, "passExpiresInSeconds", "admissionPerSecond", "saleStartsAt", "estimatedWaitSeconds", "serverTime" }`. Events without a waiting room → `409 NO_WAITING_ROOM`.
 
 ## Live position: Server-Sent Events (step 4b)
 
@@ -120,7 +131,7 @@ data: {"status":"waiting","position":12,"total":4800,…}
 | check Redis once a second per stream, send **only when something visible changed** | `ZRANK` is cheap; no traffic while nothing moves |
 | `: ping` comment every 15 s | stops proxies from closing a quiet connection |
 | `retry: 2000` | after a drop, the browser reconnects in 2 s |
-| end the stream when you're **admitted**, and after 10 min | nothing left to wait for; reconnecting re-runs authentication |
+| end the stream when you're **admitted**, when the event is **sold out for good**, and after 10 min | nothing left to wait for; reconnecting re-runs authentication |
 | `req.on('close')` stops the timers | a closed tab costs nothing |
 | at most **3 open streams per user** (Phase 5c); the 4th → `429 TOO_MANY_STREAMS`, and that page polls instead | 5,000 "tabs" from a script can't tie up 5,000 connections ([15](15-protection.md#5c--duplicate-tabs-at-most-3-live-streams-per-user)) |
 | headers `Cache-Control: no-cache, no-transform`, `X-Accel-Buffering: no` | never cache, compress or buffer a live stream |

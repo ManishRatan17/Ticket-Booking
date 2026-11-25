@@ -12,7 +12,7 @@ test('buyers left = tickets left ÷ 2, rounded up', () => {
   assert.equal(estimateChance({ status: 'waiting', position: 1, total: 1, ticketsLeft: 3 }).buyersLeft, 2);
   // A negative stock (never expected) is treated as none left.
   assert.deepEqual(estimateChance({ status: 'waiting', position: 1, total: 1, ticketsLeft: -2 }), {
-    chance: 'unlikely',
+    chance: 'all_held',
     ticketsLeft: 0,
     buyersLeft: 0,
   });
@@ -32,9 +32,19 @@ test('in line: the exact boundaries (0.7 and 1.3 × buyers left)', () => {
   assert.equal(waiting(651, 1000), 'unlikely'); // 650 ahead
 });
 
-test('in line: first in line with tickets left → good; nothing left → unlikely', () => {
+test('in line: first in line with tickets left → good', () => {
   assert.equal(waiting(1, 1), 'good');
-  assert.equal(waiting(1, 0), 'unlikely');
+});
+
+test('none left right now → all_held for everyone; every ticket PAID → sold_out (not estimates)', () => {
+  for (const status of ['waiting', 'lobby', 'not_in_queue', 'admitted']) {
+    assert.equal(estimateChance({ status, position: 1, total: 3, ticketsLeft: 0 }).chance, 'all_held', status);
+    assert.deepEqual(estimateChance({ status, position: 1, total: 3, ticketsLeft: 5, soldOutForGood: true }), {
+      chance: 'sold_out',
+      ticketsLeft: 0,
+      buyersLeft: 0,
+    });
+  }
 });
 
 test('in the lobby everyone has the same chance: buyers left ÷ people in the lobby', () => {

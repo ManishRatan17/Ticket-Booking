@@ -2,13 +2,15 @@
 // Redis only keeps a fast working copy of each event's stock.
 import { pool } from '../../config/db.js';
 
-const COLUMNS = 'id, name, total_tickets, sale_starts_at, price_paise, admission_per_second, lobby_minutes, created_at';
+const COLUMNS =
+  'id, name, total_tickets, tickets_sold, sale_starts_at, price_paise, admission_per_second, lobby_minutes, created_at';
 
 function toEvent(row) {
   return {
     id: Number(row.id),
     name: row.name,
     totalTickets: row.total_tickets,
+    ticketsSold: row.tickets_sold, // PAID tickets (Phase 2); = totalTickets means sold out for good
     saleStartsAt: row.sale_starts_at,
     pricePaise: row.price_paise, // whole paise: ₹499.00 = 49900
     admissionPerSecond: row.admission_per_second, // null = no waiting room

@@ -8,6 +8,17 @@ import { ChanceNote } from './ChanceNote.jsx'
 export function WaitingRoom({ status, onJoin, saleOpensIn, lobbyOpensIn, human }) {
   if (!status) return <p className="muted">Checking the waiting room…</p>
 
+  // Every ticket is paid for: nothing can come back, so there's nothing to wait for.
+  if (status.chance === 'sold_out') {
+    return (
+      <div className="panel" aria-live="polite">
+        <p>
+          <strong>Sold out.</strong> Every ticket for this event has been sold.
+        </p>
+      </div>
+    )
+  }
+
   // Too early: the waiting room opens a few minutes before the sale (the "lobby window").
   if (status.status === 'not_in_queue' && lobbyOpensIn > 0) {
     return (
@@ -29,6 +40,7 @@ export function WaitingRoom({ status, onJoin, saleOpensIn, lobbyOpensIn, human }
           joined.
         </p>
         {human.siteKey && <TurnstileWidget key={human.round} siteKey={human.siteKey} onToken={human.setToken} />}
+        <ChanceNote status={status} />
         <button type="button" onClick={onJoin} disabled={!human.ready}>
           Join the queue
         </button>
