@@ -1,0 +1,11 @@
+# What `docker build` may NOT copy into the image (server/Dockerfile, built from the repo root).
+**/node_modules
+**/.env
+**/.env.*
+.git
+docs
+loadtest
+client/*
+!client/package.json
+server/test
+server/test-support

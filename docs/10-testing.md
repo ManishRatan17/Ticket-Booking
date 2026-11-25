@@ -5,7 +5,7 @@ docker compose up -d     # the server tests use the real PostgreSQL and Redis
 npm test                 # server (node:test) then client (Vitest)
 ```
 
-Today: **329 server tests + 40 client tests**, all passing (about 10–15 s for the server suite).
+Today: **336 server tests + 40 client tests**, all passing (about 10–15 s for the server suite).
 
 ## How the server tests run
 
@@ -75,6 +75,7 @@ Kept outside `test/` because Node runs every file inside `test/` as a test.
 | `lucky-draw.test.js` | the draw: fingerprint public / seed secret before; nothing before the draw time; round 1 = exactly the lowest draw numbers, verifiable from the revealed seed; winners' lucky passes; two jobs at once → one round; round 2 waits a full round and picks the next numbers, nobody twice; people at the 4-ticket limit skipped; closing returns leftovers (and later releases) to the normal sale; empty draw; **chi-square fairness over 2,000 seeds**; someone admitted but still in the draw keeps the live stream and sees the win arrive |
 | `support.test.js` | the support inbox: request + first message, validation, one open request per kind and event, IDOR → 404, admin-only → 403, the conversation, **approved +2 → limit 6 for holds and payments** (only that person and event), declined, decided once, **two admins at once → one wins**, questions closed not approved, deleting an event keeps the conversation |
 | `bot-strikes.test.js` | Phase 5e with rate limits, the bot check and moderation on (private prefixes, fake Cloudflare): normal use → no signal; **a shared IP never gets anyone a signal**; a script → suspended 15 days with evidence; cleanup after a strike and booking blocked everywhere; restricted people can still sign in and use the support inbox; missing / fake tokens; second strike → banned; old or overturned strikes don't count; a suspension ends by itself; two strikes at once → one; appeals; admin restrict / lift; login returns the restriction |
+| `short-cache.test.js` | the in-memory cache for hot data (Phase 6): **1,000 simultaneous misses → ONE query** (single-flight), reuse within the time limit, delete, failures not cached, off at 0 |
 | `holds-http.test.js` | the holds API: every status code, IDOR, CSRF, lazy release on read, **300 users × 100 tickets over HTTP** |
 
 ## Client test files (Vitest)
@@ -131,6 +132,7 @@ A test only proves something once it has been seen to **fail for the right reaso
 | support approval without raising the limit | 2 support tests |
 | orders: hold-index clash answered `ORDER_EXISTS` even for the SAME key (the old code) | the 30 × 20 service-level race, 2/2 runs |
 | restriction check removed from the hold route | 3 strike tests |
+| sold-out fast path ignoring the person's own (expired) hold | the fast-path test |
 | "already restricted" guard removed from `strike()` | the two-strikes-at-once test |
 | payment check ignoring a raised limit | the approval test |
 | client createEvent sending only name/tickets/sale time (the old code) | the client createEvent test |
@@ -141,6 +143,10 @@ A test only proves something once it has been seen to **fail for the right reaso
 | stream slot never given back | 3 stream-cap tests |
 | `requireHuman` removed from register | 5 bot-check tests |
 | honeypot check disabled | the honeypot test |
+
+## Load tests
+
+Thousands of users are tested separately, with k6 and SQL verification afterwards: see [19-load-testing.md](19-load-testing.md). Note: while a load test's 10,000 people are in the database, `admin lists users` can fail (its admin is pushed off the first page). Run `loadtest/cleanup.mjs` before the test suite.
 
 ## Lessons from flaky and broken runs
 

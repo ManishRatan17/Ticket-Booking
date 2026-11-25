@@ -29,6 +29,7 @@ A ticketing platform built to stay **correct** (never sell a ticket twice) and *
 | 16 | [Lucky draw](16-lucky-draw.md) | Part of the tickets given away by a provably fair random draw among the waiting room |
 | 17 | [Support inbox](17-support-inbox.md) | People ask the organisers (e.g. for more tickets); admins answer, approve, decline |
 | 18 | [Bot strikes](18-bot-strikes.md) | Bot signals → strikes → 15-day suspension → ban; appeals; the admin Restrictions page |
+| 19 | [Load testing](19-load-testing.md) | 10,000 people, 300 tickets: k6, the results, what it found and what was fixed |
 
 ---
 
@@ -49,11 +50,13 @@ Roadmap from the original blueprint. ✅ done · 🟡 partly done · ⬜ not sta
 | Lucky draw | (added after Phase 5) a % of the tickets in their own pool, drawn among everyone in the waiting room | ✅ (L1 settings + separate pool · L2 the draw: provably fair, rounds, closing · L3 pages + verify in the browser) |
 | Support inbox | (added after the lucky draw) requests to the organisers; approved "more tickets" raises that person's limit for that event | ✅ |
 | 5e | Bot strikes: suspicion score from bot signals, 1st strike = booking paused 15 days, 2nd within a year = banned; appeals; admin page | ✅ |
-| 6 | Proof: k6 load tests with thousands of users, SQL verification | ⬜ |
+| 6 | Proof: k6 load tests with thousands of users, SQL verification | ✅ (10,000 people → exactly 300 sold, 0 failed requests; waiting room: median 3 ms, p95 48 ms; found and fixed a database bottleneck on the hold path) |
 | 7 | Polish: styling, Razorpay test mode, deployment, demo video | ⬜ |
 | 8 | Stretch: numbered seats, multiple servers, metrics | ⬜ |
 
-**Numbers today:** 329 server tests + 40 frontend tests, all passing. 300 signed-in users racing for 100 tickets over real HTTP → exactly 100 holds.
+**Load test (laptop, one API process):** 10,000 people for 300 tickets → **exactly 300 sold, 0 duplicates, 0 failed requests**. Through the waiting room: median **3 ms**, p95 **48 ms**. With no waiting room at all, 500 clicks a second: median 6 ms, p95 327 ms. Details: [19](19-load-testing.md).
+
+**Numbers today:** 336 server tests + 40 frontend tests, all passing. 300 signed-in users racing for 100 tickets over real HTTP → exactly 100 holds.
 
 ---
 

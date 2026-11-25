@@ -47,12 +47,13 @@ Node built-ins used heavily: `node:crypto` (random tokens, SHA-256, `timingSafeE
 | Postman | Trying endpoints by hand (cookies: see `COOKIE_SECURE` in [06-security](06-security.md#cookies)) |
 | `docker exec … psql` / `redis-cli` | Looking inside the databases |
 | Google Cloud Console | The OAuth client for "Continue with Google" |
+| k6 (`grafana/k6` in Docker) | Load tests (Phase 6): 10,000 simulated people; no install needed ([19](19-load-testing.md)) |
+| Docker image of the API ([server/Dockerfile](../server/Dockerfile)) | The API and worker as Linux containers: for the load test, and the start of deployment (Phase 7) |
 | Cloudflare Turnstile | The "are you a person?" check (Phase 5d): free, no package needed (a script tag in the page, one HTTPS call from the server). Development uses Cloudflare's public test keys |
 
 ## Planned (not installed yet)
 
 | Tool | Phase | For |
 |---|---|---|
-| k6 | 6 | Load tests with thousands of virtual users |
 | Razorpay (test mode) | 7 | Realistic payment flow |
 | A real email provider (Resend / SES / SMTP) | 7 | Replaces the console mailer |

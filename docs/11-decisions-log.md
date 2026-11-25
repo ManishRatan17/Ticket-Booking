@@ -163,6 +163,17 @@ Every significant choice, the alternatives considered, and why. Newest at the bo
 | Cleanup on a strike (holds, orders, queue, passes) | leave them | a bot account must not keep tickets tied up |
 | Appeals in the support inbox; upholding overturns in the same transaction | a separate appeals system | one inbox for people and admins |
 
+## Load testing (Phase 6)
+
+| Decision | Rejected | Why |
+|---|---|---|
+| k6 in Docker, arrival-rate scenarios | k6 installed on Windows; 10,000 simultaneous virtual users | nothing to install; this laptop can't hold 10,000 virtual users, and the server sees the same arrivals either way |
+| The API under test as a Linux container in the Docker network | the API on Windows | Windows / Docker Desktop port forwarding refused connections before they reached Node: that measured the laptop, not the app |
+| Verify with SQL after every run | trust k6's error count | "no errors" doesn't prove "not oversold"; the data does |
+| Hot data (event, restrictions, limits) cached in memory for 1 s, single-flight | a database query per click; a Redis cache | the load test showed 4 queries per click overwhelming the pool; 1 s of staleness across servers is acceptable, and payment always reads the database |
+| Sold-out fast path from Redis before per-person work | the full path for every click | ~97 % of clicks in a sell-out are "sold out"; they shouldn't cost database queries |
+| Restricted accounts listed in a Redis set (rebuilt from PostgreSQL, hourly too) | ask PostgreSQL for every new person | a cache can't help people it has never seen |
+
 ## Frontend
 
 | Decision | Alternatives | Why |

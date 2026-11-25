@@ -3,3 +3,6 @@ dist/
 .env
 *.log
 coverage/
+
+# Load-test data: real login tokens and run results (Phase 6)
+loadtest/.data/
