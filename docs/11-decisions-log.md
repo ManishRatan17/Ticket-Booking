@@ -107,6 +107,8 @@ Every significant choice, the alternatives considered, and why. Newest at the bo
 | Purchase cap 4 per person per event, checked in `create-hold.lua` **and** in the payment transaction | Redis only; PostgreSQL only | Redis refuses fast and atomically; PostgreSQL (event row locked) is the truth and sees simultaneous payments Redis can't |
 | `bought` counted inside `consume-hold.lua` | a separate `INCRBY` after the commit | no gap where the hold is gone but not yet counted |
 | Over the cap at payment → `failed` + refund logged | reject the webhook | the money already moved; same policy as a late payment that finds no tickets |
+| At most 3 live streams per user, extra tabs poll | one stream (newest wins); counter in server memory; browser-only `BroadcastChannel` | simple, works with several servers, and the server enforces it (a script ignores the browser) |
+| Stream count with a 15-min TTL, deleted at 0 | no TTL | a crashed server can't leave slots taken forever, and the count can never go negative |
 
 ## Frontend
 

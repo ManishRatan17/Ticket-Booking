@@ -5,7 +5,7 @@ docker compose up -d     # the server tests use the real PostgreSQL and Redis
 npm test                 # server (node:test) then client (Vitest)
 ```
 
-Today: **252 server tests + 34 client tests**, all passing (about 10–15 s for the server suite).
+Today: **255 server tests + 34 client tests**, all passing (about 10–15 s for the server suite).
 
 ## How the server tests run
 
@@ -64,7 +64,7 @@ Kept outside `test/` because Node runs every file inside `test/` as a test.
 | `sweep.test.js` | the expiry index is maintained on create / release / pay and rebuilt by `indexAllHolds()`; the sweep releases an expired hold that never got a job, leaves running holds alone, expires an overdue order whose hold vanished, removes stale index entries, and two sweeps at once release each hold once |
 | `admin-jobs.test.js` | admin-only (403/401); overview has counts for every state, ≥ 1 worker, the 60-s sweep schedule; **the dead-letter flow**: a job fails its only attempt → listed with its error → cause fixed → Retry → completed, tickets back; retry of an unknown job → 404, of a job that hasn't failed → 409 |
 | `waiting-room.test.js` | no pass → 403; events without a room unchanged; arrival order and keeping your place on re-join; **300 simultaneous joins → positions 1–300**; N per tick in order; pass lasts 10 min and allows holding; the lobby (queue before the sale, no admission); **fairness under load** (300 people, 6 ticks, nobody overtakes); two admission runs at once never admit anyone twice |
-| `waiting-room-stream.test.js` | reads the raw SSE stream: correct content type; first message = current status; position updates live as people ahead are admitted, then `admitted` and the stream ends; 401 / 409 as plain JSON |
+| `waiting-room-stream.test.js` | reads the raw SSE stream: correct content type; first message = current status; position updates live as people ahead are admitted, then `admitted` and the stream ends; 401 / 409 as plain JSON; Phase 5c: 3 streams per user, the 4th → JSON 429 (not counted), closing a tab frees a slot, key deleted at 0, **10 tabs at once → exactly 3 streams**, an admitted stream gives its slot back |
 | `ticket-rate-limits.test.js` | Phase 5a, limits switched on with a private prefix: 11th hold → 429 + `Retry-After`, others on the same IP unaffected; **13 accounts × 10 holds from one IP at once → exactly 10 refused**; release, join, status, orders and payments limits; anonymous floods don't use anyone's budget |
 | `purchase-limit.test.js` | Phase 5b: bought 4 → 1 more refused with `{ bought, limit }`; bought 2 → 3 refused without touching stock, 2 fine; per person and per event; failed payments don't count; `purchase` in my-hold; Redis loses the count → rebuilt from PostgreSQL; **two orders paid at once → exactly 4 tickets** |
 | `holds-http.test.js` | the holds API: every status code, IDOR, CSRF, lazy release on read, **300 users × 100 tickets over HTTP** |
@@ -112,6 +112,8 @@ A test only proves something once it has been seen to **fail for the right reaso
 | hold rate limiters (per user and per IP) removed | both hold rate-limit tests |
 | purchase-cap check removed from `create-hold.lua` | the hold-refused tests |
 | purchase-cap check removed from the payment transaction | the simultaneous-payments test (8 tickets paid) |
+| stream cap removed from `stream-open.lua` | 2 stream-cap tests |
+| stream slot never given back | 3 stream-cap tests |
 
 ## Lessons from flaky and broken runs
 

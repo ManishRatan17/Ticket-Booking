@@ -109,6 +109,7 @@ Redis runs every command one at a time, so **one command is atomic**. Several st
 | `event:<eventId>:stock` | string (number) | tickets available | never | event creation; holds (−); releases (+); rebuilt from Postgres if missing |
 | `hold:<holdId>` | hash | `userId`, `eventId`, `quantity`, `createdAt`, `expiresAt` (ms, Redis clock) | **never on purpose** — released explicitly (see [07](07-tickets-and-holds.md)) | `create-hold.lua` / `release-hold.lua` |
 | `event:<eventId>:user:<userId>:hold` | string | that user's hold id for that event | never (deleted on release) | the same scripts |
+| `wr:streams:<userId>` | integer | how many live queue streams that user has open (Phase 5c, at most 3) | 15 min (safety net if a server crashes; deleted at 0) | `stream-open.lua` / `stream-close.lua` |
 | `event:<eventId>:user:<userId>:bought` | integer | tickets that user has PAID for at that event (Phase 5b purchase cap; rebuilt from paid orders if missing) | never | `consume-hold.lua` (+quantity), `addBought` for late payments; read by `create-hold.lua` |
 | `holds:by-expiry` | sorted set | member = hold id, score = `expiresAt` (ms): every hold by expiry time | never (entries removed with their hold) | the hold Lua scripts (ZADD on create, ZREM on release/consume, atomically); `indexAllHolds()` at worker start |
 | `bull:expirations:*` | BullMQ's own keys | the job queue: delayed, waiting, active, completed, failed jobs, the sweep schedule | per job settings | BullMQ ([jobs/](../server/src/jobs/)) |

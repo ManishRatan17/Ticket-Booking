@@ -8,7 +8,7 @@ Phases 1–4 make the sale **correct** (never oversell) and **fair** (first come
 |---|---|---|
 | A script hammers hold / queue / checkout thousands of times a second | **rate limits** per user (strict) and per IP (generous) | 5a ✅ |
 | One account buys again and again (hold 4 → pay → hold 4 → …) | **purchase cap**: 4 tickets per account per event | 5b ✅ |
-| Thousands of open tabs, each checking Redis every second | **cap on live streams** per user | 5c ⬜ |
+| Thousands of open tabs, each checking Redis every second | **cap on live streams** per user | 5c ✅ |
 | Thousands of fake accounts made by bots | **bot check** (Cloudflare Turnstile) + honeypot | 5d ⬜ |
 
 Already in place before Phase 5:
@@ -105,3 +105,29 @@ If Redis is down, the limiter **lets requests through** (and logs a warning): it
 **Not covered here (that's 5d):** one person with **many accounts**. A per-account limit is only as strong as the cost of making an account.
 
 *Tested in [purchase-limit.test.js](../server/test/purchase-limit.test.js): bought 4 → 1 more refused (`details: { bought: 4, limit: 4 }`); bought 2 → 3 refused (stock untouched), 2 fine; per person and per event; failed payments don't count; `purchase` in "my hold"; Redis loses the count → rebuilt from PostgreSQL; two orders paid at once → exactly 4 tickets. Mutations: Lua check removed → the hold tests fail; PostgreSQL check removed → the simultaneous-payments test fails (8 tickets paid).*
+
+## 5c · Duplicate tabs: at most 3 live streams per user
+
+**The hole:** every open queue page holds one HTTP connection and reads Redis once a second (step 4b). Two or three tabs are normal. A script opening 5,000 "tabs" with one account ties up 5,000 connections and 5,000 Redis reads a second. The rate limit (20 opens a minute) only slows that down: an open stream stays open for 10 minutes.
+
+**The rule:** at most **3** open streams per user (`MAX_STREAMS_PER_USER` in [waiting-room.js](../server/src/modules/waiting-room/waiting-room.js)). The 4th gets `429 TOO_MANY_STREAMS`, and that page **still works**: [useQueueStatus](../client/src/hooks/useQueueStatus.js) treats any stream error by asking every 2 s instead (the fallback built in 4c). So extra tabs cost a cheap GET every 2 s instead of a held connection.
+
+```
+open a stream ──► stream-open.lua:  INCR count · EXPIRE 15 min · count > 3 ? DECR, refuse : allow
+                                                                         │
+the stream ends (tab closed, admitted, 10-min limit) ──► stream-close.lua: DECR · at 0, DEL
+```
+
+| Detail | Why |
+|---|---|
+| Redis key `<prefix>:streams:<userId>`, one count per user (all events together) | the cost is per connection, whatever the event |
+| **Count first, then decide**, in one Lua script ([stream-open.lua](../server/src/modules/waiting-room/lua/stream-open.lua)) | 10 tabs opening at the same instant get counts 1…10, so exactly 3 pass (tested). A refused open gives its count back |
+| Checked **before** the stream starts | the refusal is a normal JSON `429`, not a half-open stream |
+| Released in `finish()`, which every ending goes through (tab closed → `req.on('close')`, admitted, the 10-minute limit, an error) | one place, guarded by `closed`, so a slot is given back exactly once |
+| **TTL 15 min**, longer than a stream may live (10 min) | if a server crashes, its streams can't run `finish()`. Without a TTL their slots would stay taken forever |
+| [stream-close.lua](../server/src/modules/waiting-room/lua/stream-close.lua) deletes the key at 0 | a `DECR` on a key that had already expired would leave `-1` forever (= a 4th slot) |
+| `if (req.socket.destroyed) finish()` | a browser that left while we were still setting up has already fired `close`; it won't fire again |
+
+**Options considered:** one stream per user, newer tab wins (more complex: the server must tell the old tab to stop); a counter in server memory (wrong with several API servers, and lost on restart); a `BroadcastChannel` in the browser so tabs share one stream (nice, but a script ignores whatever the browser does, so the server must enforce a limit anyway).
+
+*Tested in [waiting-room-stream.test.js](../server/test/waiting-room-stream.test.js): 3 tabs → 200, the 4th → JSON 429 and not counted, TTL set, another user unaffected, closing a tab frees a slot, all closed → key deleted; **10 tabs at the same instant → exactly 3 streams**; a stream that ends by itself (admitted) gives its slot back. Mutations: cap removed → 2 tests fail; release removed → 3 tests fail.*

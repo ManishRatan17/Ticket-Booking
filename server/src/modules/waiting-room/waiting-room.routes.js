@@ -5,6 +5,8 @@ import { validate } from '../../middleware/validate.js';
 import { authenticate } from '../../middleware/authenticate.js';
 import { eventIdParamsSchema } from '../events/events.schemas.js';
 import * as waitingRoom from './waiting-room.service.js';
+import { closeStreamSlot, openStreamSlot, MAX_STREAMS_PER_USER } from './waiting-room.js';
+import { AppError } from '../../lib/errors.js';
 import { queueJoinPerIp, queueJoinPerUser, queueStatusPerUser, queueStreamPerUser } from '../../lib/ticketRateLimits.js';
 
 const router = Router();
@@ -37,6 +39,16 @@ const STREAM_MAX_MS = 10 * 60_000; // after 10 min the browser simply reconnects
 router.get('/events/:id/queue/stream', authenticate, queueStreamPerUser, validate({ params: eventIdParamsSchema }), async (req, res) => {
   const args = { eventId: req.validated.params.id, userId: req.user.id };
   const first = await waitingRoom.getStatus(args); // 404 / 409 still answered as normal JSON errors
+
+  // At most MAX_STREAMS_PER_USER open at once (Phase 5c). Checked before the stream starts, so the
+  // refusal is a normal JSON 429; the page then simply asks every 2 s instead.
+  if (!(await openStreamSlot(args.userId))) {
+    throw new AppError(
+      429,
+      'TOO_MANY_STREAMS',
+      `You already have ${MAX_STREAMS_PER_USER} live queue pages open. This one will update every few seconds instead.`,
+    );
+  }
 
   res.set({
     'Content-Type': 'text/event-stream',
@@ -75,8 +87,11 @@ router.get('/events/:id/queue/stream', authenticate, queueStreamPerUser, validat
     clearInterval(heartbeat);
     clearTimeout(limit);
     res.end();
+    // Give the slot back. If Redis fails here, the slot's TTL frees it later.
+    closeStreamSlot(args.userId).catch((err) => console.warn(`[queue] stream slot not released: ${err.message}`));
   }
   req.on('close', finish); // the browser left (tab closed, navigated away): stop working for it
+  if (req.socket.destroyed) finish(); // it left while we were still setting up: 'close' won't come again
 
   send(first);
 });

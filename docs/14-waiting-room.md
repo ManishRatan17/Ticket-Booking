@@ -76,6 +76,7 @@ data: {"status":"waiting","position":12,"total":4800,…}
 | `retry: 2000` | after a drop, the browser reconnects in 2 s |
 | end the stream when you're **admitted**, and after 10 min | nothing left to wait for; reconnecting re-runs authentication |
 | `req.on('close')` stops the timers | a closed tab costs nothing |
+| at most **3 open streams per user** (Phase 5c); the 4th → `429 TOO_MANY_STREAMS`, and that page polls instead | 5,000 "tabs" from a script can't tie up 5,000 connections ([15](15-protection.md#5c--duplicate-tabs-at-most-3-live-streams-per-user)) |
 | headers `Cache-Control: no-cache, no-transform`, `X-Accel-Buffering: no` | never cache, compress or buffer a live stream |
 
 *Tested by reading the raw stream: position 2 → (admission tick) → 1 → (tick) → `admitted` → the server ends the stream. Not signed in → 401; no waiting room → normal JSON 409.*
