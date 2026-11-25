@@ -225,7 +225,8 @@ export function EventPage() {
       ) : canStillBuy <= 0 ? (
         <p>
           You've bought the maximum of {page.purchase.limit} tickets for this event.{' '}
-          <Link to="/orders">See your tickets</Link>
+          <Link to="/orders">See your tickets</Link> ·{' '}
+          <Link to={`/support?kind=more_tickets&event=${event.id}`}>Ask the organisers for more</Link>
         </p>
       ) : (
         <form onSubmit={handleHold}>

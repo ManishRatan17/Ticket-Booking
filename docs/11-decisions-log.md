@@ -141,6 +141,16 @@ Every significant choice, the alternatives considered, and why. Newest at the bo
 | Draw at a fixed time, then 2 more rounds and a close, each a full round after the previous | draw when the normal tickets run out | predictable and can't be gamed; winners always get their full 10 minutes, even after a worker outage |
 | Entrants frozen at round 1 | keep adding people | the draw must be reproducible from the seed and a fixed list |
 
+## Support inbox
+
+| Decision | Rejected | Why |
+|---|---|---|
+| Approving "more tickets" raises the limit for that person and event (`purchase_limit_overrides`) | admins buying for people; a global higher limit | the exception stays an exception, and both checks (Redis and PostgreSQL) use the same number |
+| Limit read from PostgreSQL on each hold (one PK lookup) | cached in Redis | an approval takes effect at once; one more fast query on a path that already reads the event |
+| One open request per person, kind and event | unlimited | asking twice doesn't jump the queue; the person is sent to their existing conversation |
+| Decisions only from `open` (`UPDATE … WHERE status = 'open'`), approval + raise in one transaction | check then update | two admins can't both decide; never an approval without its raise |
+| Requests kept (event set NULL) if an event is deleted | cascade delete | the conversation is a record |
+
 ## Frontend
 
 | Decision | Alternatives | Why |

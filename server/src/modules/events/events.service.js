@@ -12,9 +12,9 @@ import {
   releaseHold,
   redisNow,
   setBoughtIfMissing,
-  MAX_TICKETS_PER_USER,
 } from '../reservation/holds.js';
 import { paidQuantityForUser } from '../orders/orders.repository.js';
+import { purchaseLimitFor } from '../reservation/purchaseLimit.js';
 import { pool } from '../../config/db.js';
 import * as eventsRepository from './events.repository.js';
 import { scheduleHoldExpiry } from '../../jobs/queue.js';
@@ -165,16 +165,17 @@ export async function holdTickets({ eventId, userId, quantity }) {
   }
   const pool = lucky ? 'lottery' : 'main';
 
-  await Promise.all([ensureStock(event), ensureBought(event.id, userId)]);
+  // This person's limit: 4, or more if an admin approved a "more tickets" request (support inbox).
+  const [limit] = await Promise.all([purchaseLimitFor(event.id, userId), ensureStock(event), ensureBought(event.id, userId)]);
   let result;
   try {
-    result = await createHold({ eventId: event.id, userId, quantity, pool });
+    result = await createHold({ eventId: event.id, userId, quantity, pool, limit });
   } catch (err) {
     // The stock key vanished between ensureStock and the hold (Redis restarted just then):
     // rebuild once more and retry once.
     if (!/No stock set up/.test(err.message)) throw err;
     await ensureStock(event);
-    result = await createHold({ eventId: event.id, userId, quantity, pool });
+    result = await createHold({ eventId: event.id, userId, quantity, pool, limit });
   }
 
   switch (result.status) {
@@ -193,8 +194,8 @@ export async function holdTickets({ eventId, userId, quantity }) {
       throw new AppError(
         409,
         'PURCHASE_LIMIT',
-        `You can buy at most ${MAX_TICKETS_PER_USER} tickets for this event (you have ${result.bought})`,
-        { bought: result.bought, limit: MAX_TICKETS_PER_USER },
+        `You can buy at most ${limit} tickets for this event (you have ${result.bought})`,
+        { bought: result.bought, limit },
       );
     default: // 'already_holding'
       throw new AppError(409, 'HOLD_EXISTS', 'You already have tickets on hold for this event', {
@@ -208,8 +209,12 @@ export async function holdTickets({ eventId, userId, quantity }) {
 // Also says how many you've bought and the limit, so the page can offer only what's allowed.
 export async function getMyHold({ eventId, userId }) {
   const event = await findEventOr404(eventId);
-  const [hold, bought] = await Promise.all([getUserHold(event.id, userId), ensureBought(event.id, userId)]);
-  const purchase = { bought, limit: MAX_TICKETS_PER_USER };
+  const [hold, bought, limit] = await Promise.all([
+    getUserHold(event.id, userId),
+    ensureBought(event.id, userId),
+    purchaseLimitFor(event.id, userId),
+  ]);
+  const purchase = { bought, limit };
   if (hold?.expired) {
     await releaseHold(hold.id);
     return { hold: null, purchase, serverTime: await redisNow() };

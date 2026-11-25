@@ -14,6 +14,8 @@ Everything lives in [client/src/](../client/src/). Styling is deliberately minim
 | `/forgot-password` | [ForgotPasswordPage](../client/src/pages/ForgotPasswordPage.jsx) | signed-out only | forgot-password |
 | `/reset-password#token=…` | [ResetPasswordPage](../client/src/pages/ResetPasswordPage.jsx) | anyone (link from email) | reset-password |
 | `/checkout/:id` | [CheckoutPage](../client/src/pages/CheckoutPage.jsx) | signed in | `GET /api/orders/:id`, `POST /api/payments/fake/:id`, then polls the order until the webhook has settled it |
+| `/support`, `/support/:id` | [SupportPage](../client/src/pages/SupportPage.jsx), [SupportRequestPage](../client/src/pages/SupportRequestPage.jsx) | signed in | ask the organisers (more tickets / question), my requests, the conversation |
+| `/admin/support` | [AdminSupportPage](../client/src/pages/AdminSupportPage.jsx) | admin | the support inbox: reply, approve, decline, close |
 | `/orders` | [OrdersPage](../client/src/pages/OrdersPage.jsx) | signed in | `GET /api/orders` (ticket numbers for paid orders, "pay now" for pending ones) |
 | `/account` | [AccountPage](../client/src/pages/AccountPage.jsx) | signed in | sessions, delete session, logout-all |
 | `/admin/users` | [AdminUsersPage](../client/src/pages/AdminUsersPage.jsx) | admin | list users, change role |

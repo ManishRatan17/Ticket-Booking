@@ -1,7 +1,8 @@
 // Payments: from "the provider says it's paid" to tickets with numbers.
 import { pool, withTransaction } from '../../config/db.js';
 import { AppError } from '../../lib/errors.js';
-import { addBought, consumeHold, releaseHold, MAX_TICKETS_PER_USER } from '../reservation/holds.js';
+import { addBought, consumeHold, releaseHold } from '../reservation/holds.js';
+import { purchaseLimitFor } from '../reservation/purchaseLimit.js';
 import { holdTickets as takeFromStock } from '../reservation/stock.js';
 import { ensureStock } from '../events/events.service.js';
 import * as eventsRepository from '../events/events.repository.js';
@@ -72,9 +73,10 @@ export async function handlePaymentEvent(event, provider = 'fake') {
     //     so two of them can't both read "0 bought" and both pass.
     await eventsRepository.lockEvent(client, order.eventId);
     const paidBefore = await ordersRepository.paidQuantityForUser(client, order.eventId, order.userId);
-    if (paidBefore + order.quantity > MAX_TICKETS_PER_USER) {
+    const limit = await purchaseLimitFor(order.eventId, order.userId, client); // 4, or more if an admin approved
+    if (paidBefore + order.quantity > limit) {
       await ordersRepository.markFailed(client, { orderId, paymentId, reason: 'purchase_limit' });
-      console.warn(`[refund] order ${orderId}: over the ${MAX_TICKETS_PER_USER}-ticket limit: refund payment ${paymentId}`);
+      console.warn(`[refund] order ${orderId}: over the ${limit}-ticket limit: refund payment ${paymentId}`);
       return { outcome: 'refund_needed', releaseHoldId: order.holdId };
     }
 

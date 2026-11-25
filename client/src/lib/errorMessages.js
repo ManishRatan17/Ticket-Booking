@@ -28,6 +28,11 @@ const MESSAGES = {
   LOBBY_NOT_OPEN: 'The waiting room is not open yet. It opens a few minutes before the sale.',
   BOT_CHECK_FAILED: "We couldn't confirm you're a person. Please complete the check and try again.",
   ORDER_NOT_PENDING: 'This order is no longer waiting for payment.',
+  // Support inbox
+  REQUEST_NOT_FOUND: 'That request does not exist.',
+  REQUEST_CLOSED: 'This request has been answered and closed. Start a new one if you need more help.',
+  REQUEST_NOT_OPEN: 'This request was already decided (maybe by another admin). Reload to see it.',
+  NOT_APPROVABLE: 'Only "more tickets" requests can be approved. Close this one instead.',
   // Admin
   FORBIDDEN: 'You do not have permission to do this.',
   LAST_ADMIN: 'This is the only admin left. Make someone else an admin first.',

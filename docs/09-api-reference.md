@@ -130,7 +130,7 @@ Body `{ "name": "3–120 chars", "totalTickets": 1–100000, "saleStartsAt": "20
 ### `POST /events/:id/holds`  · signed in · limits 10/min per user, 120/min per IP
 Body `{ "quantity": 1 }` (JSON integer 1–4)
 → `201 { "hold": { "id", "eventId", "quantity", "pool", "expiresAt" }, "serverTime" }` (`pool`: `main`, or `lottery` for a lucky-draw winner)
-· `409 SOLD_OUT` (`details.available`) · `409 HOLD_EXISTS` (`details.holdId`) · `409 LUCKY_DRAW_LIMIT` (a lucky-draw winner asked for more than `details.limit`) · `409 PURCHASE_LIMIT` (`details: { bought, limit }`: at most 4 tickets per person per event, over all orders) · `409 SALE_NOT_STARTED` (`details.saleStartsAt`) · `404 EVENT_NOT_FOUND` · `400`
+· `409 SOLD_OUT` (`details.available`) · `409 HOLD_EXISTS` (`details.holdId`) · `409 LUCKY_DRAW_LIMIT` (a lucky-draw winner asked for more than `details.limit`) · `409 PURCHASE_LIMIT` (`details: { bought, limit }`: at most 4 tickets per person per event over all orders, more if an admin approved a request) · `409 SALE_NOT_STARTED` (`details.saleStartsAt`) · `404 EVENT_NOT_FOUND` · `400`
 
 ### `GET /events/:id/holds/mine`  · signed in
 → `200 { "hold": {…} | null, "purchase": { "bought", "limit" }, "serverTime" }` (an expired hold is released and reported as `null`; `purchase` = tickets you have bought for this event, and the per-person limit)
@@ -178,6 +178,27 @@ Header `X-Payment-Signature: sha256=<HMAC-SHA256 of the exact body>`. Body `{ "i
 · `401 INVALID_SIGNATURE` · `400 INVALID_WEBHOOK` · `500` on a crash (the provider retries)
 
 ---
+
+## Support inbox
+
+People, signed in ([17](17-support-inbox.md)):
+
+### `POST /support/requests`  · limit 5/hour per user
+Body `{ "kind": "more_tickets", "eventId", "extraTickets": 1–4, "message" }` or `{ "kind": "question", "eventId"?: …, "message" }` (message 1–2,000 characters)
+→ `201 { "request": { "id", "kind", "eventId", "eventName", "extraTickets", "status": "open", "messages": [{ "id", "fromAdmin", "body", "createdAt" }], … } }` · `400` · `404 EVENT_NOT_FOUND` · `409 REQUEST_EXISTS` (`details.requestId`: you already have an open one about this)
+
+### `GET /support/requests` → `200 { "requests": [ … ] }` (newest activity first)
+### `GET /support/requests/:id` → `200 { "request": { …, "messages": [ … ] } }` · `404 REQUEST_NOT_FOUND` (also for someone else's)
+### `POST /support/requests/:id/messages`  · limit 30/hour per user
+Body `{ "body" }` → `201 { "request" }` · `404` · `409 REQUEST_CLOSED`
+
+Admins (`/api/admin`, role admin):
+
+### `GET /admin/support?status=open|approved|declined|closed` → `200 { "requests": [ { …, "userEmail", "awaitingReply" } ] }` (open first, oldest first)
+### `GET /admin/support/:id` → `200 { "request" }`
+### `POST /admin/support/:id/messages` Body `{ "body" }` → `201 { "request" }`
+### `POST /admin/support/:id/decision`
+Body `{ "decision": "approved" | "declined" | "closed", "message"?: "…" }` → `200 { "request" }` · `409 REQUEST_NOT_OPEN` (already decided) · `409 NOT_APPROVABLE` (only more_tickets can be approved). Approving a `more_tickets` request raises that person's purchase limit for that event to 4 + extraTickets, in the same transaction.
 
 ## Trying it with curl
 

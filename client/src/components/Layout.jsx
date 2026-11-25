@@ -24,12 +24,14 @@ function NavBar() {
         {status === 'signed-in' ? (
           <>
             <NavLink to="/orders">My orders</NavLink>
+            <NavLink to="/support">Help</NavLink>
             {/* Only a convenience: hiding the links is not what protects the admin API */}
             {user.role === 'admin' && (
               <>
                 <NavLink to="/admin/users">Users</NavLink>
                 <NavLink to="/admin/events">Manage events</NavLink>
                 <NavLink to="/admin/jobs">Jobs</NavLink>
+                <NavLink to="/admin/support">Support inbox</NavLink>
               </>
             )}
             <NavLink to="/account" title="My account and devices">

@@ -54,9 +54,10 @@ function assertValid({ eventId, userId, quantity }) {
 //   { status: 'held', hold }
 //   { status: 'already_holding', holdId }
 //   { status: 'sold_out', available }
-//   { status: 'limit_reached', bought }    (bought + quantity > MAX_TICKETS_PER_USER)
+//   { status: 'limit_reached', bought }    (bought + quantity > limit)
 // pool: 'main' = the normal sale · 'lottery' = the lucky draw's own tickets (winners only)
-export async function createHold({ eventId, userId, quantity, pool = 'main' }) {
+// limit = this person's purchase limit for the event (purchaseLimit.js); default MAX_TICKETS_PER_USER.
+export async function createHold({ eventId, userId, quantity, pool = 'main', limit = MAX_TICKETS_PER_USER }) {
   assertValid({ eventId, userId, quantity });
   const holdId = randomUUID();
   const [code, value] = await redis.createHold(
@@ -69,7 +70,7 @@ export async function createHold({ eventId, userId, quantity, pool = 'main' }) {
     eventId,
     quantity,
     HOLD_SECONDS,
-    MAX_TICKETS_PER_USER,
+    limit,
     pool,
   );
 

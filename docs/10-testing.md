@@ -5,7 +5,7 @@ docker compose up -d     # the server tests use the real PostgreSQL and Redis
 npm test                 # server (node:test) then client (Vitest)
 ```
 
-Today: **303 server tests + 39 client tests**, all passing (about 10–15 s for the server suite).
+Today: **315 server tests + 40 client tests**, all passing (about 10–15 s for the server suite).
 
 ## How the server tests run
 
@@ -60,7 +60,7 @@ Kept outside `test/` because Node runs every file inside `test/` as a test.
 | `password-reset.test.js` | link in `#fragment`, identical answers, no waiting for email, newest link only, single use, race, expiry, rollback on "password = email", sessions revoked, Google-only users |
 | `holds.test.js` | holds in Redis: rules, lazy expiry, idempotent release, owner check, 1,000-user race, mixed quantities, 50 clicks → 1 hold |
 | `events.test.js` | admin creation, reading, validation, **stock rebuilt from PostgreSQL**, rebuild race (`SET NX`) |
-| `orders.test.js` | hold → pending order, price from the database (body can't set it), **idempotency** (replay, 10 parallel same-key → 1 order, other key → 409, key reuse → 422, missing key → 400), IDOR, expired hold, lazy order expiry, the `tickets_sold` CHECK |
+| `orders.test.js` | hold → pending order, price from the database (body can't set it), **idempotency** (replay, 10 parallel same-key → 1 order, **30 rounds × 20 truly simultaneous same-key calls → always the same order, never `ORDER_EXISTS`**, other key → 409, key reuse → 422, missing key → 400), IDOR, expired hold, lazy order expiry, the `tickets_sold` CHECK |
 | `payments.test.js` | pay → signed webhook → paid with ticket numbers; failed payment; the browser can't decide payment; wrong secret / tampered body → 401; duplicates (sequential and 10 at once); two deliveries for one order; amount mismatch; late payment (free → paid, sold out → refund); 20 simultaneous payments → numbers 1–20 |
 | `jobs.test.js` | a real worker inside the test process, 1-second holds (`HOLD_SECONDS=1`), private queue prefix: the job is scheduled with retry/dead-letter settings; an **abandoned** hold is released with nobody looking; an unpaid order becomes `expired`; a paid hold is left alone; the job is idempotent (3 runs at once → tickets back once); a job that runs too early fails and changes nothing |
 | `sweep.test.js` | the expiry index is maintained on create / release / pay and rebuilt by `indexAllHolds()`; the sweep releases an expired hold that never got a job, leaves running holds alone, expires an overdue order whose hold vanished, removes stale index entries, and two sweeps at once release each hold once |
@@ -73,6 +73,7 @@ Kept outside `test/` because Node runs every file inside `test/` as a test.
 | `chance.test.js` | the waiting room's "what are my chances?" levels: exact boundaries (0.7 and 1.3 × buyers left), lobby shares, rounding, no estimate outside the line, `all_held` / `sold_out` for every status |
 | `lucky-draw-pool.test.js` | the lucky draw's own pool: 20 % of 1,000 → 800 + 200; schema limits; the normal sale can't touch the draw's tickets; a winner holds from the lucky pool (limit per winner); released and expired lucky tickets return to the lucky pool, even when replaced by a normal hold; orders keep their pool; both pools rebuilt from PostgreSQL |
 | `lucky-draw.test.js` | the draw: fingerprint public / seed secret before; nothing before the draw time; round 1 = exactly the lowest draw numbers, verifiable from the revealed seed; winners' lucky passes; two jobs at once → one round; round 2 waits a full round and picks the next numbers, nobody twice; people at the 4-ticket limit skipped; closing returns leftovers (and later releases) to the normal sale; empty draw; **chi-square fairness over 2,000 seeds**; someone admitted but still in the draw keeps the live stream and sees the win arrive |
+| `support.test.js` | the support inbox: request + first message, validation, one open request per kind and event, IDOR → 404, admin-only → 403, the conversation, **approved +2 → limit 6 for holds and payments** (only that person and event), declined, decided once, **two admins at once → one wins**, questions closed not approved, deleting an event keeps the conversation |
 | `holds-http.test.js` | the holds API: every status code, IDOR, CSRF, lazy release on read, **300 users × 100 tickets over HTTP** |
 
 ## Client test files (Vitest)
@@ -82,6 +83,7 @@ Kept outside `test/` because Node runs every file inside `test/` as a test.
 | `api/client.test.js` | refresh-and-retry, single shared refresh, 409 handling, session-over codes, retry only once, wrong password not refreshed, error parsing, `Retry-After` |
 | `lib/format.test.js` | device names from real user-agent strings, "time ago" |
 | `lib/serverClock.test.js` | countdowns correct with the device clock fast or slow; formatting |
+| `api/admin.test.js` | "create event" sends every form field (it used to send only 3: price, waiting room, lobby and lucky draw were silently dropped) |
 | `lib/verifyDraw.test.js` | the browser's draw check (Web Crypto) computes exactly what the server computes (node:crypto); a swapped seed or another person's number fails |
 | `api/botCheck.test.js` | the "are you a person?" token goes in `X-Turnstile-Token` (register and queue join); no header without a token; the honeypot field is sent only when filled |
 
@@ -125,6 +127,10 @@ A test only proves something once it has been seen to **fail for the right reaso
 | lucky-draw winners chosen by user id instead of draw number | 3 draw tests |
 | no wait between lucky-draw rounds | the round-2 test and the two-jobs test |
 | stream ends on admission even while waiting for a draw | the live-win test |
+| support approval without raising the limit | 2 support tests |
+| orders: hold-index clash answered `ORDER_EXISTS` even for the SAME key (the old code) | the 30 × 20 service-level race, 2/2 runs |
+| payment check ignoring a raised limit | the approval test |
+| client createEvent sending only name/tickets/sale time (the old code) | the client createEvent test |
 | hold rate limiters (per user and per IP) removed | both hold rate-limit tests |
 | purchase-cap check removed from `create-hold.lua` | the hold-refused tests |
 | purchase-cap check removed from the payment transaction | the simultaneous-payments test (8 tickets paid) |
@@ -134,6 +140,10 @@ A test only proves something once it has been seen to **fail for the right reaso
 | honeypot check disabled | the honeypot test |
 
 ## Lessons from flaky and broken runs
+
+- **A test that failed once in a full run (orders, same-key race):** it passed 5/5 alone, so it would have been easy to call it "flaky". A stress script (60 rounds × 20 simultaneous calls) reproduced it every time: ~15 errors in 1,200, a real bug since Phase 2 (see [12](12-orders-and-payments.md#orders-and-idempotency-step-2a)). Lesson: a rare failure under load is usually a real race; make it frequent, then fix it.
+
+- **A test file that never ends (support inbox):** all 10 tests passed, then the file hung. Its cleanup threw (a real bug: deleting an event broke a table rule on its support requests) before releasing the admin lock and closing connections, so the process never exited. Fixes: the rule (see [17](17-support-inbox.md)), and cleanup in `try … finally`. Lesson: a hanging run often hides an error in `after()`; run the file with `--test-reporter=spec` into a file to see it.
 
 | Symptom | Real cause | Fix |
 |---|---|---|

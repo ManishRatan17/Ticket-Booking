@@ -19,6 +19,9 @@ import { EventsPage } from './pages/EventsPage.jsx'
 import { EventPage } from './pages/EventPage.jsx'
 import { CheckoutPage } from './pages/CheckoutPage.jsx'
 import { OrdersPage } from './pages/OrdersPage.jsx'
+import { SupportPage } from './pages/SupportPage.jsx'
+import { SupportRequestPage } from './pages/SupportRequestPage.jsx'
+import { AdminSupportPage } from './pages/AdminSupportPage.jsx'
 
 function App() {
   return (
@@ -44,6 +47,8 @@ function App() {
               <Route path="account" element={<AccountPage />} />
               <Route path="checkout/:id" element={<CheckoutPage />} />
               <Route path="orders" element={<OrdersPage />} />
+              <Route path="support" element={<SupportPage />} />
+              <Route path="support/:id" element={<SupportRequestPage />} />
             </Route>
 
             {/* Admins only (and the server answers 403 to anyone else anyway) */}
@@ -51,6 +56,7 @@ function App() {
               <Route path="admin/users" element={<AdminUsersPage />} />
               <Route path="admin/events" element={<AdminEventsPage />} />
               <Route path="admin/jobs" element={<AdminJobsPage />} />
+              <Route path="admin/support" element={<AdminSupportPage />} />
             </Route>
 
             {/* Reachable either way: the link comes from an email */}

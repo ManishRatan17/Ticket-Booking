@@ -9,6 +9,7 @@ import eventsRouter from './modules/events/events.routes.js';
 import ordersRouter from './modules/orders/orders.routes.js';
 import { paymentsRouter, webhooksRouter } from './modules/payments/payments.routes.js';
 import waitingRoomRouter from './modules/waiting-room/waiting-room.routes.js';
+import supportRouter from './modules/support/support.routes.js';
 import { authenticate } from './middleware/authenticate.js';
 import { requireRole } from './middleware/authorize.js';
 import { rejectCrossSiteRequests } from './middleware/csrf.js';
@@ -41,6 +42,7 @@ export function createApp() {
   app.use('/api', ordersRouter); // /api/orders…
   app.use('/api', paymentsRouter); // /api/payments/fake/…
   app.use('/api', waitingRoomRouter); // /api/events/:id/queue
+  app.use('/api', supportRouter); // /api/support/requests…
 
   // These two must be LAST: nothing above matched → 404; anything threw → error handler.
   app.use(notFound);

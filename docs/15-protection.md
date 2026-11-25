@@ -102,6 +102,8 @@ If Redis is down, the limiter **lets requests through** (and logs a warning): it
 
 **Client:** `GET /events/:id/holds/mine` now also returns `purchase: { bought, limit }`. The event page offers only `min(4, in stock, limit − bought)` tickets, says "(you already have 2)", and at the limit shows "You've bought the maximum of 4 tickets for this event" with a link to your tickets.
 
+**Exceptions:** a person can ask the organisers for more through the support inbox; an approved request raises **their** limit for **that** event (4 + up to 4), and both checks above use it ([17](17-support-inbox.md)).
+
 **Not covered here (that's 5d):** one person with **many accounts**. A per-account limit is only as strong as the cost of making an account.
 
 *Tested in [purchase-limit.test.js](../server/test/purchase-limit.test.js): bought 4 → 1 more refused (`details: { bought: 4, limit: 4 }`); bought 2 → 3 refused (stock untouched), 2 fine; per person and per event; failed payments don't count; `purchase` in "my hold"; Redis loses the count → rebuilt from PostgreSQL; two orders paid at once → exactly 4 tickets. Mutations: Lua check removed → the hold tests fail; PostgreSQL check removed → the simultaneous-payments test fails (8 tickets paid).*
