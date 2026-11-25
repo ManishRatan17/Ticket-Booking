@@ -18,6 +18,7 @@ const lobbyOpensAt = (event) => new Date(new Date(event.saleStartsAt).getTime() 
 
 // Adds what the page needs: the server's time (for countdowns) and a rough wait estimate.
 // Estimate = (seconds until the sale opens, if it hasn't) + position ÷ people let in per second.
+// In the lobby there's no position yet, so no estimate either (the page says "drawn at 11:00").
 function describe(status, event, now) {
   const secondsUntilSale = Math.max(0, Math.ceil((new Date(event.saleStartsAt) - now) / 1000));
   return {
@@ -32,11 +33,18 @@ function describe(status, event, now) {
 }
 
 // Joining opens lobbyMinutes BEFORE the sale (the "lobby"); admission starts the moment the sale does.
+// Everyone in the lobby gets a random place (the fair draw); later arrivals queue behind them.
 // Before the lobby opens → 409 LOBBY_NOT_OPEN: nobody can take a place days ahead.
 export async function join({ eventId, userId }) {
   const event = await findEventWithRoom(eventId);
   const opensAt = lobbyOpensAt(event);
-  const [status, now] = await Promise.all([joinQueue(event.id, userId, { lobbyOpensAtMs: opensAt.getTime() }), redisNow()]);
+  const [status, now] = await Promise.all([
+    joinQueue(event.id, userId, {
+      lobbyOpensAtMs: opensAt.getTime(),
+      saleStartsAtMs: new Date(event.saleStartsAt).getTime(),
+    }),
+    redisNow(),
+  ]);
   if (status.status === 'not_open') {
     throw new AppError(409, 'LOBBY_NOT_OPEN', `The waiting room opens ${event.lobbyMinutes} minutes before the sale`, {
       lobbyOpensAt: opensAt,
@@ -47,6 +55,7 @@ export async function join({ eventId, userId }) {
 
 export async function getStatus({ eventId, userId }) {
   const event = await findEventWithRoom(eventId);
-  const [status, now] = await Promise.all([queueStatus(event.id, userId), redisNow()]);
+  const now = await redisNow();
+  const status = await queueStatus(event.id, userId, { inLobby: now < new Date(event.saleStartsAt) });
   return describe(status, event, now);
 }

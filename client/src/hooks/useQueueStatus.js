@@ -4,7 +4,7 @@ import { getQueueStatus, joinQueue, queueStreamUrl } from '../api/waitingRoom.js
 // Your place in an event's waiting room, kept up to date LIVE.
 //
 //   1. Ask once (GET) where you are.
-//   2. If you're waiting: open a Server-Sent Events stream — the server pushes every change.
+//   2. If you're waiting (or in the lobby): open a Server-Sent Events stream — the server pushes every change.
 //   3. If the stream breaks (network, or your access cookie expired — EventSource can't refresh
 //      it), fall back to asking every 2 s through the API client, which DOES refresh.
 //
@@ -42,7 +42,7 @@ export function useQueueStatus(eventId, enabled) {
     getQueueStatus(eventId).then(
       (first) => {
         apply(first)
-        if (active && first.status === 'waiting') openStream()
+        if (active && (first.status === 'waiting' || first.status === 'lobby')) openStream()
       },
       () => {},
     )

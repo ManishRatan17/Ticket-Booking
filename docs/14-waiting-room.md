@@ -22,7 +22,7 @@ Per event: **`admission_per_second`** (migration 005). Empty = no waiting room �
 
 | Key | Type | Meaning |
 |---|---|---|
-| `wr:<eventId>:queue` | sorted set | member = user id, score = **arrival number** |
+| `wr:<eventId>:queue` | sorted set | member = user id, score = place in line: a **random number in [0, 1)** for people who joined in the lobby (the fair draw), the **arrival number** (≥ 1) for people who came after the sale opened |
 | `wr:<eventId>:seq` | counter | hands out arrival numbers 1, 2, 3, … |
 | `wr:<eventId>:pass:<userId>` | string with TTL | "admitted" — expires after `ADMISSION_PASS_SECONDS` (default 600) |
 | `wr:active` | set | event ids whose room has people waiting (so the worker only checks those) |
@@ -33,7 +33,7 @@ The prefix `wr` is configurable (`WAITING_ROOM_PREFIX`); tests use `test-wr` so 
 
 ## The two Lua scripts (each one atomic step)
 
-**[join-queue.lua](../server/src/modules/waiting-room/lua/join-queue.lua):** already admitted → say so (with the pass's time left). Already in the line (second tab, reload, double click) → **keep the original place**. Otherwise take the next arrival number, enter the line, mark the room active. Return your position and the line's length. *Tested: 300 people joining at the same instant get positions exactly 1–300; joining again doesn't move you or add a second place (mutation-tested).*
+**[join-queue.lua](../server/src/modules/waiting-room/lua/join-queue.lua):** already admitted → say so (with the pass's time left). Already in the line (second tab, reload, double click) → **keep the original place**. Lobby not open yet → `not_open`. Otherwise enter the line (a random score in the lobby, the next arrival number after the sale opened; see the fair draw below) and mark the room active. Return `lobby` + the lobby's size before the sale, or your position and the line's length after. *Tested: 300 people joining at the same instant get positions exactly 1–300; joining again doesn't move you or add a second place (mutation-tested).*
 
 **[admit.lua](../server/src/modules/waiting-room/lua/admit.lua):** `ZPOPMIN` the N earliest, give each a pass with an expiry, and — **in the same step** — if the line is now empty, take the room off `wr:active`. (Done separately, someone could join between "is it empty?" and "stop checking" and wait forever: check-then-act again.) *Tested: two admission runs at once admit 2 × N, nobody twice.*
 
@@ -42,6 +42,26 @@ The prefix `wr` is configurable (`WAITING_ROOM_PREFIX`); tests use `test-wr` so 
 `admit-waiting` runs **every second** (a BullMQ job scheduler, set up by every worker at startup — still one schedule). For each active room whose **sale has started**, admit `admission_per_second` people. Rooms of deleted events are cleaned up. It's only logged when it actually admits someone.
 
 **The lobby:** joining is allowed **before** the sale opens. People gather, and admission starts the moment the sale does. The estimated wait includes the time until the sale.
+
+**The fair draw (step 4e): first come, first served, or random?** Pure first come just moves the spike: everyone (and every bot) hits Join at 10:45:00.000 instead of 11:00:00, and the fastest connection wins. Pure random would let someone who arrives at 11:20 jump ahead of someone who waited since 10:45. So it's a **hybrid**, the way large ticketing sites do it:
+
+```
+            10:45 lobby opens                 11:00 sale opens
+  ──────────────┬─────────────────────────────────┬──────────────────────────────►
+                │  join any time: same chance     │  join: back of the line, in order
+                │  score = random in [0, 1)       │  score = arrival number 1, 2, 3 … (≥ 1)
+                │  page: "You're in the lobby     │  page: "You're #340 of 1,800"
+                │   with 1,800 people"            │
+  line at 11:00:  [ lobby people in random order ][ later arrivals, first come first served ]
+```
+
+- **No shuffle step:** each lobby joiner gets a random score the moment they join. Random scores are already a random order, and every later arrival's score (≥ 1) is bigger than every lobby score (< 1). `ZPOPMIN` (admission) and `ZRANK` (position) work unchanged.
+- **The random number** comes from Node's `crypto.randomBytes` (48 bits, a cryptographically secure source), passed into the script. Not Lua's `math.random`: Redis seeds it in ways that aren't meant for fairness.
+- **Positions are hidden until the sale opens:** the status is `lobby` with the lobby's size, no position and no estimate. "Your place is drawn at 11:00" is what the page says. (The draw really happens as people join, but nobody sees it before 11:00, so it's the same thing.)
+- **Re-joining never re-draws:** a second tab or a reload keeps the original score (`ZSCORE` exists → nothing changes). Otherwise people would reload until they got a good number.
+- **What it costs bots:** arriving at the exact second gains nothing. A bot army with 1,000 accounts still gets 1,000 random places; that's what the bot check (Phase 5d) and the purchase cap are for.
+
+*Tested: 200 people join the lobby one after another; when the sale opens, places are exactly 1–200 and the **rank correlation** between arrival order and place is near 0 (first come, first served would be 1; the test allows |r| < 0.3, more than 4 standard deviations); the first admission tick lets in exactly places 1–50 and everyone else moves up 50; newcomers after the sale get places 21–25 behind a 20-person lobby; re-joining keeps the same score. Mutation: the lobby given arrival numbers → r = 1.000, the test fails.*
 
 **The lobby window (step 4d):** the lobby opens only **`lobby_minutes`** before the sale (migration [006](../server/migrations/006_lobby_window.sql), default **15**, 1–1440, set by the admin per event). Joining earlier → **`409 LOBBY_NOT_OPEN`** with `details.lobbyOpensAt`, and the status says `not_in_queue` with `lobbyOpensAt`, so the page can count down: "The waiting room opens in 12:30 (at 10:45)". Without a window, a bot (or a superfan) could take place #1 three days early. The check is inside [join-queue.lua](../server/src/modules/waiting-room/lua/join-queue.lua) using **Redis's clock** (`TIME`), the same clock as holds and passes, so every server gives the same answer at the same moment. Someone already in the line is never refused. *Tested: too early → 409 and nobody added; `lobbyMinutes: 60` lets people in 30 minutes ahead; the schema accepts 1–1440 and defaults to 15. Mutation: window check removed → the too-early test fails.*
 
@@ -58,7 +78,7 @@ The prefix `wr` is configurable (`WAITING_ROOM_PREFIX`); tests use `test-wr` so 
 | `POST /api/events/:id/queue` | join (or re-join) → status. Needs the "are you a person?" token (Phase 5d, [15](15-protection.md#5d--bot-check-cloudflare-turnstile--a-honeypot)) |
 | `GET /api/events/:id/queue` | current status |
 
-Status: `{ "status": "waiting" | "admitted" | "not_in_queue", "position", "total", "passExpiresInSeconds", "admissionPerSecond", "saleStartsAt", "estimatedWaitSeconds", "serverTime" }`. Events without a waiting room → `409 NO_WAITING_ROOM`.
+Status: `{ "status": "lobby" | "waiting" | "admitted" | "not_in_queue", "position", "total", "passExpiresInSeconds", "admissionPerSecond", "saleStartsAt", "estimatedWaitSeconds", "serverTime" }`. Events without a waiting room → `409 NO_WAITING_ROOM`.
 
 ## Live position: Server-Sent Events (step 4b)
 

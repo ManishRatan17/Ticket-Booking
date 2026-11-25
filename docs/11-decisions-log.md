@@ -121,6 +121,10 @@ Every significant choice, the alternatives considered, and why. Newest at the bo
 |---|---|---|
 | The lobby opens `lobby_minutes` (default 15) before the sale | joining any time after the event is created | nobody can take place #1 days ahead; a short window keeps the lobby small and honest |
 | Window checked inside `join-queue.lua` with Redis `TIME` | checked in Node | one clock for every server, and the check and the join are one atomic step |
+| **Hybrid order**: random places for everyone in the lobby, first come first served after the sale opens | pure first come; pure random | first come rewards the fastest click (and bots) and just moves the spike; pure random lets latecomers overtake people who waited |
+| Random score at join time (lobby < 1, later arrivals ≥ 1) | a shuffle job at the sale's start | no extra moving part that could fail or run late at the busiest second; admission and positions work unchanged |
+| Random numbers from Node `crypto.randomBytes`, passed to Lua | Lua `math.random` | a proper random source, nothing predictable |
+| Positions hidden in the lobby | show the drawn place early | "drawn at 11:00" is clearer, and nobody refreshes hoping for a better number (re-joining keeps the score anyway) |
 
 ## Frontend
 

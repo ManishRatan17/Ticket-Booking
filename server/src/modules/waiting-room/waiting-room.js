@@ -9,6 +9,7 @@
 // Why a sorted set: "what's my position?" is ZRANK — one fast command, even with 100,000 people
 // in line — and ZADD only adds a member once, so a second tab can't take a second place.
 import { readFileSync } from 'node:fs';
+import { randomBytes } from 'node:crypto';
 import { redis } from '../../config/redis.js';
 import { env } from '../../config/env.js';
 
@@ -25,9 +26,15 @@ redis.defineCommand('wrAdmit', { numberOfKeys: 2, lua: lua('admit.lua') });
 redis.defineCommand('wrStreamOpen', { numberOfKeys: 1, lua: lua('stream-open.lua') });
 redis.defineCommand('wrStreamClose', { numberOfKeys: 1, lua: lua('stream-close.lua') });
 
+// A random number in [0, 1) for the lobby's fair draw (join-queue.lua explains the draw).
+// 6 bytes from crypto.randomBytes = 48 random bits from a cryptographically secure source: nobody
+// can predict or steer it. 48 bits: ties between two people are practically impossible (and a tie would be
+// broken by user id, still not by arrival time).
+export const drawScore = () => randomBytes(6).readUIntBE(0, 6) / 2 ** 48;
+
 // Join (or re-join: you keep your place). Returns a status (see describe()), or
 // { status: 'not_open' } before the lobby window opens.
-export async function joinQueue(eventId, userId, { lobbyOpensAtMs }) {
+export async function joinQueue(eventId, userId, { lobbyOpensAtMs, saleStartsAtMs }) {
   const [status, a, b] = await redis.wrJoin(
     queueKey(eventId),
     seqKey(eventId),
@@ -36,13 +43,18 @@ export async function joinQueue(eventId, userId, { lobbyOpensAtMs }) {
     userId,
     eventId,
     lobbyOpensAtMs,
+    saleStartsAtMs,
+    drawScore(),
   );
   if (status === 'not_open') return { status };
-  return status === 'admitted' ? { status, passExpiresInSeconds: a } : { status, position: a, total: b };
+  if (status === 'admitted') return { status, passExpiresInSeconds: a };
+  if (status === 'lobby') return { status, total: a }; // no position yet: it's drawn when the sale opens
+  return { status, position: a, total: b };
 }
 
 // Where am I? Read-only (several separate reads: fine for DISPLAY, nothing is decided on it).
-export async function queueStatus(eventId, userId) {
+// inLobby = the sale hasn't started: positions are not shown yet (they're a random draw).
+export async function queueStatus(eventId, userId, { inLobby = false } = {}) {
   const [passTtl, rank, total] = await Promise.all([
     redis.ttl(passKey(eventId, userId)),
     redis.zrank(queueKey(eventId), String(userId)),
@@ -50,6 +62,7 @@ export async function queueStatus(eventId, userId) {
   ]);
   if (passTtl > 0) return { status: 'admitted', passExpiresInSeconds: passTtl };
   if (rank === null) return { status: 'not_in_queue' };
+  if (inLobby) return { status: 'lobby', total };
   return { status: 'waiting', position: rank + 1, total };
 }
 

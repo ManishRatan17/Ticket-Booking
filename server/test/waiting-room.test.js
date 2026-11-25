@@ -144,11 +144,12 @@ test('the lobby: before the sale opens people can queue, but nobody is let in ye
   const e = await event({ rate: 10, startsInMs: 5 * 60_000 }); // inside the default 15-minute window
   const [ann] = await users(1);
   const joined = (await join(ann, e.id)).body;
-  assert.equal(joined.status, 'waiting');
-  assert.ok(joined.estimatedWaitSeconds > 290, 'the estimate includes the time until the sale');
+  assert.equal(joined.status, 'lobby');
+  assert.equal(joined.total, 1);
+  assert.equal(joined.position, undefined, 'no place yet: it is drawn when the sale opens');
 
   await admitWaiting({ eventIds: [e.id] });
-  assert.equal((await status(ann, e.id)).body.status, 'waiting');
+  assert.equal((await status(ann, e.id)).body.status, 'lobby', 'nobody is let in before the sale');
 });
 
 test('fairness under load: 300 in line, rate 50 → 6 ticks admit everyone, strictly in arrival order', async () => {
@@ -224,4 +225,64 @@ test('lobbyMinutes: default 15, between 1 and 1440 (the admin form is validated)
   assert.equal(createEventSchema.safeParse({ ...base, lobbyMinutes: 0 }).success, false);
   assert.equal(createEventSchema.safeParse({ ...base, lobbyMinutes: 1441 }).success, false);
   assert.equal(createEventSchema.parse({ ...base, lobbyMinutes: 60 }).lobbyMinutes, 60);
+});
+
+// ---------- the fair draw (hybrid order) ----------
+
+// The sale opens NOW (as if the clock reached 11:00). The service reads the event fresh each time.
+const openSaleNow = (e) => pool.query("UPDATE events SET sale_starts_at = now() - interval '1 second' WHERE id = $1", [e.id]);
+const positionOf = async (u, e) => (await status(u, e.id)).body.position;
+
+// Spearman rank correlation: +1 = same order, 0 = unrelated, −1 = reversed.
+function rankCorrelation(a, b) {
+  const n = a.length;
+  const sumD2 = a.reduce((sum, x, i) => sum + (x - b[i]) ** 2, 0);
+  return 1 - (6 * sumD2) / (n * (n * n - 1));
+}
+
+test('fair draw: 200 join the lobby one after another → at the sale their order is RANDOM, not arrival order', async () => {
+  const e = await event({ rate: 50, startsInMs: 5 * 60_000 });
+  const crowd = await users(200);
+  for (const u of crowd) assert.equal((await join(u, e.id)).body.status, 'lobby'); // strictly one after another
+
+  await openSaleNow(e);
+  const positions = [];
+  for (const u of crowd) positions.push(await positionOf(u, e));
+
+  assert.deepEqual([...positions].sort((x, y) => x - y), Array.from({ length: 200 }, (_, i) => i + 1), 'places 1–200, each once');
+  const arrival = crowd.map((_, i) => i + 1);
+  const r = rankCorrelation(arrival, positions);
+  // First come, first served would give r = 1. A fair shuffle of 200 gives r ≈ 0 ± 0.07;
+  // |r| < 0.3 is more than 4 standard deviations: a fair draw practically never fails this.
+  assert.ok(Math.abs(r) < 0.3, `arrival order and place must be unrelated (r = ${r.toFixed(3)})`);
+  assert.ok(positions[0] !== 1 || positions[1] !== 2 || positions[2] !== 3, 'not simply the arrival order');
+
+  // Admission follows the drawn order: the first tick lets in exactly places 1–50.
+  await admitWaiting({ eventIds: [e.id] });
+  for (let i = 0; i < crowd.length; i++) {
+    const s = (await status(crowd[i], e.id)).body;
+    if (positions[i] <= 50) assert.equal(s.status, 'admitted');
+    else assert.equal(s.position, positions[i] - 50, 'everyone else moves up 50, keeping their drawn order');
+  }
+});
+
+test('fair draw: after the sale opens, newcomers queue BEHIND the whole lobby, first come first served', async () => {
+  const e = await event({ rate: 5, startsInMs: 5 * 60_000 });
+  const lobby = await users(20);
+  await Promise.all(lobby.map((u) => join(u, e.id))); // the lobby can arrive all at once: same chance either way
+  await openSaleNow(e);
+
+  const late = await users(5);
+  for (const u of late) await join(u, e.id);
+  assert.deepEqual(await Promise.all(late.map((u) => positionOf(u, e))), [21, 22, 23, 24, 25]);
+});
+
+test('fair draw: joining again in the lobby (another tab, a reload) never re-draws your place', async () => {
+  const e = await event({ startsInMs: 5 * 60_000 });
+  const [ann] = await users(1);
+  await join(ann, e.id);
+  const drawn = await redis.zscore(queueKey(e.id), String(ann.id));
+  assert.ok(Number(drawn) >= 0 && Number(drawn) < 1, 'a lobby place is a random number in [0, 1)');
+  for (let i = 0; i < 5; i++) await join(ann, e.id);
+  assert.equal(await redis.zscore(queueKey(e.id), String(ann.id)), drawn);
 });

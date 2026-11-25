@@ -35,6 +35,24 @@ export function WaitingRoom({ status, onJoin, saleOpensIn, lobbyOpensIn, human }
     )
   }
 
+  // In the lobby (before the sale): no place yet. At the sale's start everyone here gets a random one.
+  if (status.status === 'lobby') {
+    return (
+      <div className="panel" aria-live="polite">
+        <p>
+          You're in the lobby with <strong>{status.total.toLocaleString()}</strong>{' '}
+          {status.total === 1 ? 'person' : 'people'} (you included).
+        </p>
+        <p>
+          When the sale opens{saleOpensIn > 0 && <> in <strong>{formatCountdown(saleOpensIn)}</strong></>}, everyone in
+          the lobby gets a <strong>random place in line</strong>. Joining early or late in the lobby gives the same
+          chance, so there's no need to rush or refresh.
+        </p>
+        <p className="muted">People who arrive after the sale opens queue up behind the lobby. Keep this page open.</p>
+      </div>
+    )
+  }
+
   // 'waiting' ('admitted' is handled by the event page: it shows the hold form instead)
   return (
     <div className="panel" aria-live="polite">
