@@ -91,6 +91,14 @@ export async function createHold({ eventId, userId, quantity, pool = 'main', lim
   }
 }
 
+// A quick look before the expensive work (Phase 6 load test): how many are left in the pool, and
+// does this person have a hold already? One Redis round trip (MGET). In a sell-out almost every
+// click can be answered from this alone.
+export async function quickLook({ eventId, userId, pool = 'main' }) {
+  const [left, existingHold] = await redis.mget(pool === 'lottery' ? lotteryStockKey(eventId) : stockKey(eventId), userHoldKey(eventId, userId));
+  return { available: left === null ? null : Number(left), hasHold: existingHold !== null };
+}
+
 // "Now" according to REDIS — the same clock create-hold.lua uses for expiresAt.
 // Sent to the browser as serverTime, so a countdown never depends on the user's own clock.
 export async function redisNow() {

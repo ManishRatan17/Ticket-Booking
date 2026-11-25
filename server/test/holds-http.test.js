@@ -179,3 +179,21 @@ test('300 signed-in users race for 100 tickets over HTTP → exactly 100 holds, 
   const holders = new Set(responses.filter((r) => r.status === 201).map((r) => r.body.hold.id));
   assert.equal(holders.size, 100, 'every winner got a distinct hold');
 });
+
+// ---------- the sold-out fast path (Phase 6 load test) ----------
+
+test('sold out → SOLD_OUT straight from Redis; but MY expired hold is still released and re-held (no shortcut then)', async () => {
+  const e = await event(2);
+  const [ann, bob] = await users(2);
+  const h = (await hold(ann, e.id, 2)).body.hold; // all 2 tickets
+  assert.equal(await stock(e.id), 0);
+
+  const quick = await hold(bob, e.id, 1);
+  assert.equal(quick.status, 409);
+  assert.deepEqual([quick.body.error.code, quick.body.error.details.available], ['SOLD_OUT', 0]);
+
+  await redis.hset(`hold:${h.id}`, 'expiresAt', Date.now() - 1000); // Ann's hold ran out
+  const again = await hold(ann, e.id, 1);
+  assert.equal(again.status, 201, 'stock is 0, but Ann has an (expired) hold: the real path runs and frees it');
+  assert.equal(await stock(e.id), 1);
+});

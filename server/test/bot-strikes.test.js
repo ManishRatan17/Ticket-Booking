@@ -277,3 +277,12 @@ test('logging in tells the page about the restriction straight away (no extra /m
   assert.equal(res.status, 200, 'restricted people can still sign in');
   assert.equal(res.body.user.restriction.kind, 'suspended');
 });
+
+test('Redis loses the list of restricted accounts → rebuilt from PostgreSQL; the restriction still holds', async () => {
+  const e = await event();
+  const [bot] = await users(1);
+  await strike(bot.id, { reason: 'test' });
+  await redis.del(`bot-test-${ID}:restricted`, `bot-test-${ID}:restricted:ready`); // as if Redis restarted
+  assert.equal((await hold(bot, e)).status, 403);
+  assert.equal(await redis.sismember(`bot-test-${ID}:restricted`, String(bot.id)), 1, 'listed again');
+});

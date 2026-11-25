@@ -9,6 +9,7 @@ import {
   createHold,
   getBought,
   getUserHold,
+  quickLook,
   releaseHold,
   redisNow,
   setBoughtIfMissing,
@@ -17,6 +18,8 @@ import { paidQuantityForUser } from '../orders/orders.repository.js';
 import { purchaseLimitFor } from '../reservation/purchaseLimit.js';
 import { pool } from '../../config/db.js';
 import * as eventsRepository from './events.repository.js';
+import { createShortCache } from '../../lib/shortCache.js';
+import { env } from '../../config/env.js';
 import { scheduleHoldExpiry } from '../../jobs/queue.js';
 import { hasLuckyPass, hasPass } from '../waiting-room/waiting-room.js';
 
@@ -122,6 +125,13 @@ export async function listEvents() {
   return { events: await Promise.all(events.map((e) => withAvailability(e, now))), serverTime: now };
 }
 
+// The event as read by the HOT paths (every hold, every queue status check, every live-stream tick):
+// reused for HOT_CACHE_MS (1 s), and 1,000 simultaneous misses share ONE query (shortCache.js).
+const eventCache = createShortCache({ ttlMs: env.hotCacheMs });
+export async function findEventCached(eventId) {
+  return eventCache.get(String(eventId), () => eventsRepository.findEventById(eventId));
+}
+
 async function findEventOr404(eventId) {
   const event = await eventsRepository.findEventById(eventId);
   if (!event) throw new AppError(404, 'EVENT_NOT_FOUND', 'No event with this id');
@@ -142,7 +152,8 @@ function toPublicHold(hold) {
 }
 
 export async function holdTickets({ eventId, userId, quantity }) {
-  const [event, now] = await Promise.all([findEventOr404(eventId), redisNow()]);
+  const [event, now] = await Promise.all([findEventCached(eventId), redisNow()]);
+  if (!event) throw new AppError(404, 'EVENT_NOT_FOUND', 'No event with this id');
 
   // The SERVER decides when a sale opens. Hiding a button in the browser protects nothing.
   if (new Date(event.saleStartsAt) > now) {
@@ -164,6 +175,15 @@ export async function holdTickets({ eventId, userId, quantity }) {
     throw new AppError(403, 'NOT_ADMITTED', 'Join the waiting room first; you can hold tickets once you are let in');
   }
   const pool = lucky ? 'lottery' : 'main';
+
+  // SOLD-OUT FAST PATH (Phase 6 load test): not enough left, and no hold of this person's that the
+  // script could release first → answer SOLD_OUT now, from Redis alone, without the per-person
+  // lookups below. In a stampede for 300 tickets, ~97 % of clicks end here. (Unknown stock → the
+  // normal path, which rebuilds it. The Lua script still decides every real hold.)
+  const quick = await quickLook({ eventId: event.id, userId, pool });
+  if (quick.available !== null && quick.available < quantity && !quick.hasHold) {
+    throw new AppError(409, 'SOLD_OUT', `Not enough tickets left (${quick.available} available)`, { available: quick.available });
+  }
 
   // This person's limit: 4, or more if an admin approved a "more tickets" request (support inbox).
   const [limit] = await Promise.all([purchaseLimitFor(event.id, userId), ensureStock(event), ensureBought(event.id, userId)]);

@@ -1,14 +1,13 @@
 // Waiting-room rules: who may join, and what to tell people while they wait.
 import { AppError } from '../../lib/errors.js';
 import { redisNow } from '../reservation/holds.js';
-import * as eventsRepository from '../events/events.repository.js';
 import { joinQueue, queueStatus } from './waiting-room.js';
 import { estimateChance } from './chance.js';
-import { ensureStock } from '../events/events.service.js';
+import { ensureStock, findEventCached } from '../events/events.service.js';
 import { lotteryInfo } from '../lottery/lottery.service.js';
 
 async function findEventWithRoom(eventId) {
-  const event = await eventsRepository.findEventById(eventId);
+  const event = await findEventCached(eventId); // checked every second by every live stream
   if (!event) throw new AppError(404, 'EVENT_NOT_FOUND', 'No event with this id');
   if (!event.admissionPerSecond) {
     throw new AppError(409, 'NO_WAITING_ROOM', 'This event has no waiting room; you can hold tickets directly');

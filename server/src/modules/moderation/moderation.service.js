@@ -17,8 +17,41 @@ import { AppError } from '../../lib/errors.js';
 import { releaseHold } from '../reservation/holds.js';
 import { removeUserFromWaitingRooms } from '../waiting-room/waiting-room.js';
 import * as repo from './moderation.repository.js';
+import { createShortCache } from '../../lib/shortCache.js';
 
 const { prefix: PREFIX, threshold: THRESHOLD, windowSeconds: WINDOW_SECONDS, suspensionDays: SUSPENSION_DAYS } = env.moderation;
+
+// "Is this account restricted?" is asked on every booking click: reused for HOT_CACHE_MS (1 s).
+// Strikes and lifts on this server forget the old answer at once.
+const restrictionCache = createShortCache({ ttlMs: env.hotCacheMs });
+export function forgetRestriction(userId) {
+  restrictionCache.delete(String(userId));
+}
+
+// Every account with a restriction in force is listed in a Redis SET (Phase 6 load test), so "is this
+// person restricted?" — asked on EVERY booking click — is one Redis lookup. PostgreSQL stays the truth:
+// a listed person is confirmed there (and taken off the list once it's over). If Redis loses the list,
+// it's rebuilt from PostgreSQL (the "ready" marker tells us whether the list is complete).
+const RESTRICTED = `${PREFIX}:restricted`;
+const RESTRICTED_READY = `${PREFIX}:restricted:ready`;
+
+async function rebuildRestrictedList() {
+  const { rows } = await pool.query(
+    `SELECT DISTINCT user_id FROM account_restrictions WHERE lifted_at IS NULL AND (ends_at IS NULL OR ends_at > now())`,
+  );
+  const multi = redis.multi().del(RESTRICTED);
+  if (rows.length) multi.sadd(RESTRICTED, ...rows.map((r) => String(r.user_id)));
+  // The marker expires after an hour, so the list is rebuilt from PostgreSQL at least hourly (that also
+  // picks up a restriction written straight into the database).
+  await multi.set(RESTRICTED_READY, '1', 'EX', 3600).exec();
+}
+
+async function maybeRestricted(userId) {
+  const [[, listed], [, ready]] = await redis.multi().sismember(RESTRICTED, String(userId)).exists(RESTRICTED_READY).exec();
+  if (ready) return listed === 1;
+  await rebuildRestrictedList();
+  return (await redis.sismember(RESTRICTED, String(userId))) === 1;
+}
 
 // How suspicious each signal is. A person using the site normally never produces any of them;
 // a script produces dozens a minute.
@@ -72,6 +105,8 @@ export async function strike(userId, { reason, evidence = {}, adminId = null, ki
   });
   if (id === null) return null;
 
+  forgetRestriction(userId);
+  await redis.sadd(RESTRICTED, String(userId));
   await cleanUpAfterRestriction(userId);
   const restriction = await repo.findRestriction(pool, id);
   console.warn(
@@ -96,8 +131,12 @@ async function cleanUpAfterRestriction(userId) {
 }
 
 // What the site tells a person (and enforces): null, or { kind, until, reason }.
-export async function restrictionFor(userId, client = pool) {
-  const r = await repo.activeRestriction(client, userId);
+export async function restrictionFor(userId, client = null) {
+  if (!client && !(await maybeRestricted(userId))) return null; // not on the list: the common case
+  const r = client
+    ? await repo.activeRestriction(client, userId)
+    : await restrictionCache.get(String(userId), () => repo.activeRestriction(pool, userId));
+  if (!r && !client) await redis.srem(RESTRICTED, String(userId)); // over (or lifted): off the list
   return r && { id: r.id, kind: r.kind, until: r.endsAt, reason: r.reason, since: r.startsAt };
 }
 
@@ -118,6 +157,8 @@ export async function lift({ adminId, restrictionId, reason, overturn }) {
   const r = await repo.findRestriction(pool, restrictionId);
   if (!r) throw new AppError(404, 'RESTRICTION_NOT_FOUND', 'No restriction with this id');
   const lifted = await repo.liftActive(pool, { userId: r.userId, adminId, reason, overturn });
+  forgetRestriction(r.userId);
+  await redis.srem(RESTRICTED, String(r.userId));
   if (lifted === 0) throw new AppError(409, 'NOT_IN_FORCE', 'This restriction is no longer in force');
   console.warn(`[moderation] admin ${adminId} lifted restrictions of user ${r.userId}${overturn ? ' (overturned)' : ''}: ${reason}`);
   return repo.findRestriction(pool, restrictionId);

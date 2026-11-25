@@ -5,7 +5,7 @@ import { env } from './env.js';
 // Opening a new connection for every request would be slow (TCP + auth handshake each time).
 export const pool = new pg.Pool({
   connectionString: env.databaseUrl,
-  max: 10, // at most 10 connections at once; extra queries wait in line
+  max: env.dbPoolMax, // at most this many connections at once (default 20); extra queries wait in line
   connectionTimeoutMillis: 2000, // give up if Postgres doesn't answer within 2s
 });
 

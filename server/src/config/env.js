@@ -91,6 +91,11 @@ export const env = {
     prefix: process.env.RATE_LIMIT_PREFIX || 'ratelimit', // Redis key prefix (tests use their own)
   },
   databaseUrl: required('DATABASE_URL'),
+  // Connections to PostgreSQL per process (Phase 6 load test: 10 was too few for a burst).
+  dbPoolMax: Math.max(2, Number(process.env.DB_POOL_MAX ?? 20)),
+  // How long hot, rarely-changing data (the event, restrictions, limits) may be reused from memory.
+  // 0 = off (the general test suite: some tests change the database directly and expect it at once).
+  hotCacheMs: Math.max(0, Number(process.env.HOT_CACHE_MS ?? 1000)),
   redisUrl: required('REDIS_URL'),
   jwt: {
     accessSecret: requiredSecret('JWT_ACCESS_SECRET'),

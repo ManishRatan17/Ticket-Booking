@@ -9,7 +9,8 @@ import { AppError } from '../../lib/errors.js';
 import { isUniqueViolation } from '../../lib/db-errors.js';
 import * as eventsRepository from '../events/events.repository.js';
 import * as repo from './support.repository.js';
-import { overturnForAppeal, restrictionFor } from '../moderation/moderation.service.js';
+import { overturnForAppeal, restrictionFor, forgetRestriction } from '../moderation/moderation.service.js';
+import { forgetPurchaseLimit } from '../reservation/purchaseLimit.js';
 
 const notFound = () => new AppError(404, 'REQUEST_NOT_FOUND', 'No support request with this id');
 
@@ -114,6 +115,9 @@ export async function decide(adminId, id, { decision, message }) {
     }
     if (message) await repo.insertMessage(client, { requestId: id, authorId: adminId, fromAdmin: true, body: message });
   });
+  // This server's in-memory copies forget the old answer at once (others within 1 s).
+  if (request.eventId) forgetPurchaseLimit(request.eventId, request.userId);
+  forgetRestriction(request.userId);
   console.log(`[support] admin ${adminId} ${decision} request ${id} (${request.kind}, user ${request.userId})`);
   return getRequest(id);
 }
