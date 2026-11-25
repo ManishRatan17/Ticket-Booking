@@ -1,7 +1,7 @@
 // Events and ticket holds: the rules. No HTTP in here.
 import { redis } from '../../config/redis.js';
 import { AppError } from '../../lib/errors.js';
-import { stockKey } from '../reservation/stock.js';
+import { stockKey, lotteryStockKey } from '../reservation/stock.js';
 import {
   createHold,
   getBought,
@@ -15,7 +15,7 @@ import { paidQuantityForUser } from '../orders/orders.repository.js';
 import { pool } from '../../config/db.js';
 import * as eventsRepository from './events.repository.js';
 import { scheduleHoldExpiry } from '../../jobs/queue.js';
-import { hasPass } from '../waiting-room/waiting-room.js';
+import { hasLuckyPass, hasPass } from '../waiting-room/waiting-room.js';
 
 // ---------------------------------------------------------------------------
 // Stock: Postgres is the truth, Redis is the fast working copy
@@ -30,14 +30,31 @@ import { hasPass } from '../waiting-room/waiting-room.js';
 //
 // Known limit: holds that lived in Redis are lost with it, so their tickets come back on sale.
 // Acceptable for 5-minute holds; PAID tickets are safe because they're counted in Postgres.
+//
+// With a lucky draw there are TWO pools (each rebuilt the same way):
+//   lucky-draw stock = lotteryTickets − sold from the draw          (while the draw is open)
+//   normal stock     = total − all sold − what the draw still has
+export const lotteryOpen = (event) => event.lotteryTickets > 0 && !event.lotteryClosedAt;
+
 export async function ensureStock(event) {
   const key = stockKey(event.id);
-  const current = await redis.get(key);
-  if (current !== null) return Number(current);
+  const lotteryKey = lotteryStockKey(event.id);
+  const [current, currentLottery] = await redis.mget(key, lotteryKey);
+  const lotteryMissing = lotteryOpen(event) && currentLottery === null;
+  if (current !== null && !lotteryMissing) return Number(current);
 
-  const sold = await eventsRepository.countSoldTickets(event.id);
-  await redis.set(key, event.totalTickets - sold, 'NX');
+  const { sold, soldLottery } = await eventsRepository.countSoldTickets(event.id);
+  const lotteryLeft = lotteryOpen(event) ? Math.max(0, event.lotteryTickets - soldLottery) : 0;
+  if (lotteryMissing) await redis.set(lotteryKey, lotteryLeft, 'NX');
+  await redis.set(key, event.totalTickets - sold - lotteryLeft, 'NX');
   return Number(await redis.get(key));
+}
+
+// Tickets still in the lucky draw's pool (0 if there's no draw, or it's over).
+export async function lotteryStockLeft(event) {
+  if (!lotteryOpen(event)) return 0;
+  await ensureStock(event);
+  return Number((await redis.get(lotteryStockKey(event.id))) ?? 0);
 }
 
 // How many tickets this user has bought for this event. Redis answers normally; if it doesn't
@@ -60,7 +77,24 @@ async function withAvailability(event, now) {
 // Events
 // ---------------------------------------------------------------------------
 
-export async function createEvent({ name, totalTickets, saleStartsAt, pricePaise = 0, admissionPerSecond = null, lobbyMinutes = 15 }) {
+export async function createEvent({
+  name,
+  totalTickets,
+  saleStartsAt,
+  pricePaise = 0,
+  admissionPerSecond = null,
+  lobbyMinutes = 15,
+  lotteryPercent = 0,
+  lotteryDrawMinutes = 30,
+  lotteryPerWinner = 2,
+}) {
+  // The lucky draw's share, rounded down: 20 % of 1,000 = 200; 20 % of 3 = 0 (no draw).
+  const lottery = {
+    percent: lotteryPercent,
+    tickets: Math.floor((totalTickets * lotteryPercent) / 100),
+    drawMinutes: lotteryDrawMinutes,
+    perWinner: lotteryPerWinner,
+  };
   // 1. Postgres first: the event exists for real.
   const event = await eventsRepository.createEvent({
     name,
@@ -69,6 +103,7 @@ export async function createEvent({ name, totalTickets, saleStartsAt, pricePaise
     pricePaise,
     admissionPerSecond,
     lobbyMinutes,
+    lottery,
   });
   // 2. Then Redis. If this fails, nothing is lost: ensureStock rebuilds it on first use.
   await ensureStock(event).catch((err) => console.warn(`[events] stock for event ${event.id} not loaded yet: ${err.message}`));
@@ -96,7 +131,7 @@ export async function getEvent(eventId) {
 // ---------------------------------------------------------------------------
 
 function toPublicHold(hold) {
-  return { id: hold.id, eventId: Number(hold.eventId), quantity: hold.quantity, expiresAt: hold.expiresAt };
+  return { id: hold.id, eventId: Number(hold.eventId), quantity: hold.quantity, pool: hold.pool, expiresAt: hold.expiresAt };
 }
 
 export async function holdTickets({ eventId, userId, quantity }) {
@@ -109,21 +144,30 @@ export async function holdTickets({ eventId, userId, quantity }) {
     });
   }
 
+  // Lucky draw: a WINNER (with a lucky pass) holds from the draw's own pool, up to lotteryPerWinner.
+  const lucky = lotteryOpen(event) && (await hasLuckyPass(event.id, userId));
+  if (lucky && quantity > event.lotteryPerWinner) {
+    throw new AppError(409, 'LUCKY_DRAW_LIMIT', `Lucky-draw winners can buy up to ${event.lotteryPerWinner} tickets`, {
+      limit: event.lotteryPerWinner,
+    });
+  }
+
   // Waiting room: only people who were let in (who hold a pass) may hold tickets.
-  if (event.admissionPerSecond && !(await hasPass(event.id, userId))) {
+  if (!lucky && event.admissionPerSecond && !(await hasPass(event.id, userId))) {
     throw new AppError(403, 'NOT_ADMITTED', 'Join the waiting room first; you can hold tickets once you are let in');
   }
+  const pool = lucky ? 'lottery' : 'main';
 
   await Promise.all([ensureStock(event), ensureBought(event.id, userId)]);
   let result;
   try {
-    result = await createHold({ eventId: event.id, userId, quantity });
+    result = await createHold({ eventId: event.id, userId, quantity, pool });
   } catch (err) {
     // The stock key vanished between ensureStock and the hold (Redis restarted just then):
     // rebuild once more and retry once.
     if (!/No stock set up/.test(err.message)) throw err;
     await ensureStock(event);
-    result = await createHold({ eventId: event.id, userId, quantity });
+    result = await createHold({ eventId: event.id, userId, quantity, pool });
   }
 
   switch (result.status) {

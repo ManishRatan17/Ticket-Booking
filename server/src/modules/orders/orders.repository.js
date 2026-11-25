@@ -2,7 +2,7 @@
 
 // One order with its event name and ticket numbers (empty until paid).
 const ORDER_SELECT = `
-  SELECT o.id, o.user_id, o.event_id, e.name AS event_name, o.quantity, o.amount_paise, o.status,
+  SELECT o.id, o.user_id, o.event_id, e.name AS event_name, o.quantity, o.amount_paise, o.status, o.pool,
          o.hold_id, o.idempotency_key, o.payment_id, o.expires_at, o.paid_at, o.failure_reason, o.created_at,
          COALESCE(array_agg(s.ticket_number ORDER BY s.ticket_number)
                   FILTER (WHERE s.ticket_number IS NOT NULL), '{}') AS ticket_numbers
@@ -19,6 +19,7 @@ function toOrder(row) {
     quantity: row.quantity,
     amountPaise: row.amount_paise,
     status: row.status, // pending → paid | failed | expired
+    pool: row.pool, // 'main' or 'lottery' (lucky-draw tickets)
     holdId: row.hold_id,
     idempotencyKey: row.idempotency_key,
     paymentId: row.payment_id,
@@ -60,13 +61,16 @@ export async function listOrdersForUser(client, userId) {
 // "Insert unless this user already used this idempotency key." Returns the new order's id,
 // or null if the key was taken (by an earlier request, or one racing us right now).
 // ON CONFLICT … DO NOTHING is atomic: two parallel requests can't both insert.
-export async function insertOrder(client, { userId, eventId, quantity, amountPaise, holdId, idempotencyKey, expiresAt }) {
+export async function insertOrder(
+  client,
+  { userId, eventId, quantity, amountPaise, holdId, idempotencyKey, expiresAt, pool = 'main' },
+) {
   const { rows } = await client.query(
-    `INSERT INTO orders (user_id, event_id, quantity, amount_paise, hold_id, idempotency_key, expires_at)
-     VALUES ($1, $2, $3, $4, $5, $6, $7)
+    `INSERT INTO orders (user_id, event_id, quantity, amount_paise, hold_id, idempotency_key, expires_at, pool)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
      ON CONFLICT (user_id, idempotency_key) DO NOTHING
      RETURNING id`,
-    [userId, eventId, quantity, amountPaise, holdId, idempotencyKey, expiresAt],
+    [userId, eventId, quantity, amountPaise, holdId, idempotencyKey, expiresAt, pool],
   );
   return rows.length === 0 ? null : Number(rows[0].id);
 }

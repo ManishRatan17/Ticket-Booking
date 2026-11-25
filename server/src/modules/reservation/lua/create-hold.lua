@@ -1,10 +1,11 @@
 -- Create a ticket hold: check and reserve in ONE step that nothing can interrupt.
 --
--- KEYS[1] = event:<eventId>:stock                 tickets still available
+-- KEYS[1] = event:<eventId>:stock                 tickets still available in the POOL this hold takes from
+--           (or event:<eventId>:lottery-stock for a lucky-draw winner)
 -- KEYS[2] = event:<eventId>:user:<userId>:hold    which hold this user has for this event
 -- KEYS[3] = hold:<newHoldId>                      the hold record to create
 -- KEYS[4] = event:<eventId>:user:<userId>:bought  tickets this user has already PAID for (Phase 5b)
--- ARGV    = holdId, userId, eventId, quantity, holdSeconds, maxTicketsPerUser
+-- ARGV    = holdId, userId, eventId, quantity, holdSeconds, maxTicketsPerUser, pool ('main' | 'lottery')
 --
 -- Returns:
 --   { 1, expiresAtMs }        held
@@ -33,15 +34,25 @@ end
 local existingId = redis.call('GET', KEYS[2])
 if existingId then
   local existingKey = 'hold:' .. existingId
-  local fields = redis.call('HMGET', existingKey, 'quantity', 'expiresAt')
+  local fields = redis.call('HMGET', existingKey, 'quantity', 'expiresAt', 'pool')
   local oldQuantity = tonumber(fields[1])
   local oldExpiresAt = tonumber(fields[2])
   if oldQuantity and oldExpiresAt and oldExpiresAt > nowMs then
     return { -2, existingId }
   end
   if oldQuantity then
-    redis.call('INCRBY', KEYS[1], oldQuantity) -- the expired hold's tickets go back on sale
-    stock = stock + oldQuantity
+    -- The expired hold's tickets go back on sale — to the pool THEY came from (same rule as
+    -- release-hold.lua), which may not be the pool this new hold takes from.
+    local oldStockKey = 'event:' .. ARGV[3] .. ':stock'
+    if fields[3] == 'lottery' and redis.call('EXISTS', 'event:' .. ARGV[3] .. ':lottery-closed') == 0 then
+      oldStockKey = 'event:' .. ARGV[3] .. ':lottery-stock'
+    end
+    if oldStockKey == KEYS[1] then
+      redis.call('INCRBY', KEYS[1], oldQuantity)
+      stock = stock + oldQuantity
+    elseif redis.call('EXISTS', oldStockKey) == 1 then
+      redis.call('INCRBY', oldStockKey, oldQuantity)
+    end
   end
   redis.call('DEL', existingKey, KEYS[2])
   redis.call('ZREM', 'holds:by-expiry', existingId)
@@ -67,7 +78,8 @@ redis.call('HSET', KEYS[3],
   'eventId', ARGV[3],
   'quantity', quantity,
   'createdAt', nowMs,
-  'expiresAt', expiresAt)
+  'expiresAt', expiresAt,
+  'pool', ARGV[7])
 redis.call('SET', KEYS[2], ARGV[1])
 redis.call('ZADD', 'holds:by-expiry', expiresAt, ARGV[1])
 return { 1, expiresAt }

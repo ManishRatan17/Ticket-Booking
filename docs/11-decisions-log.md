@@ -129,6 +129,14 @@ Every significant choice, the alternatives considered, and why. Newest at the bo
 | Admission pauses while the stock is 0 | keep admitting | a pass with nothing to buy is wasted; returned tickets should go to the next people in line |
 | Positions hidden in the lobby | show the drawn place early | "drawn at 11:00" is clearer, and nobody refreshes hoping for a better number (re-joining keeps the score anyway) |
 
+## Lucky draw
+
+| Decision | Rejected | Why |
+|---|---|---|
+| A separate Redis stock for the draw's tickets | one stock with a "reserved" number | the line physically can't take them; the same atomic Lua scripts work for both pools |
+| Every hold and order records its pool | infer it later | released, expired and late-paid tickets must go back to (or come from) the right pool, and each pool must be rebuildable from PostgreSQL |
+| At most 50 %, needs a waiting room | any % | at 100 % the line is pointless; the entrants are the waiting room |
+
 ## Frontend
 
 | Decision | Alternatives | Why |

@@ -7,6 +7,17 @@ export function stockKey(eventId) {
   return `event:${eventId}:stock`;
 }
 
+// The LUCKY DRAW's own pool: tickets set aside for the draw. The normal sale can't touch them.
+// While event:<id>:lottery-closed exists, the draw is over and its tickets belong to the normal sale.
+export const lotteryStockKey = (eventId) => `event:${eventId}:lottery-stock`;
+export const lotteryClosedKey = (eventId) => `event:${eventId}:lottery-closed`;
+
+// The stock key for a pool. A 'lottery' pool after the draw closed = the normal stock.
+export async function stockKeyForPool(eventId, pool = 'main') {
+  if (pool === 'lottery' && !(await redis.exists(lotteryClosedKey(eventId)))) return lotteryStockKey(eventId);
+  return stockKey(eventId);
+}
+
 export async function setStock(eventId, count) {
   await redis.set(stockKey(eventId), count);
 }
@@ -56,9 +67,10 @@ redis.defineCommand('holdStock', {
   lua: readFileSync(new URL('./lua/hold-stock.lua', import.meta.url), 'utf8'),
 });
 
-export async function holdTickets(eventId, quantity) {
+// pool: 'main' (default) or 'lottery' (a late payment for a lucky-draw order takes from that pool).
+export async function holdTickets(eventId, quantity, { pool = 'main' } = {}) {
   assertValidQuantity(quantity);
-  const result = await redis.holdStock(stockKey(eventId), quantity);
+  const result = await redis.holdStock(await stockKeyForPool(eventId, pool), quantity);
   if (result === -1) throw new Error(`No stock set up for event ${eventId}`);
   return result === 1;
 }

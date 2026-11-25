@@ -3,7 +3,8 @@
 //
 // Redis keys (the Lua scripts build some of these names too — keep them in sync):
 //   event:<eventId>:stock                 tickets available        (stock.js)
-//   hold:<holdId>                         { userId, eventId, quantity, createdAt, expiresAt }
+//   hold:<holdId>                         { userId, eventId, quantity, createdAt, expiresAt, pool }
+//                                         pool = 'main' or 'lottery' (lucky-draw tickets)
 //   event:<eventId>:user:<userId>:hold    the user's hold id for that event
 //   event:<eventId>:user:<userId>:bought  tickets the user has PAID for (Phase 5b purchase cap)
 //
@@ -15,7 +16,7 @@ import { readFileSync } from 'node:fs';
 import { randomUUID } from 'node:crypto';
 import { redis } from '../../config/redis.js';
 import { env } from '../../config/env.js';
-import { stockKey } from './stock.js';
+import { stockKey, lotteryStockKey } from './stock.js';
 
 export const HOLD_SECONDS = env.holds.seconds; // 5 minutes unless HOLD_SECONDS says otherwise
 export const MAX_TICKETS_PER_HOLD = 4;
@@ -54,11 +55,12 @@ function assertValid({ eventId, userId, quantity }) {
 //   { status: 'already_holding', holdId }
 //   { status: 'sold_out', available }
 //   { status: 'limit_reached', bought }    (bought + quantity > MAX_TICKETS_PER_USER)
-export async function createHold({ eventId, userId, quantity }) {
+// pool: 'main' = the normal sale · 'lottery' = the lucky draw's own tickets (winners only)
+export async function createHold({ eventId, userId, quantity, pool = 'main' }) {
   assertValid({ eventId, userId, quantity });
   const holdId = randomUUID();
   const [code, value] = await redis.createHold(
-    stockKey(eventId),
+    pool === 'lottery' ? lotteryStockKey(eventId) : stockKey(eventId),
     userHoldKey(eventId, userId),
     holdKey(holdId),
     boughtKey(eventId, userId),
@@ -68,13 +70,14 @@ export async function createHold({ eventId, userId, quantity }) {
     quantity,
     HOLD_SECONDS,
     MAX_TICKETS_PER_USER,
+    pool,
   );
 
   switch (code) {
     case 1:
       return {
         status: 'held',
-        hold: { id: holdId, eventId: String(eventId), userId, quantity, expiresAt: new Date(Number(value)) },
+        hold: { id: holdId, eventId: String(eventId), userId, quantity, pool, expiresAt: new Date(Number(value)) },
       };
     case 0:
       return { status: 'sold_out', available: Number(value) };
@@ -102,6 +105,7 @@ function toHold(holdId, fields) {
     eventId: fields.eventId,
     userId: Number(fields.userId),
     quantity: Number(fields.quantity),
+    pool: fields.pool || 'main', // holds made before the lucky draw existed have no pool: main
     createdAt: new Date(Number(fields.createdAt)),
     expiresAt,
     expired: expiresAt.getTime() <= Date.now(),

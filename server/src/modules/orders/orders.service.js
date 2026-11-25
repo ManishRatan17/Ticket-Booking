@@ -20,6 +20,7 @@ export function toPublicOrder(order) {
     quantity: order.quantity,
     amountPaise: order.amountPaise,
     status: order.status,
+    pool: order.pool, // 'lottery' = won in the lucky draw (My orders can say so)
     expiresAt: order.expiresAt,
     paidAt: order.paidAt,
     failureReason: order.failureReason,
@@ -64,6 +65,7 @@ export async function createOrder({ userId, holdId, idempotencyKey }) {
       holdId,
       idempotencyKey,
       expiresAt: hold.expiresAt, // the order lives exactly as long as its hold
+      pool: hold.pool, // lucky-draw tickets stay lucky-draw tickets (needed to rebuild each pool's stock)
     });
   } catch (err) {
     // A DIFFERENT key for a hold that already has an order (e.g. a second tab).

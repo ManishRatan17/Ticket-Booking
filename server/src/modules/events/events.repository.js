@@ -2,8 +2,8 @@
 // Redis only keeps a fast working copy of each event's stock.
 import { pool } from '../../config/db.js';
 
-const COLUMNS =
-  'id, name, total_tickets, tickets_sold, sale_starts_at, price_paise, admission_per_second, lobby_minutes, created_at';
+const COLUMNS = `id, name, total_tickets, tickets_sold, sale_starts_at, price_paise, admission_per_second, lobby_minutes,
+  lottery_percent, lottery_tickets, lottery_draw_minutes, lottery_per_winner, lottery_closed_at, created_at`;
 
 function toEvent(row) {
   return {
@@ -15,15 +15,27 @@ function toEvent(row) {
     pricePaise: row.price_paise, // whole paise: ₹499.00 = 49900
     admissionPerSecond: row.admission_per_second, // null = no waiting room
     lobbyMinutes: row.lobby_minutes, // the waiting room opens this many minutes before the sale
+    // The lucky draw: lotteryTickets set aside, drawn lotteryDrawMinutes after the sale opens,
+    // up to lotteryPerWinner each. lotteryClosedAt = the draw is over (leftovers back on normal sale).
+    lotteryPercent: row.lottery_percent,
+    lotteryTickets: row.lottery_tickets,
+    lotteryDrawMinutes: row.lottery_draw_minutes,
+    lotteryPerWinner: row.lottery_per_winner,
+    lotteryClosedAt: row.lottery_closed_at,
     createdAt: row.created_at,
   };
 }
 
-export async function createEvent({ name, totalTickets, saleStartsAt, pricePaise, admissionPerSecond = null, lobbyMinutes = 15 }) {
-  const { rows } = await pool.query(
-    `INSERT INTO events (name, total_tickets, sale_starts_at, price_paise, admission_per_second, lobby_minutes)
-     VALUES ($1, $2, $3, $4, $5, $6) RETURNING ${COLUMNS}`,
-    [name, totalTickets, saleStartsAt, pricePaise, admissionPerSecond, lobbyMinutes],
+export async function createEvent(
+  { name, totalTickets, saleStartsAt, pricePaise, admissionPerSecond = null, lobbyMinutes = 15, lottery = {} },
+  client = pool,
+) {
+  const { percent = 0, tickets = 0, drawMinutes = 30, perWinner = 2 } = lottery;
+  const { rows } = await client.query(
+    `INSERT INTO events (name, total_tickets, sale_starts_at, price_paise, admission_per_second, lobby_minutes,
+                         lottery_percent, lottery_tickets, lottery_draw_minutes, lottery_per_winner)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING ${COLUMNS}`,
+    [name, totalTickets, saleStartsAt, pricePaise, admissionPerSecond, lobbyMinutes, percent, tickets, drawMinutes, perWinner],
   );
   return toEvent(rows[0]);
 }
@@ -57,8 +69,14 @@ export async function takeTicketNumbers(client, eventId, quantity) {
   return Array.from({ length: quantity }, (_, i) => last - quantity + 1 + i);
 }
 
-// Tickets that are SOLD for good (paid orders, Phase 2). Used to rebuild Redis stock.
+// Tickets that are SOLD for good (paid orders, Phase 2), in total and from the lucky draw's pool.
+// Used to rebuild Redis stock.
 export async function countSoldTickets(eventId) {
-  const { rows } = await pool.query('SELECT count(*)::int AS sold FROM sold_tickets WHERE event_id = $1', [eventId]);
-  return rows[0].sold;
+  const { rows } = await pool.query(
+    `SELECT count(*)::int AS sold, (count(*) FILTER (WHERE o.pool = 'lottery'))::int AS sold_lottery
+       FROM sold_tickets AS s JOIN orders AS o ON o.id = s.order_id
+      WHERE s.event_id = $1`,
+    [eventId],
+  );
+  return { sold: rows[0].sold, soldLottery: rows[0].sold_lottery };
 }

@@ -87,7 +87,7 @@ export async function handlePaymentEvent(event, provider = 'fake') {
     let reserved = order.holdId ? await consumeHold(order.holdId) : false;
     if (!reserved) {
       await ensureStock(await eventsRepository.findEventById(order.eventId));
-      reserved = await takeFromStock(order.eventId, order.quantity);
+      reserved = await takeFromStock(order.eventId, order.quantity, { pool: order.pool });
       // No hold was consumed, so count these tickets as bought here (consume-hold.lua does it otherwise).
       if (reserved) await addBought(order.eventId, order.userId, order.quantity);
     }

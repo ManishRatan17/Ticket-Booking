@@ -8,7 +8,7 @@ import { FormField } from '../components/FormField.jsx'
 import { errorMessage, fieldErrors } from '../lib/errorMessages.js'
 import { formatDate, formatMoney } from '../lib/format.js'
 
-const EMPTY_FORM = { name: '', totalTickets: '100', price: '499', admissionPerSecond: '', lobbyMinutes: '15', saleStartsAt: '' }
+const EMPTY_FORM = { name: '', totalTickets: '100', price: '499', admissionPerSecond: '', lobbyMinutes: '15', lotteryPercent: '0', lotteryDrawMinutes: '30', lotteryPerWinner: '2', saleStartsAt: '' }
 
 export function AdminEventsPage() {
   const [events, setEvents] = useState(null)
@@ -48,6 +48,10 @@ export function AdminEventsPage() {
           admissionPerSecond: form.admissionPerSecond ? Number(form.admissionPerSecond) : null,
           // The waiting room opens this many minutes before the sale (only matters with a waiting room).
           lobbyMinutes: Number(form.lobbyMinutes) || 15,
+          // The lucky draw (needs a waiting room): % of tickets given away by a random draw.
+          lotteryPercent: form.admissionPerSecond ? Number(form.lotteryPercent) || 0 : 0,
+          lotteryDrawMinutes: Number(form.lotteryDrawMinutes) || 30,
+          lotteryPerWinner: Number(form.lotteryPerWinner) || 2,
           // <input type="datetime-local"> gives LOCAL time without a zone ("2026-12-01T18:00").
           // new Date() reads it as local time; toISOString() sends it in UTC — unambiguous.
           // Empty = "on sale right now".
@@ -114,6 +118,42 @@ export function AdminEventsPage() {
             onChange={update('lobbyMinutes')}
             error={errors.lobbyMinutes}
           />
+        )}
+        {form.admissionPerSecond && (
+          <FormField
+            id="lotteryPercent"
+            label="Lucky draw: % of tickets given away by a random draw among the waiting room (0 = none, max 50)"
+            type="number"
+            min="0"
+            max="50"
+            value={form.lotteryPercent}
+            onChange={update('lotteryPercent')}
+            error={errors.lotteryPercent}
+          />
+        )}
+        {form.admissionPerSecond && Number(form.lotteryPercent) > 0 && (
+          <>
+            <FormField
+              id="lotteryDrawMinutes"
+              label="Lucky draw happens this many minutes after the sale opens"
+              type="number"
+              min="1"
+              max="1440"
+              value={form.lotteryDrawMinutes}
+              onChange={update('lotteryDrawMinutes')}
+              error={errors.lotteryDrawMinutes}
+            />
+            <FormField
+              id="lotteryPerWinner"
+              label="Tickets each winner may buy (1–4)"
+              type="number"
+              min="1"
+              max="4"
+              value={form.lotteryPerWinner}
+              onChange={update('lotteryPerWinner')}
+              error={errors.lotteryPerWinner}
+            />
+          </>
         )}
         <FormField
           id="saleStartsAt"

@@ -66,6 +66,13 @@ export async function queueStatus(eventId, userId, { inLobby = false } = {}) {
   return { status: 'waiting', position: rank + 1, total };
 }
 
+// LUCKY DRAW winners get a "lucky pass" (set by the draw): it lets them hold tickets from the
+// draw's own pool, whether or not the line has reached them yet.
+export const luckyPassKey = (eventId, userId) => `${PREFIX}:${eventId}:lucky:${userId}`;
+export async function hasLuckyPass(eventId, userId) {
+  return (await redis.exists(luckyPassKey(eventId, userId))) === 1;
+}
+
 export async function hasPass(eventId, userId) {
   return (await redis.exists(passKey(eventId, userId))) === 1;
 }

@@ -108,7 +108,7 @@ Body `{ "role": "user" | "admin" }` → `200 { "user": {…} }`
 Demotion revokes all of that user's sessions immediately; promotion applies at their next refresh.
 
 ### `POST /events`
-Body `{ "name": "3–120 chars", "totalTickets": 1–100000, "saleStartsAt": "2026-12-01T18:00:00Z", "pricePaise": 49900, "admissionPerSecond": 50 }` (`admissionPerSecond` 1–10,000, or null = no waiting room; `lobbyMinutes` 1–1440, default 15 = the waiting room opens that many minutes before the sale) (any date, also past; `pricePaise` whole paise 0–10,000,000, default 0)
+Body `{ "name": "3–120 chars", "totalTickets": 1–100000, "saleStartsAt": "2026-12-01T18:00:00Z", "pricePaise": 49900, "admissionPerSecond": 50 }` (`admissionPerSecond` 1–10,000, or null = no waiting room; `lobbyMinutes` 1–1440, default 15 = the waiting room opens that many minutes before the sale; lucky draw: `lotteryPercent` 0–50 (default 0 = none; needs a waiting room), `lotteryDrawMinutes` 1–1440 after the sale (default 30), `lotteryPerWinner` 1–4 (default 2)) (any date, also past; `pricePaise` whole paise 0–10,000,000, default 0)
 → `201 { "event": { "id", "name", "totalTickets", "saleStartsAt", "pricePaise", "createdAt", "available", "onSale" } }`
 
 ### `GET /jobs`
@@ -129,8 +129,8 @@ Body `{ "name": "3–120 chars", "totalTickets": 1–100000, "saleStartsAt": "20
 
 ### `POST /events/:id/holds`  · signed in · limits 10/min per user, 120/min per IP
 Body `{ "quantity": 1 }` (JSON integer 1–4)
-→ `201 { "hold": { "id", "eventId", "quantity", "expiresAt" }, "serverTime" }`
-· `409 SOLD_OUT` (`details.available`) · `409 HOLD_EXISTS` (`details.holdId`) · `409 PURCHASE_LIMIT` (`details: { bought, limit }`: at most 4 tickets per person per event, over all orders) · `409 SALE_NOT_STARTED` (`details.saleStartsAt`) · `404 EVENT_NOT_FOUND` · `400`
+→ `201 { "hold": { "id", "eventId", "quantity", "pool", "expiresAt" }, "serverTime" }` (`pool`: `main`, or `lottery` for a lucky-draw winner)
+· `409 SOLD_OUT` (`details.available`) · `409 HOLD_EXISTS` (`details.holdId`) · `409 LUCKY_DRAW_LIMIT` (a lucky-draw winner asked for more than `details.limit`) · `409 PURCHASE_LIMIT` (`details: { bought, limit }`: at most 4 tickets per person per event, over all orders) · `409 SALE_NOT_STARTED` (`details.saleStartsAt`) · `404 EVENT_NOT_FOUND` · `400`
 
 ### `GET /events/:id/holds/mine`  · signed in
 → `200 { "hold": {…} | null, "purchase": { "bought", "limit" }, "serverTime" }` (an expired hold is released and reported as `null`; `purchase` = tickets you have bought for this event, and the per-person limit)

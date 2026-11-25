@@ -9,8 +9,8 @@
 --
 -- Returns: 1 released · 0 no such hold (already released / expired and cleaned up) · -1 not yours
 
-local fields = redis.call('HMGET', KEYS[1], 'userId', 'eventId', 'quantity')
-local ownerId, eventId, quantity = fields[1], fields[2], fields[3]
+local fields = redis.call('HMGET', KEYS[1], 'userId', 'eventId', 'quantity', 'pool')
+local ownerId, eventId, quantity, pool = fields[1], fields[2], fields[3], fields[4]
 if not quantity then
   return 0
 end
@@ -18,7 +18,12 @@ if ARGV[2] ~= '' and ownerId ~= ARGV[2] then
   return -1
 end
 
+-- Tickets go back to the POOL they came from (lucky draw, Phase "lucky draw"): a lucky-draw
+-- hold returns to the lucky-draw stock — unless the draw is over, then to the normal sale.
 local stockKey = 'event:' .. eventId .. ':stock'
+if pool == 'lottery' and redis.call('EXISTS', 'event:' .. eventId .. ':lottery-closed') == 0 then
+  stockKey = 'event:' .. eventId .. ':lottery-stock'
+end
 local userHoldKey = 'event:' .. eventId .. ':user:' .. ownerId .. ':hold'
 
 -- If the stock key is gone (Redis lost its data), it will be rebuilt from Postgres instead.

@@ -5,7 +5,7 @@ docker compose up -d     # the server tests use the real PostgreSQL and Redis
 npm test                 # server (node:test) then client (Vitest)
 ```
 
-Today: **285 server tests + 37 client tests**, all passing (about 10–15 s for the server suite).
+Today: **292 server tests + 37 client tests**, all passing (about 10–15 s for the server suite).
 
 ## How the server tests run
 
@@ -71,6 +71,7 @@ Kept outside `test/` because Node runs every file inside `test/` as a test.
 | `purchase-limit.test.js` | Phase 5b: bought 4 → 1 more refused with `{ bought, limit }`; bought 2 → 3 refused without touching stock, 2 fine; per person and per event; failed payments don't count; `purchase` in my-hold; Redis loses the count → rebuilt from PostgreSQL; **two orders paid at once → exactly 4 tickets** |
 | `bot-check.test.js` | Phase 5d against the fake Cloudflare: `/api/config` has the site key, not the secret; no / made-up / **replayed** token → 403; good token → 201 with secret, token and visitor IP sent; a typo doesn't use up the token; honeypot → 403, no account; Cloudflare 500 / dropped connection → allowed (fail open); wrong secret → refused; queue join needs a token; 401 before any Cloudflare call |
 | `chance.test.js` | the waiting room's "what are my chances?" levels: exact boundaries (0.7 and 1.3 × buyers left), lobby shares, rounding, no estimate outside the line, `all_held` / `sold_out` for every status |
+| `lucky-draw-pool.test.js` | the lucky draw's own pool: 20 % of 1,000 → 800 + 200; schema limits; the normal sale can't touch the draw's tickets; a winner holds from the lucky pool (limit per winner); released and expired lucky tickets return to the lucky pool, even when replaced by a normal hold; orders keep their pool; both pools rebuilt from PostgreSQL |
 | `holds-http.test.js` | the holds API: every status code, IDOR, CSRF, lazy release on read, **300 users × 100 tickets over HTTP** |
 
 ## Client test files (Vitest)
@@ -118,6 +119,7 @@ A test only proves something once it has been seen to **fail for the right reaso
 | lobby joiners given arrival numbers instead of the random draw | the fair-draw test (rank correlation 1.000) and the re-draw test |
 | chance level "good" never given in line | 4 chance tests |
 | admission pause (stock 0) removed | the all-held test |
+| `release-hold.lua` always returning tickets to the normal stock | the lucky-pool release test |
 | hold rate limiters (per user and per IP) removed | both hold rate-limit tests |
 | purchase-cap check removed from `create-hold.lua` | the hold-refused tests |
 | purchase-cap check removed from the payment transaction | the simultaneous-payments test (8 tickets paid) |

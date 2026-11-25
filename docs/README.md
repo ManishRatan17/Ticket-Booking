@@ -26,6 +26,7 @@ A ticketing platform built to stay **correct** (never sell a ticket twice) and *
 | 13 | [Background jobs](13-background-jobs.md) | BullMQ: delayed expiry jobs, the worker process, retries, dead-letter queue, idempotent jobs |
 | 14 | [Waiting room](14-waiting-room.md) | Admission control: a fair queue (sorted set), the admission worker, passes, the lobby |
 | 15 | [Protection](15-protection.md) | Abuse defences: rate limits on the ticket path, purchase cap, stream cap, bot check |
+| 16 | [Lucky draw](16-lucky-draw.md) | Part of the tickets given away by a provably fair random draw among the waiting room |
 
 ---
 
@@ -43,11 +44,12 @@ Roadmap from the original blueprint. ✅ done · 🟡 partly done · ⬜ not sta
 | 3 | Expiry: a background worker (BullMQ) that releases expired holds for everyone | ✅ (delayed job per hold · worker process · safety-net sweep with a sorted-set index · admin Background jobs page with the dead-letter queue and Retry) |
 | 4 | Waiting room: queue, admission worker, live position | ✅ (4a queue + admission worker + pass check · 4b live updates (SSE) · 4c queue screen · 4d lobby window · 4e fair draw for the lobby · 4f chance of a ticket · 4g sold-out notice) |
 | 5 | Protection: rate limit on holds, duplicate-tab and bot defence | ✅ (5a rate limits on the ticket path · 5b purchase cap of 4 per person · 5c at most 3 live streams per person · 5d bot check: Cloudflare Turnstile + honeypot) |
+| Lucky draw | (added after Phase 5) a % of the tickets in their own pool, drawn among everyone in the waiting room | 🟡 (L1 settings + separate pool ✅ · L2 the draw ⬜ · L3 pages ⬜) |
 | 6 | Proof: k6 load tests with thousands of users, SQL verification | ⬜ |
 | 7 | Polish: styling, Razorpay test mode, deployment, demo video | ⬜ |
 | 8 | Stretch: numbered seats, multiple servers, metrics | ⬜ |
 
-**Numbers today:** 285 server tests + 37 frontend tests, all passing. 300 signed-in users racing for 100 tickets over real HTTP → exactly 100 holds.
+**Numbers today:** 292 server tests + 37 frontend tests, all passing. 300 signed-in users racing for 100 tickets over real HTTP → exactly 100 holds.
 
 ---
 
