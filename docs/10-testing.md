@@ -5,7 +5,7 @@ docker compose up -d     # the server tests use the real PostgreSQL and Redis
 npm test                 # server (node:test) then client (Vitest)
 ```
 
-Today: **273 server tests + 37 client tests**, all passing (about 10–15 s for the server suite).
+Today: **281 server tests + 37 client tests**, all passing (about 10–15 s for the server suite).
 
 ## How the server tests run
 
@@ -64,11 +64,12 @@ Kept outside `test/` because Node runs every file inside `test/` as a test.
 | `jobs.test.js` | a real worker inside the test process, 1-second holds (`HOLD_SECONDS=1`), private queue prefix: the job is scheduled with retry/dead-letter settings; an **abandoned** hold is released with nobody looking; an unpaid order becomes `expired`; a paid hold is left alone; the job is idempotent (3 runs at once → tickets back once); a job that runs too early fails and changes nothing |
 | `sweep.test.js` | the expiry index is maintained on create / release / pay and rebuilt by `indexAllHolds()`; the sweep releases an expired hold that never got a job, leaves running holds alone, expires an overdue order whose hold vanished, removes stale index entries, and two sweeps at once release each hold once |
 | `admin-jobs.test.js` | admin-only (403/401); overview has counts for every state, ≥ 1 worker, the 60-s sweep schedule; **the dead-letter flow**: a job fails its only attempt → listed with its error → cause fixed → Retry → completed, tickets back; retry of an unknown job → 404, of a job that hasn't failed → 409 |
-| `waiting-room.test.js` | no pass → 403; events without a room unchanged; arrival order and keeping your place on re-join; **300 simultaneous joins → positions 1–300**; N per tick in order; pass lasts 10 min and allows holding; the lobby (queue before the sale, no admission); **fairness under load** (300 people, 6 ticks, nobody overtakes); two admission runs at once never admit anyone twice; lobby window (too early → 409 `LOBBY_NOT_OPEN`, nobody added; per-event `lobbyMinutes`; schema 1–1440, default 15); **fair draw**: 200 joining the lobby one by one get places 1–200 unrelated to arrival order (rank correlation ≈ 0), admission follows the draw, newcomers after the sale queue behind the lobby, re-joining never re-draws |
+| `waiting-room.test.js` | no pass → 403; events without a room unchanged; arrival order and keeping your place on re-join; **300 simultaneous joins → positions 1–300**; N per tick in order; pass lasts 10 min and allows holding; the lobby (queue before the sale, no admission); **fairness under load** (300 people, 6 ticks, nobody overtakes); two admission runs at once never admit anyone twice; lobby window (too early → 409 `LOBBY_NOT_OPEN`, nobody added; per-event `lobbyMinutes`; schema 1–1440, default 15); **fair draw**: 200 joining the lobby one by one get places 1–200 unrelated to arrival order (rank correlation ≈ 0), admission follows the draw, newcomers after the sale queue behind the lobby, re-joining never re-draws; statuses carry `ticketsLeft` / `buyersLeft` / `chance` and follow the stock |
 | `waiting-room-stream.test.js` | reads the raw SSE stream: correct content type; first message = current status; position updates live as people ahead are admitted, then `admitted` and the stream ends; 401 / 409 as plain JSON; Phase 5c: 3 streams per user, the 4th → JSON 429 (not counted), closing a tab frees a slot, key deleted at 0, **10 tabs at once → exactly 3 streams**, an admitted stream gives its slot back |
 | `ticket-rate-limits.test.js` | Phase 5a, limits switched on with a private prefix: 11th hold → 429 + `Retry-After`, others on the same IP unaffected; **13 accounts × 10 holds from one IP at once → exactly 10 refused**; release, join, status, orders and payments limits; anonymous floods don't use anyone's budget |
 | `purchase-limit.test.js` | Phase 5b: bought 4 → 1 more refused with `{ bought, limit }`; bought 2 → 3 refused without touching stock, 2 fine; per person and per event; failed payments don't count; `purchase` in my-hold; Redis loses the count → rebuilt from PostgreSQL; **two orders paid at once → exactly 4 tickets** |
 | `bot-check.test.js` | Phase 5d against the fake Cloudflare: `/api/config` has the site key, not the secret; no / made-up / **replayed** token → 403; good token → 201 with secret, token and visitor IP sent; a typo doesn't use up the token; honeypot → 403, no account; Cloudflare 500 / dropped connection → allowed (fail open); wrong secret → refused; queue join needs a token; 401 before any Cloudflare call |
+| `chance.test.js` | the waiting room's "what are my chances?" levels: exact boundaries (0.7 and 1.3 × buyers left), lobby shares, rounding, no estimate outside the line |
 | `holds-http.test.js` | the holds API: every status code, IDOR, CSRF, lazy release on read, **300 users × 100 tickets over HTTP** |
 
 ## Client test files (Vitest)
@@ -114,6 +115,7 @@ A test only proves something once it has been seen to **fail for the right reaso
 | holds allowed without a waiting-room pass | the NOT_ADMITTED test |
 | lobby window check removed from `join-queue.lua` | the too-early test |
 | lobby joiners given arrival numbers instead of the random draw | the fair-draw test (rank correlation 1.000) and the re-draw test |
+| chance level "good" never given in line | 4 chance tests |
 | hold rate limiters (per user and per IP) removed | both hold rate-limit tests |
 | purchase-cap check removed from `create-hold.lua` | the hold-refused tests |
 | purchase-cap check removed from the payment transaction | the simultaneous-payments test (8 tickets paid) |

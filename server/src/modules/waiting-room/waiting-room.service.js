@@ -3,6 +3,8 @@ import { AppError } from '../../lib/errors.js';
 import { redisNow } from '../reservation/holds.js';
 import * as eventsRepository from '../events/events.repository.js';
 import { joinQueue, queueStatus } from './waiting-room.js';
+import { estimateChance } from './chance.js';
+import { ensureStock } from '../events/events.service.js';
 
 async function findEventWithRoom(eventId) {
   const event = await eventsRepository.findEventById(eventId);
@@ -19,10 +21,12 @@ const lobbyOpensAt = (event) => new Date(new Date(event.saleStartsAt).getTime() 
 // Adds what the page needs: the server's time (for countdowns) and a rough wait estimate.
 // Estimate = (seconds until the sale opens, if it hasn't) + position ÷ people let in per second.
 // In the lobby there's no position yet, so no estimate either (the page says "drawn at 11:00").
-function describe(status, event, now) {
+// ticketsLeft = the live stock (Redis): it feeds the "what are my chances?" estimate (chance.js).
+function describe(status, event, now, ticketsLeft) {
   const secondsUntilSale = Math.max(0, Math.ceil((new Date(event.saleStartsAt) - now) / 1000));
   return {
     ...status,
+    ...estimateChance({ ...status, ticketsLeft }),
     admissionPerSecond: event.admissionPerSecond,
     lobbyOpensAt: lobbyOpensAt(event),
     saleStartsAt: event.saleStartsAt,
@@ -38,24 +42,25 @@ function describe(status, event, now) {
 export async function join({ eventId, userId }) {
   const event = await findEventWithRoom(eventId);
   const opensAt = lobbyOpensAt(event);
-  const [status, now] = await Promise.all([
+  const [status, now, ticketsLeft] = await Promise.all([
     joinQueue(event.id, userId, {
       lobbyOpensAtMs: opensAt.getTime(),
       saleStartsAtMs: new Date(event.saleStartsAt).getTime(),
     }),
     redisNow(),
+    ensureStock(event),
   ]);
   if (status.status === 'not_open') {
     throw new AppError(409, 'LOBBY_NOT_OPEN', `The waiting room opens ${event.lobbyMinutes} minutes before the sale`, {
       lobbyOpensAt: opensAt,
     });
   }
-  return describe(status, event, now);
+  return describe(status, event, now, ticketsLeft);
 }
 
 export async function getStatus({ eventId, userId }) {
   const event = await findEventWithRoom(eventId);
-  const now = await redisNow();
+  const [now, ticketsLeft] = await Promise.all([redisNow(), ensureStock(event)]);
   const status = await queueStatus(event.id, userId, { inLobby: now < new Date(event.saleStartsAt) });
-  return describe(status, event, now);
+  return describe(status, event, now, ticketsLeft);
 }

@@ -286,3 +286,28 @@ test('fair draw: joining again in the lobby (another tab, a reload) never re-dra
   for (let i = 0; i < 5; i++) await join(ann, e.id);
   assert.equal(await redis.zscore(queueKey(e.id), String(ann.id)), drawn);
 });
+
+// ---------- "what are my chances?" ----------
+
+test('chance: statuses carry ticketsLeft, buyersLeft and a level, and follow the stock live', async () => {
+  const e = await event({ rate: 1, tickets: 10 }); // 10 tickets ≈ 5 buyers
+  const [first, second, third] = await users(3);
+  for (const u of [first, second, third]) await join(u, e.id);
+
+  const s = (await status(third, e.id)).body;
+  assert.deepEqual([s.ticketsLeft, s.buyersLeft, s.chance], [10, 5, 'good']); // 2 ahead of 5 buyers
+
+  // The first person is let in and holds 1 ticket: 9 left (≈ 5 buyers, rounded up), and #2 is now next.
+  await admitWaiting({ eventIds: [e.id] });
+  assert.equal((await hold(first, e.id)).status, 201);
+  const after = (await status(second, e.id)).body;
+  assert.deepEqual([after.position, after.ticketsLeft, after.buyersLeft], [1, 9, 5]);
+});
+
+test('chance in the lobby: 20 people and 10 tickets (≈ 5 buyers) → unlikely for everyone', async () => {
+  const e = await event({ rate: 1, tickets: 10, startsInMs: 5 * 60_000 });
+  const crowd = await users(20);
+  await Promise.all(crowd.map((u) => join(u, e.id)));
+  const s = (await status(crowd[0], e.id)).body;
+  assert.deepEqual([s.status, s.total, s.buyersLeft, s.chance], ['lobby', 20, 5, 'unlikely']);
+});

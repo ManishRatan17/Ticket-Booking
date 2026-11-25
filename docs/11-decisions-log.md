@@ -124,6 +124,7 @@ Every significant choice, the alternatives considered, and why. Newest at the bo
 | **Hybrid order**: random places for everyone in the lobby, first come first served after the sale opens | pure first come; pure random | first come rewards the fastest click (and bots) and just moves the spike; pure random lets latecomers overtake people who waited |
 | Random score at join time (lobby < 1, later arrivals ≥ 1) | a shuffle job at the sale's start | no extra moving part that could fail or run late at the busiest second; admission and positions work unchanged |
 | Random numbers from Node `crypto.randomBytes`, passed to Lua | Lua `math.random` | a proper random source, nothing predictable |
+| Chance shown as a level (good / maybe / unlikely), assuming 2 tickets per buyer | an exact percentage | the inputs are guesses; a precise-looking number would mislead |
 | Positions hidden in the lobby | show the drawn place early | "drawn at 11:00" is clearer, and nobody refreshes hoping for a better number (re-joining keeps the score anyway) |
 
 ## Frontend

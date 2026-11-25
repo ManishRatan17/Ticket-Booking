@@ -72,8 +72,8 @@ router.get('/events/:id/queue/stream', authenticate, queueStreamPerUser, validat
   let lastKey = null;
   let closed = false;
   const send = (status) => {
-    // Only send when something visible changed (not just the clock).
-    const key = `${status.status}|${status.position}|${status.total}`;
+    // Only send when something visible changed (not just the clock): place, line, tickets left, chance.
+    const key = `${status.status}|${status.position}|${status.total}|${status.ticketsLeft}|${status.chance}`;
     if (key === lastKey) return;
     lastKey = key;
     res.write(`event: status\ndata: ${JSON.stringify(status)}\n\n`);

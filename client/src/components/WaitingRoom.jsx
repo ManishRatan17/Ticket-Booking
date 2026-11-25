@@ -1,6 +1,7 @@
 // What you see while you wait for your turn.
 import { formatCountdown } from '../lib/serverClock.js'
 import { TurnstileWidget } from './TurnstileWidget.jsx'
+import { ChanceNote } from './ChanceNote.jsx'
 
 // human = useHumanCheck() from the page: joining needs the "are you a person?" check (Phase 5d).
 // lobbyOpensIn = seconds until the waiting room opens (0 = open).
@@ -48,6 +49,7 @@ export function WaitingRoom({ status, onJoin, saleOpensIn, lobbyOpensIn, human }
           the lobby gets a <strong>random place in line</strong>. Joining early or late in the lobby gives the same
           chance, so there's no need to rush or refresh.
         </p>
+        <ChanceNote status={status} />
         <p className="muted">People who arrive after the sale opens queue up behind the lobby. Keep this page open.</p>
       </div>
     )
@@ -60,6 +62,7 @@ export function WaitingRoom({ status, onJoin, saleOpensIn, lobbyOpensIn, human }
         You're <strong>#{status.position.toLocaleString()}</strong> of {status.total.toLocaleString()} in line.
       </p>
       {saleOpensIn > 0 && <p>The sale opens in {formatCountdown(saleOpensIn)} — your place is saved.</p>}
+      <ChanceNote status={status} />
       {status.estimatedWaitSeconds != null && (
         <p className="muted">About {formatCountdown(status.estimatedWaitSeconds)} to go.</p>
       )}

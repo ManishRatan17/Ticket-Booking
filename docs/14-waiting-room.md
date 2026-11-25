@@ -63,6 +63,30 @@ The prefix `wr` is configurable (`WAITING_ROOM_PREFIX`); tests use `test-wr` so 
 
 *Tested: 200 people join the lobby one after another; when the sale opens, places are exactly 1–200 and the **rank correlation** between arrival order and place is near 0 (first come, first served would be 1; the test allows |r| < 0.3, more than 4 standard deviations); the first admission tick lets in exactly places 1–50 and everyone else moves up 50; newcomers after the sale get places 21–25 behind a 20-person lobby; re-joining keeps the same score. Mutation: the lobby given arrival numbers → r = 1.000, the test fails.*
 
+**What are my chances? (step 4f)** Every status now also carries `ticketsLeft` (the live Redis stock), `buyersLeft` and a `chance` level, computed by [chance.js](../server/src/modules/waiting-room/chance.js):
+
+```
+buyersLeft ≈ ticketsLeft ÷ 2            (assumption: people buy about 2 tickets each)
+
+in line:   people ahead < 0.7 × buyersLeft → good · < 1.3 × → maybe · otherwise → unlikely
+in lobby:  share = buyersLeft ÷ people in the lobby (everyone has the same chance: the fair draw)
+           share ≥ 0.8 → good · ≥ 0.3 → maybe · otherwise → unlikely
+
+example: 1,000 tickets ≈ 500 buyers → #341 good · #601 maybe · #1,500 unlikely
+         lobby of 1,800 → "about 1 in 4 people here will get tickets"
+```
+
+| Choice | Why |
+|---|---|
+| a **level**, not "73 %" | the inputs are guesses (people buy 1–4, some never buy, some holds expire). An exact-looking number would be wrong most of the time and make people angry |
+| assume **2 tickets per buyer** | a simple, stated assumption. Phase 6's load tests or real sales could replace it with the event's real average |
+| recomputed **every second**, pushed live | the SSE stream now also sends when `ticketsLeft` or the level changes, so the estimate corrects itself as tickets are held and sold |
+| one `GET` of the stock per status | cheap. `ensureStock` rebuilds it from PostgreSQL if Redis lost it |
+
+Known optimism: people already admitted but not yet holding tickets will take some too; the level catches up as soon as they hold. On the page: [ChanceNote](../client/src/components/ChanceNote.jsx) shows a coloured label (Good chance / Maybe / Unlikely) and one sentence, e.g. "1,000 tickets left, enough for roughly 500 buyers, and 340 people are ahead of you. (An estimate: it changes as tickets sell.)"
+
+*Tested: [chance.test.js](../server/test/chance.test.js) checks the exact boundaries (349 ahead of 500 buyers → good, 350 → maybe, 649 → maybe, 650 → unlikely), the lobby shares, rounding (3 tickets → 2 buyers) and "no estimate when not in line"; over HTTP, statuses carry the numbers and follow the stock when someone holds tickets; a lobby of 20 with 10 tickets is "unlikely". Mutation: "good" never given → 4 tests fail.*
+
 **The lobby window (step 4d):** the lobby opens only **`lobby_minutes`** before the sale (migration [006](../server/migrations/006_lobby_window.sql), default **15**, 1–1440, set by the admin per event). Joining earlier → **`409 LOBBY_NOT_OPEN`** with `details.lobbyOpensAt`, and the status says `not_in_queue` with `lobbyOpensAt`, so the page can count down: "The waiting room opens in 12:30 (at 10:45)". Without a window, a bot (or a superfan) could take place #1 three days early. The check is inside [join-queue.lua](../server/src/modules/waiting-room/lua/join-queue.lua) using **Redis's clock** (`TIME`), the same clock as holds and passes, so every server gives the same answer at the same moment. Someone already in the line is never refused. *Tested: too early → 409 and nobody added; `lobbyMinutes: 60` lets people in 30 minutes ahead; the schema accepts 1–1440 and defaults to 15. Mutation: window check removed → the too-early test fails.*
 
 *Tested: 300 people, rate 50 → after each of 6 ticks exactly the first 50, 100, … 300 are in — nobody ever overtakes anybody — and the empty room is no longer checked.*
@@ -78,7 +102,7 @@ The prefix `wr` is configurable (`WAITING_ROOM_PREFIX`); tests use `test-wr` so 
 | `POST /api/events/:id/queue` | join (or re-join) → status. Needs the "are you a person?" token (Phase 5d, [15](15-protection.md#5d--bot-check-cloudflare-turnstile--a-honeypot)) |
 | `GET /api/events/:id/queue` | current status |
 
-Status: `{ "status": "lobby" | "waiting" | "admitted" | "not_in_queue", "position", "total", "passExpiresInSeconds", "admissionPerSecond", "saleStartsAt", "estimatedWaitSeconds", "serverTime" }`. Events without a waiting room → `409 NO_WAITING_ROOM`.
+Status: `{ "status": "lobby" | "waiting" | "admitted" | "not_in_queue", "position", "total", "ticketsLeft", "buyersLeft", "chance": "good" | "maybe" | "unlikely" | null, "passExpiresInSeconds", "admissionPerSecond", "saleStartsAt", "estimatedWaitSeconds", "serverTime" }`. Events without a waiting room → `409 NO_WAITING_ROOM`.
 
 ## Live position: Server-Sent Events (step 4b)
 
