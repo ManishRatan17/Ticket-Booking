@@ -5,7 +5,7 @@ docker compose up -d     # the server tests use the real PostgreSQL and Redis
 npm test                 # server (node:test) then client (Vitest)
 ```
 
-Today: **302 server tests + 37 client tests**, all passing (about 10–15 s for the server suite).
+Today: **303 server tests + 39 client tests**, all passing (about 10–15 s for the server suite).
 
 ## How the server tests run
 
@@ -72,7 +72,7 @@ Kept outside `test/` because Node runs every file inside `test/` as a test.
 | `bot-check.test.js` | Phase 5d against the fake Cloudflare: `/api/config` has the site key, not the secret; no / made-up / **replayed** token → 403; good token → 201 with secret, token and visitor IP sent; a typo doesn't use up the token; honeypot → 403, no account; Cloudflare 500 / dropped connection → allowed (fail open); wrong secret → refused; queue join needs a token; 401 before any Cloudflare call |
 | `chance.test.js` | the waiting room's "what are my chances?" levels: exact boundaries (0.7 and 1.3 × buyers left), lobby shares, rounding, no estimate outside the line, `all_held` / `sold_out` for every status |
 | `lucky-draw-pool.test.js` | the lucky draw's own pool: 20 % of 1,000 → 800 + 200; schema limits; the normal sale can't touch the draw's tickets; a winner holds from the lucky pool (limit per winner); released and expired lucky tickets return to the lucky pool, even when replaced by a normal hold; orders keep their pool; both pools rebuilt from PostgreSQL |
-| `lucky-draw.test.js` | the draw: fingerprint public / seed secret before; nothing before the draw time; round 1 = exactly the lowest draw numbers, verifiable from the revealed seed; winners' lucky passes; two jobs at once → one round; round 2 waits a full round and picks the next numbers, nobody twice; people at the 4-ticket limit skipped; closing returns leftovers (and later releases) to the normal sale; empty draw; **chi-square fairness over 2,000 seeds** |
+| `lucky-draw.test.js` | the draw: fingerprint public / seed secret before; nothing before the draw time; round 1 = exactly the lowest draw numbers, verifiable from the revealed seed; winners' lucky passes; two jobs at once → one round; round 2 waits a full round and picks the next numbers, nobody twice; people at the 4-ticket limit skipped; closing returns leftovers (and later releases) to the normal sale; empty draw; **chi-square fairness over 2,000 seeds**; someone admitted but still in the draw keeps the live stream and sees the win arrive |
 | `holds-http.test.js` | the holds API: every status code, IDOR, CSRF, lazy release on read, **300 users × 100 tickets over HTTP** |
 
 ## Client test files (Vitest)
@@ -82,6 +82,7 @@ Kept outside `test/` because Node runs every file inside `test/` as a test.
 | `api/client.test.js` | refresh-and-retry, single shared refresh, 409 handling, session-over codes, retry only once, wrong password not refreshed, error parsing, `Retry-After` |
 | `lib/format.test.js` | device names from real user-agent strings, "time ago" |
 | `lib/serverClock.test.js` | countdowns correct with the device clock fast or slow; formatting |
+| `lib/verifyDraw.test.js` | the browser's draw check (Web Crypto) computes exactly what the server computes (node:crypto); a swapped seed or another person's number fails |
 | `api/botCheck.test.js` | the "are you a person?" token goes in `X-Turnstile-Token` (register and queue join); no header without a token; the honeypot field is sent only when filled |
 
 ## Mutation testing
@@ -123,6 +124,7 @@ A test only proves something once it has been seen to **fail for the right reaso
 | `release-hold.lua` always returning tickets to the normal stock | the lucky-pool release test |
 | lucky-draw winners chosen by user id instead of draw number | 3 draw tests |
 | no wait between lucky-draw rounds | the round-2 test and the two-jobs test |
+| stream ends on admission even while waiting for a draw | the live-win test |
 | hold rate limiters (per user and per IP) removed | both hold rate-limit tests |
 | purchase-cap check removed from `create-hold.lua` | the hold-refused tests |
 | purchase-cap check removed from the payment transaction | the simultaneous-payments test (8 tickets paid) |

@@ -43,6 +43,7 @@ export function OrdersPage() {
           <li key={order.id}>
             <strong>{order.eventName}</strong> — {order.quantity} ticket{order.quantity > 1 ? 's' : ''},{' '}
             {formatMoney(order.amountPaise)} — {STATUS_TEXT[order.status] ?? order.status}
+            {order.pool === 'lottery' && ' · 🎟 lucky draw'}
             {order.status === 'paid' && <> — ticket{order.ticketNumbers.length > 1 ? 's' : ''} #{order.ticketNumbers.join(', #')}</>}
             {order.status === 'pending' && (
               <>

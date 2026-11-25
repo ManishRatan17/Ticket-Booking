@@ -79,8 +79,9 @@ router.get('/events/:id/queue/stream', authenticate, queueStreamPerUser, validat
     lastKey = key;
     res.write(`event: status\ndata: ${JSON.stringify(status)}\n\n`);
     // Nothing more to wait for: you're in, or every ticket is paid for (none can come back).
-    // (A lucky-draw winner's stream stays open until admitted too: the page shows the win live.)
-    if (status.status === 'admitted' || status.chance === 'sold_out') finish();
+    // …except someone admitted who is still waiting for a lucky draw: they should see the result live.
+    const waitingForDraw = draw && draw.state !== 'closed' && draw.entered && !draw.won;
+    if ((status.status === 'admitted' && !waitingForDraw) || status.chance === 'sold_out') finish();
   };
 
   const timer = setInterval(async () => {

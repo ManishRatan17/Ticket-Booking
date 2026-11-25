@@ -14,6 +14,16 @@ const DEMO_EVENTS = [
   { name: 'Demo: Almost Sold Out', totalTickets: 5, startsInMs: -MINUTE, pricePaise: 99_900 }, // try selling out
   // A waiting room letting 2 people in per second: join before the sale opens and watch your place.
   { name: 'Demo: Big Festival', totalTickets: 1000, startsInMs: 10 * MINUTE, pricePaise: 149_900, admissionPerSecond: 2 },
+  // A lucky draw: 20 of the 100 tickets are drawn among the waiting room 2 minutes after the sale
+  // opens (the sale opens 5 minutes after seeding). Needs the worker running (npm run dev does).
+  {
+    name: 'Demo: Lucky Draw Concert',
+    totalTickets: 100,
+    startsInMs: 5 * MINUTE,
+    pricePaise: 99_900,
+    admissionPerSecond: 1,
+    lottery: { lotteryPercent: 20, lotteryDrawMinutes: 2, lotteryPerWinner: 2 },
+  },
 ];
 
 try {
@@ -41,6 +51,7 @@ try {
       saleStartsAt: new Date(Date.now() + demo.startsInMs),
       pricePaise: demo.pricePaise,
       admissionPerSecond: demo.admissionPerSecond ?? null,
+      ...demo.lottery,
     });
     console.log(`created  ${event.name} — id ${event.id}, ${event.totalTickets} tickets`);
   }

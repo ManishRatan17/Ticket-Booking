@@ -1,6 +1,9 @@
 import { useCallback, useEffect, useState } from 'react'
 import { getQueueStatus, joinQueue, queueStreamUrl } from '../api/waitingRoom.js'
 
+// Entered in a lucky draw that hasn't picked you yet: keep listening, the result comes live.
+const waitingForDraw = (s) => Boolean(s.lottery && s.lottery.state !== 'closed' && s.lottery.entered && !s.lottery.won)
+
 // Your place in an event's waiting room, kept up to date LIVE.
 //
 //   1. Ask once (GET) where you are.
@@ -22,7 +25,7 @@ export function useQueueStatus(eventId, enabled) {
     const apply = (next) => {
       if (!active) return
       setStatus(next)
-      if (next.status === 'admitted' || next.chance === 'sold_out') {
+      if ((next.status === 'admitted' && !waitingForDraw(next)) || next.chance === 'sold_out') {
         source?.close() // nothing more to wait for
         clearInterval(poller)
       }
@@ -42,7 +45,7 @@ export function useQueueStatus(eventId, enabled) {
     getQueueStatus(eventId).then(
       (first) => {
         apply(first)
-        if (active && (first.status === 'waiting' || first.status === 'lobby')) openStream()
+        if (active && (first.status === 'waiting' || first.status === 'lobby' || waitingForDraw(first))) openStream()
       },
       () => {},
     )

@@ -97,6 +97,27 @@ anyone       ──► SHA-256(revealed seed) = the fingerprint shown before?   
 
 *Tested in [lucky-draw.test.js](../server/test/lucky-draw.test.js): before the draw the fingerprint is public and the seed secret, joining = entered, nothing happens before the draw time; round 1 with 12 entrants and 10 tickets → exactly the 5 lowest numbers, and the revealed seed matches the fingerprint and the page's own number; winners hold lucky tickets for 10 minutes, others can't; two jobs at once → one round; round 2 waits a full round, then the next 3 numbers win, nobody twice; someone at the 4-ticket limit is skipped; after 3 rounds the draw closes, 8 leftovers go to the normal sale, and a lucky hold released after closing goes there too; a draw nobody entered returns everything; **fairness: over 2,000 seeds each of 10 entrants has the lowest number about equally often** (chi-square < 27.9, the 0.1 % level). Mutations: winners chosen by user id instead of draw number → 3 tests fail; no wait between rounds → 2 tests fail.*
 
-## Coming next
+## Step L3 · The pages
 
-- **L3:** the pages: "You're entered", "You won!", verifying the draw.
+Every waiting-room status now carries `lottery`: the draw as **this person** sees it ([lottery.service.js](../server/src/modules/lottery/lottery.service.js) `lotteryInfo`):
+
+`{ state: "upcoming" | "drawing" | "closed", tickets, ticketsLeft, perWinner, drawAt, rounds, roundsDone, entrants, entered, odds, winners, won: { round, passExpiresInSeconds } | null, seedHash, seed (after the draw), myDrawNumber (after the draw) }`
+
+| What you see | When |
+|---|---|
+| "20 tickets go to a lucky draw at 11:30 … You're entered. 1,800 entered so far: about 1 in 90 will win." + the seed's fingerprint | before the draw |
+| "🎉 You won the lucky draw (round 1)! Buy up to 2 lucky-draw tickets within 9:58." + the hold form (from the lucky pool, max 2) | you won, your pass is running |
+| "Not this time (round 1 of 3). If winners don't buy, their tickets are drawn again — you're still in." | entered, not (yet) picked |
+| "The lucky draw is over. Its remaining tickets went back to the normal sale." | closed |
+| the seed, the fingerprint, **your draw number** and a **"Verify the draw in my browser"** button | after the draw |
+| "🎟 lucky draw" next to the order | My orders, for lucky-draw tickets |
+
+**Verify in your own browser** ([lib/verifyDraw.js](../client/src/lib/verifyDraw.js)): the Web Crypto API computes SHA-256(seed) and HMAC-SHA256(seed, "<event>:<you>") **in the browser**, without trusting the server's word, and shows ✅/❌. A client test checks it computes exactly what the server's `node:crypto` computes.
+
+**Live:** someone already let in by the line but still waiting for the draw keeps the live stream (and the page keeps listening), so "You won!" appears without a reload. The stream used to end as soon as you were admitted.
+
+**For people not signed in**, the event page still says "🎟 20 of the tickets go to a lucky draw among everyone in the waiting room."
+
+**Demo:** `npm run seed:demo` creates *Demo: Lucky Draw Concert*: 100 tickets, 20 in a lucky draw, sale 5 minutes after seeding, draw 2 minutes after the sale opens. Join with two or three accounts and watch the draw happen (the **worker** must be running: `npm run dev` starts it).
+
+*Tested: a person admitted by the line, still in the draw, keeps the stream and receives `won` live (mutation: ending the stream on admission → the test fails); client [verifyDraw.test.js](../client/src/lib/verifyDraw.test.js): the browser's SHA-256 and HMAC equal node:crypto's, an honest draw verifies, a swapped seed or someone else's number doesn't. **Checked live with a real worker process** (port 5059): 4 people joined, the worker's `lottery-tick` drew round 1 within ~1 s, 3 winners (5 tickets ÷ 2), a winner held 2 from the lucky pool (pool `lottery`), a non-winner saw "not won", 3 left, and the revealed seed.*

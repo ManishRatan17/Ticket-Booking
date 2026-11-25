@@ -251,3 +251,44 @@ test('fair: over 2,000 seeds, each of 10 entrants has the lowest number about eq
   const chi2 = wins.reduce((sum, w) => sum + (w - 200) ** 2 / 200, 0);
   assert.ok(chi2 < 27.9, `wins ${wins.join(', ')} (chi² = ${chi2.toFixed(1)})`);
 });
+
+// ---------- live: the win arrives on the open stream ----------
+
+test('live: someone already let in by the line, still in the draw, keeps the stream — and sees "won" arrive', async () => {
+  const { admitWaiting } = await import('../src/jobs/processors.js');
+  const e = await event({ perWinner: 2 });
+  const [ann] = await users(1);
+  await join(ann, e);
+  await admitWaiting({ eventIds: [e.id] }); // the line lets her in
+
+  const res = await fetch(`${baseUrl}/api/events/${e.id}/queue/stream`, { headers: { Cookie: ann.cookie } });
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+  async function next() {
+    const deadline = Date.now() + 5000;
+    for (;;) {
+      const end = buffer.indexOf('\n\n');
+      if (end >= 0) {
+        const block = buffer.slice(0, end);
+        buffer = buffer.slice(end + 2);
+        const data = block.split('\n').find((l) => l.startsWith('data:'));
+        if (data) return JSON.parse(data.slice(5));
+        continue;
+      }
+      if (Date.now() > deadline) throw new Error('no message in time');
+      const { value, done } = await reader.read();
+      if (done) return null;
+      buffer += decoder.decode(value, { stream: true });
+    }
+  }
+
+  const first = await next();
+  assert.equal(first.status, 'admitted');
+  assert.equal(first.lottery.won, null);
+  await tick(e); // the draw: she's the only entrant, so she wins
+  const later = await next();
+  assert.ok(later, 'the stream stayed open (she was waiting for the draw)');
+  assert.equal(later.lottery.won.round, 1);
+  await reader.cancel();
+});

@@ -13,6 +13,7 @@ import { clockOffset, formatCountdown } from '../lib/serverClock.js'
 import { useQueueStatus } from '../hooks/useQueueStatus.js'
 import { WaitingRoom } from '../components/WaitingRoom.jsx'
 import { useHumanCheck } from '../hooks/useHumanCheck.js'
+import { LuckyDrawPanel } from '../components/LuckyDrawPanel.jsx'
 
 // Loads the event, plus my hold if I'm signed in. Returns everything the page shows.
 async function loadPage(eventId, signedIn) {
@@ -31,7 +32,7 @@ export function EventPage() {
   // One idempotency key per hold: clicking Checkout twice (or a retry) sends the SAME key,
   // so the server returns the same order instead of making a second one.
   const checkoutKey = useRef(null)
-  const { status } = useAuth()
+  const { status, user } = useAuth()
   const signedIn = status === 'signed-in'
 
   const [page, setPage] = useState(null) // { event, hold, purchase, offset }
@@ -76,6 +77,9 @@ export function EventPage() {
   const hasRoom = Boolean(event?.admissionPerSecond)
   const queue = useQueueStatus(id, signedIn && hasRoom && !page?.hold)
   const admitted = queue.status?.status === 'admitted'
+  // A lucky-draw winner may hold lucky-draw tickets while their lucky pass lasts, line or no line.
+  const draw = queue.status?.lottery
+  const luckyWin = Boolean(draw?.state === 'drawing' && draw.won?.passExpiresInSeconds > 0)
   const human = useHumanCheck() // joining the queue needs the "are you a person?" check
   // Counts down to the lobby window; at 0 the Join button appears (no reload needed).
   const lobbyOpensIn = useCountdown(
@@ -156,7 +160,9 @@ export function EventPage() {
 
   // Offer only what I may still buy: per hold, in stock, and under my per-person limit.
   const canStillBuy = page.purchase ? page.purchase.limit - page.purchase.bought : MAX_TICKETS_PER_HOLD
-  const maxChoice = Math.min(MAX_TICKETS_PER_HOLD, event.available, canStillBuy)
+  // A lucky-draw winner buys from the draw's own tickets, up to the per-winner limit.
+  const ticketsOnOffer = luckyWin ? draw.ticketsLeft : event.available
+  const maxChoice = Math.min(luckyWin ? draw.perWinner : MAX_TICKETS_PER_HOLD, ticketsOnOffer, canStillBuy)
 
   return (
     <section>
@@ -172,6 +178,16 @@ export function EventPage() {
       <Alert kind="info">{notice}</Alert>
 
       {hasRoom && <p className="muted">This sale has a waiting room ({event.admissionPerSecond} people let in per second).</p>}
+      {draw ? (
+        <LuckyDrawPanel draw={draw} eventId={event.id} userId={user?.id} />
+      ) : (
+        event.lotteryTickets > 0 &&
+        !event.lotteryClosedAt && (
+          <p className="muted">
+            🎟 {event.lotteryTickets} of the tickets go to a lucky draw among everyone in the waiting room.
+          </p>
+        )
+      )}
 
       {page.hold ? (
         <div>
@@ -193,7 +209,7 @@ export function EventPage() {
           </Link>{' '}
           {hasRoom ? 'to join the queue.' : 'to hold tickets.'}
         </p>
-      ) : hasRoom && !admitted ? (
+      ) : hasRoom && !admitted && !luckyWin ? (
         // You can queue before the sale opens; admission starts when it does.
         <WaitingRoom
           status={queue.status}
@@ -204,8 +220,8 @@ export function EventPage() {
         />
       ) : !event.onSale ? (
         <p>On sale in {formatCountdown(saleSecondsLeft)}</p>
-      ) : event.available === 0 ? (
-        <p>Sold out.</p>
+      ) : ticketsOnOffer === 0 ? (
+        <p>{luckyWin ? 'All lucky-draw tickets are taken or held right now.' : 'Sold out.'}</p>
       ) : canStillBuy <= 0 ? (
         <p>
           You've bought the maximum of {page.purchase.limit} tickets for this event.{' '}
@@ -213,7 +229,12 @@ export function EventPage() {
         </p>
       ) : (
         <form onSubmit={handleHold}>
-          {admitted && (
+          {luckyWin && (
+            <p>
+              🎉 <strong>Lucky draw:</strong> choose up to {draw.perWinner} lucky-draw ticket{draw.perWinner > 1 ? 's' : ''}.
+            </p>
+          )}
+          {admitted && !luckyWin && (
             <p>
               <strong>It's your turn!</strong> Choose your tickets within{' '}
               {formatCountdown(queue.status.passExpiresInSeconds)}.
