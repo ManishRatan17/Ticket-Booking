@@ -5,7 +5,7 @@ docker compose up -d     # the server tests use the real PostgreSQL and Redis
 npm test                 # server (node:test) then client (Vitest)
 ```
 
-Today: **352 server tests + 40 client tests**, all passing (about 10–15 s for the server suite).
+Today: **363 server tests + 41 client tests**, all passing (about 10–15 s for the server suite).
 
 ## How the server tests run
 
@@ -35,6 +35,7 @@ Kept outside `test/` because Node runs every file inside `test/` as a test.
 | [cookies.js](../server/test-support/cookies.js) | read `Set-Cookie`, build `Cookie` headers, list flags (Node's `fetch` has no cookie jar) |
 | [fake-google.js](../server/test-support/fake-google.js) | a fake OpenID provider: RSA keys, JWKS, codes, PKCE check, signed ID tokens |
 | [admin-lock.js](../server/test-support/admin-lock.js) | a PostgreSQL **advisory lock** so the "last admin" tests run only when no other test file has admin users: files that create admins hold it shared, the last-admin tests take it exclusive. (Found when the dev database lost its own admin: the tests stopped skipping and then failed in the full parallel run, because another file's admin appeared mid-test. Alone, they passed.) |
+| [fake-razorpay.js](../server/test-support/fake-razorpay.js) | a fake Razorpay: creates orders (checks Basic auth), produces the checkout window's signed answer, and signed webhook deliveries |
 | [fake-turnstile.js](../server/test-support/fake-turnstile.js) | a fake Cloudflare `siteverify`: checks the secret, single-use `human-…` tokens, records every call, and can answer 500 or drop the connection |
 | [users.js](../server/test-support/users.js) | creates hundreds of signed-in users fast (user + session rows + tokens signed by the real code) without 300 argon2 logins |
 | [redis-cleanup.js](../server/test-support/redis-cleanup.js) | `deleteEventKeys(ids)`: removes a test's stock keys, holds, user links and expiry-index entries in one place (replaced 7 hand-written copies; one of them forgot hold keys and left hundreds of stale holds in the dev Redis) |
@@ -79,6 +80,7 @@ Kept outside `test/` because Node runs every file inside `test/` as a test.
 | `admin-console.test.js` | admins can't buy (hold, join, order, pay → 403) or send support requests; Manage events live numbers and statuses; editing before / after the sale; a lucky draw keeps its waiting room; admins only; bot-strike notifications with the email, hand-made restrictions not "new", mark as seen |
 | `website.test.js` | the API serving the built website (Phase 7): pages → index.html, `/api` stays JSON (JSON 404), year-long caching of built files, the security policy |
 | `mail.test.js` | real email against a fake Resend: the request it receives, a 500 makes delivery fail (so the job retries), `sendMail` queues a `send-email` job that isn't kept after delivery |
+| `razorpay.test.js` | Razorpay test mode against a fake Razorpay: public key only, fake provider off, one Razorpay order for the exact amount, a valid signature pays (once), a forged signature or another order's payment → 400, the webhook alone pays, page + webhook at once → tickets once, a failed attempt keeps the order payable, webhook signature / duplicates / unknown orders, a wrong amount fails |
 | `holds-http.test.js` | the holds API: every status code, IDOR, CSRF, lazy release on read, **300 users × 100 tickets over HTTP** |
 
 ## Client test files (Vitest)
@@ -138,6 +140,7 @@ A test only proves something once it has been seen to **fail for the right reaso
 | sold-out fast path ignoring the person's own (expired) hold | the fast-path test |
 | "admins can't buy" removed from the hold route | the admin-booking test |
 | the admin email alert after an automatic strike removed | the email test |
+| Razorpay: payment not checked against THIS order / any signature accepted | the forged-payment test (both) |
 | "already restricted" guard removed from `strike()` | the two-strikes-at-once test |
 | payment check ignoring a raised limit | the approval test |
 | client createEvent sending only name/tickets/sale time (the old code) | the client createEvent test |

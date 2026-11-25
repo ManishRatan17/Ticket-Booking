@@ -26,14 +26,16 @@ export function createApp() {
 
   // Middleware runs top to bottom for every request.
   // Security headers. The Content-Security-Policy (which scripts and frames a page may load) is
-  // helmet's strict default, plus Cloudflare's "are you a person?" widget: its script, and the frame
-  // it draws in. (Matters once the API serves the website itself, in production.)
+  // helmet's strict default, plus Cloudflare's "are you a person?" widget and Razorpay's checkout window:
+  // their scripts and the frames they draw in. (Matters once the API serves the website, in production.)
   app.use(
     helmet({
       contentSecurityPolicy: {
         directives: {
-          scriptSrc: ["'self'", 'https://challenges.cloudflare.com'],
-          frameSrc: ["'self'", 'https://challenges.cloudflare.com'],
+          scriptSrc: ["'self'", 'https://challenges.cloudflare.com', 'https://checkout.razorpay.com'],
+          frameSrc: ["'self'", 'https://challenges.cloudflare.com', 'https://api.razorpay.com', 'https://checkout.razorpay.com'],
+          connectSrc: ["'self'", 'https://*.razorpay.com'],
+          imgSrc: ["'self'", 'data:', 'https://*.razorpay.com'],
         },
       },
     }),

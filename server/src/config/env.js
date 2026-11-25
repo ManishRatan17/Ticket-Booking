@@ -61,6 +61,23 @@ function botCheckSettings() {
   };
 }
 
+// Razorpay: both keys or neither (test keys start with rzp_test_). The webhook secret is the one you
+// type when adding the webhook in Razorpay's dashboard.
+function razorpaySettings() {
+  const keyId = process.env.RAZORPAY_KEY_ID || '';
+  const keySecret = process.env.RAZORPAY_KEY_SECRET || '';
+  if (Boolean(keyId) !== Boolean(keySecret)) {
+    throw new Error('Set both RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET, or neither (see server/.env.example)');
+  }
+  return {
+    enabled: Boolean(keyId),
+    keyId, // public: the checkout window needs it
+    keySecret, // private: creating orders, checking payment signatures
+    webhookSecret: process.env.RAZORPAY_WEBHOOK_SECRET || '',
+    apiUrl: process.env.RAZORPAY_API_URL || 'https://api.razorpay.com/v1', // tests point it at a fake
+  };
+}
+
 // Express "trust proxy": which proxies may tell us the client's real IP (X-Forwarded-For).
 //   unset/"false" → trust nobody: req.ip is whoever connected to us (safe default)
 //   "1"           → trust ONE proxy in front of us (typical on Railway/Render)
@@ -145,6 +162,9 @@ export const env = {
     webhookSecret: paymentWebhookSecret(),
     // How long the fake provider waits before calling our webhook (a real one takes seconds).
     fakeDelayMs: Number(process.env.FAKE_PAYMENT_DELAY_MS ?? 800),
+    // Razorpay (Phase 7). With a key id + secret, payments go through Razorpay and the fake provider
+    // is switched OFF; without them (development, tests, the load test) the fake provider is used.
+    razorpay: razorpaySettings(),
   },
   // Email (Phase 7). Without a Resend key, emails are printed in the console (development).
   mail: {

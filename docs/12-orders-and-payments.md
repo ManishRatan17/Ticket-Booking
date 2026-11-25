@@ -96,3 +96,36 @@ Behaves like Razorpay/Stripe where it matters: the browser gets only a payment i
 - **Refunds** are only logged (`[refund] …`); a real refund call comes with Razorpay.
 - **Live updates:** the checkout page polls every 0.5 s; Phase 4 brings push updates.
 - **Automatic expiry** of everyone's holds and orders: Phase 3.
+
+## Razorpay, test mode (Phase 7)
+
+With `RAZORPAY_KEY_ID` + `RAZORPAY_KEY_SECRET` set, payments go through **Razorpay** and the fake provider is **switched off** (`404 FAKE_PAYMENTS_OFF`: nobody gets tickets by pressing a fake "Pay"). Without them (development, tests, the load test) the fake provider is used. The page asks `GET /api/config` which one to show.
+
+```
+1. "Pay with Razorpay" → POST /api/payments/razorpay/:orderId
+      our server → Razorpay: create an ORDER for exactly the order's amount (Basic auth: key id + SECRET)
+      stored on our order (provider_order_id); asking again reuses it
+2. the page opens Razorpay's own window (their script and iframe): card details never touch us
+3. paid → the window gives the page { razorpay_payment_id, razorpay_order_id, razorpay_signature }
+      → POST /api/payments/razorpay/:orderId/verify
+      the server checks: signature = HMAC-SHA256(KEY SECRET, "order_id|payment_id"), and that the
+      Razorpay order is THIS order's  →  the SAME payment transaction as webhooks (below)
+4. Razorpay ALSO calls POST /api/webhooks/razorpay, signed with the WEBHOOK SECRET over the raw body
+      (X-Razorpay-Signature): payment.captured → paid. The backup if the tab closed before step 3.
+```
+
+[razorpay.js](../server/src/modules/payments/razorpay.js) is plain HTTPS + HMAC (no SDK); signatures are compared in constant time.
+
+| Rule | Why |
+|---|---|
+| Steps 3 and 4 both feed the **same transaction** (processed deliveries, order lock, consume the hold, ticket numbers, late-payment rules, the purchase cap) | one source of truth for "paid", whoever reports it first. Both can arrive: the second finds the order already paid (tested: tickets taken once) |
+| The signature must match **and** the Razorpay order must be **this** order's | otherwise a genuinely paid cheap order could be "reused" to pay another (tested: Bob's real payment sent for Ann's order → 400) |
+| `payment.failed` doesn't fail the order | it's ONE failed attempt: in Razorpay's window the person can retry with another card at once. Failing the order would turn that retry's success into a refund. If they give up, the order expires after 5 minutes like any unpaid order |
+| The amount comes from **our** order (step 3) or Razorpay's payment (step 4), and a mismatch fails the order | never sell for the wrong price (tested) |
+| A Razorpay order is created once per our order (`UPDATE … WHERE provider_order_id IS NULL`) | double clicks don't create two payable orders |
+
+**Test mode:** Razorpay's test keys (`rzp_test_…`) take no real money; pay with Razorpay's test cards (e.g. `4111 1111 1111 1111`, any future date, any CVV) or test UPI `success@razorpay`. In the dashboard, make sure payments are **captured automatically** (Account & Settings → Payment capture), otherwise `payment.captured` never comes.
+
+**Content-Security-Policy:** the page may load `https://checkout.razorpay.com` (script) and Razorpay's frames (`api.razorpay.com`, `checkout.razorpay.com`).
+
+*Tested in [razorpay.test.js](../server/test/razorpay.test.js) against a fake Razorpay ([fake-razorpay.js](../server/test-support/fake-razorpay.js), same shapes and signatures): the page gets the public key id, never the secret; the fake provider is off; a Razorpay order for exactly the amount, created once; someone else's order → 404, not pending → 409; a valid signature → paid with ticket numbers, confirming twice → `duplicate`; a forged signature or another order's real payment → 400, still pending; `payment.captured` webhook alone → paid; page + webhook at the same moment → one payment, tickets once; a failed attempt keeps the order pending and a retry pays; wrong webhook signature → 401, the same delivery twice → duplicate, unknown orders / other events ignored; a wrong amount → failed. Mutations: not checking the payment belongs to this order, or accepting any signature → the forged-payment test fails. **Not yet tried with your real test keys** (needs your Razorpay account).*

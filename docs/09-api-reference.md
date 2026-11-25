@@ -200,6 +200,17 @@ Admins (`/api/admin`, role admin):
 ### `POST /admin/support/:id/decision`
 Body `{ "decision": "approved" | "declined" | "closed", "message"?: "…" }` → `200 { "request" }` · `409 REQUEST_NOT_OPEN` (already decided) · `409 NOT_APPROVABLE` (only more_tickets can be approved). Approving a `more_tickets` request raises that person's purchase limit for that event to 4 + extraTickets, in the same transaction.
 
+## Razorpay (test mode)
+
+When the server has Razorpay keys (`GET /api/config` → `payments: { provider: "razorpay", keyId }`; otherwise `{ provider: "fake" }`). See [12](12-orders-and-payments.md#razorpay-test-mode-phase-7).
+
+### `POST /payments/razorpay/:orderId`  · signed in · not admins · limit 10/min
+→ `200 { "keyId", "razorpayOrderId", "amountPaise", "currency": "INR", "description" }` (the same Razorpay order on every call) · `404 ORDER_NOT_FOUND` · `409 ORDER_NOT_PENDING` · `503 PAYMENTS_UNAVAILABLE`
+### `POST /payments/razorpay/:orderId/verify`
+Body: Razorpay's answer `{ "razorpay_order_id", "razorpay_payment_id", "razorpay_signature" }` → `200 { "outcome": "paid" | "duplicate" | "already_paid" | … }` · `400 PAYMENT_SIGNATURE_INVALID`
+### `POST /api/webhooks/razorpay`  · called by Razorpay
+Signed: `X-Razorpay-Signature` = HMAC-SHA256(webhook secret, raw body). `payment.captured` → paid; `payment.failed` → `attempt_failed` (the order stays pending: the person may retry); others ignored. `401 INVALID_SIGNATURE`. With Razorpay on, `POST /payments/fake/:orderId` → `404 FAKE_PAYMENTS_OFF`.
+
 ## Admins run the sale
 
 Admins → `403 ADMINS_CANNOT_BUY` on `POST /events/:id/holds`, `POST /events/:id/queue`, `POST /orders`, `POST /payments/fake/:orderId`; `403 ADMINS_USE_INBOX` on `POST /support/requests` and `POST /support/requests/:id/messages`. See [20](20-admin-side.md).

@@ -43,7 +43,7 @@ How to put the app online. Everything the **code** needs is done and tested; wha
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REDIRECT_URI` | Google Cloud Console; redirect `https://your-app…/api/auth/google/callback` | optional ("Continue with Google") |
 | `PORT` | set by the host | automatic |
 
-**Payments:** until Razorpay test mode is added, the deployed demo uses the built-in **fake** provider (signed webhooks, retries; no real money). It's the payment page's "Pay" / "Fail" buttons.
+**Payments:** set `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET` and `RAZORPAY_WEBHOOK_SECRET` (Razorpay **test** keys: no real money) and add the webhook `https://<your domain>/api/webhooks/razorpay` (event `payment.captured`) in Razorpay's dashboard. Without them the deployed demo uses the built-in fake provider. See [12 § Razorpay](12-orders-and-payments.md#razorpay-test-mode-phase-7).
 
 ## Email (Resend)
 
@@ -86,6 +86,6 @@ Why Railway: it builds the Dockerfile straight from your GitHub repo, PostgreSQL
 
 ## Still to do in Phase 7
 
-- **Razorpay test mode** (needs your Razorpay test keys: free, no KYC for test mode).
+- **Razorpay with your test keys**: the code is done and tested against a fake Razorpay; try it with your keys.
 - **The demo video** (2 minutes, script in the final report).
 - **Styling**: yours, later.

@@ -39,6 +39,38 @@ paymentsRouter.post(
   },
 );
 
+// ---------- browser: Razorpay (test mode) ----------
+const orderParams = z.object({ orderId: z.coerce.number().int().positive() });
+const bookingGuards = [authenticate, customersOnly, requireNotRestricted, payPerUser];
+
+paymentsRouter.post('/payments/razorpay/:orderId', ...bookingGuards, validate({ params: orderParams }), async (req, res) => {
+  res.json(await paymentsService.startRazorpayPayment({ orderId: req.validated.params.orderId, userId: req.user.id }));
+});
+
+paymentsRouter.post(
+  '/payments/razorpay/:orderId/verify',
+  ...bookingGuards,
+  validate({
+    params: orderParams,
+    body: z.object({
+      razorpay_order_id: z.string().min(1).max(100),
+      razorpay_payment_id: z.string().min(1).max(100),
+      razorpay_signature: z.string().min(1).max(200),
+    }),
+  }),
+  async (req, res) => {
+    const b = req.validated.body;
+    const result = await paymentsService.confirmRazorpayPayment({
+      orderId: req.validated.params.orderId,
+      userId: req.user.id,
+      razorpayOrderId: b.razorpay_order_id,
+      razorpayPaymentId: b.razorpay_payment_id,
+      razorpaySignature: b.razorpay_signature,
+    });
+    res.json({ outcome: result.outcome });
+  },
+);
+
 // ---------- provider: the webhook ----------
 
 const webhookSchema = z.object({
@@ -70,5 +102,16 @@ webhooksRouter.post('/payments', express.raw({ type: 'application/json', limit: 
   }
 
   const result = await paymentsService.handlePaymentEvent(event);
+  res.json({ received: true, ...result });
+});
+
+// Razorpay's webhook: raw bytes too (the signature covers them exactly). Answers 2xx for every outcome
+// ("handled, stop retrying"); only a crash answers 500, which makes Razorpay retry.
+webhooksRouter.post('/razorpay', express.raw({ type: 'application/json', limit: '100kb' }), async (req, res) => {
+  const result = await paymentsService.handleRazorpayWebhook({
+    rawBody: Buffer.isBuffer(req.body) ? req.body : Buffer.alloc(0),
+    signature: req.get('x-razorpay-signature'),
+    eventId: req.get('x-razorpay-event-id'),
+  });
   res.json({ received: true, ...result });
 });

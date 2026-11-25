@@ -18,6 +18,7 @@ The database structure lives in numbered SQL files in [server/migrations/](../se
 | `002_auth.sql` | users get `role`, `password_changed_at`, lowercase-email check; new `sessions`, `refresh_tokens`, `password_reset_tokens` |
 | `003_google_login.sql` | `password_hash` becomes optional; users get `email_verified_at`; new `user_identities`; new revoke reason `account_linked` |
 | `005_waiting_room.sql` | events get `admission_per_second` (NULL = no waiting room) |
+| `012_razorpay.sql` | orders get `provider_order_id` (the Razorpay order, unique): created once per order; webhooks find our order by it |
 | `011_admin_notifications.sql` | `account_restrictions` get `acknowledged_at` / `acknowledged_by`: an automatic restriction is "new" for admins until one marks it as seen (hand-made ones start as seen) |
 | `010_moderation.sql` | `account_restrictions` (user, kind suspended/banned, reason, evidence JSON, starts/ends — NULL = permanent, created_by NULL = automatic, lifted, overturned); support requests get the kind `appeal` |
 | `009_support.sql` | `support_requests` (kind, event, extra tickets, status, decided by/at; one OPEN request per person + kind + event via a partial unique index), `support_messages` (from_admin, body 1–2,000), `purchase_limit_overrides` (event + user → extra 1–4: the raised limit) |

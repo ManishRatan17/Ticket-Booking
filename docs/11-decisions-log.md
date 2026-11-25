@@ -193,6 +193,10 @@ Every significant choice, the alternatives considered, and why. Newest at the bo
 | Resend over its HTTP API | SMTP; an SDK | one `fetch`, no new dependency; free tier |
 | Emails through the job queue | send inline | retries and crash-safety (a reset email used to be lost on a crash) |
 | Railway recommended | Render free tier; Fly.io; a VPS | Dockerfile from GitHub, managed PostgreSQL + Redis, a worker service, simple |
+| Razorpay over plain HTTPS + HMAC | the Razorpay SDK | three small functions; no dependency; easy to fake in tests |
+| Page confirmation (signature) AND webhook, both into the same transaction | webhook only | the page gets an answer at once; the webhook covers closed tabs; idempotency makes both safe |
+| A Razorpay `payment.failed` doesn't fail the order | fail it | it's one attempt; the person can retry in the same window; expiry handles giving up |
+| Fake provider OFF when Razorpay is configured | keep both | nobody should get tickets with a fake "Pay" on a real deployment |
 
 ## Frontend
 

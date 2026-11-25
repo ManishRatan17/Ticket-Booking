@@ -6,3 +6,9 @@ import { api } from './client.js'
 // outcome: 'success' | 'failure' — the fake provider's two buttons.
 export const startFakePayment = (orderId, outcome) =>
   api(`/payments/fake/${encodeURIComponent(orderId)}`, { method: 'POST', body: { outcome } })
+
+// Razorpay (Phase 7): create (once) the Razorpay order for this order, then report the checkout
+// window's answer so the server can check its signature.
+export const startRazorpayPayment = (orderId) => api(`/payments/razorpay/${encodeURIComponent(orderId)}`, { method: 'POST' })
+export const verifyRazorpayPayment = (orderId, answer) =>
+  api(`/payments/razorpay/${encodeURIComponent(orderId)}/verify`, { method: 'POST', body: answer })

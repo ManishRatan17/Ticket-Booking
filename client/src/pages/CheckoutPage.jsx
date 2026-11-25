@@ -1,8 +1,12 @@
-// /checkout/:id — pay for an order (with the fake payment provider), then see the result.
+// /checkout/:id — pay for an order (Razorpay when the server has it, else the fake provider), then
+// see the result.
 import { useCallback, useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { getOrder } from '../api/orders.js'
-import { startFakePayment } from '../api/payments.js'
+import { startFakePayment, startRazorpayPayment, verifyRazorpayPayment } from '../api/payments.js'
+import { getPublicConfig } from '../api/config.js'
+import { openRazorpayCheckout } from '../lib/razorpayCheckout.js'
+import { useAuth } from '../auth/useAuth.js'
 import { Alert } from '../components/Alert.jsx'
 import { useCountdown } from '../hooks/useCountdown.js'
 import { errorMessage } from '../lib/errorMessages.js'
@@ -14,6 +18,7 @@ const FAILURE_TEXT = {
   amount_mismatch: 'The amount paid did not match the order. The payment will be refunded.',
   sold_out_after_expiry:
     'Your payment arrived after your hold expired, and the tickets were sold out by then. The payment will be refunded.',
+  purchase_limit: 'This payment would take you over the per-person ticket limit. The payment will be refunded.',
 }
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
@@ -23,6 +28,19 @@ export function CheckoutPage() {
   const [page, setPage] = useState(null) // { order, offset }
   const [error, setError] = useState(null)
   const [paying, setPaying] = useState(false)
+  const [provider, setProvider] = useState(null) // 'razorpay' | 'fake' (from the server)
+  const { user } = useAuth()
+
+  useEffect(() => {
+    let active = true
+    getPublicConfig().then(
+      (config) => active && setProvider(config.payments?.provider ?? 'fake'),
+      () => active && setProvider('fake'),
+    )
+    return () => {
+      active = false
+    }
+  }, [])
 
   const reload = useCallback(async () => {
     try {
@@ -49,6 +67,35 @@ export function CheckoutPage() {
   const order = page?.order
   // When the deadline passes, ask the server: it marks the order expired and frees the tickets.
   const secondsLeft = useCountdown(order?.status === 'pending' ? order.expiresAt : null, page?.offset ?? 0, reload)
+
+  // The result is decided on the SERVER (signature check or webhook): ask it until the order isn't pending.
+  async function waitForResult() {
+    for (let attempt = 0; attempt < 30; attempt++) {
+      const latest = await reload()
+      if (!latest || latest.status !== 'pending') return
+      await sleep(500)
+    }
+  }
+
+  async function payWithRazorpay() {
+    setPaying(true)
+    setError(null)
+    try {
+      const details = await startRazorpayPayment(id)
+      const answer = await openRazorpayCheckout(details, {
+        email: user?.email,
+        onAttemptFailed: (reason) => setError(`That payment attempt failed${reason ? `: ${reason}` : ''}. You can try again.`),
+      })
+      if (!answer) return // window closed without paying: nothing changed, the order is still pending
+      setError(null)
+      await verifyRazorpayPayment(id, answer)
+      await waitForResult()
+    } catch (err) {
+      setError(errorMessage(err))
+    } finally {
+      setPaying(false)
+    }
+  }
 
   async function pay(outcome) {
     setPaying(true)
@@ -97,6 +144,20 @@ export function CheckoutPage() {
           </p>
           {paying ? (
             <p>Waiting for the payment provider to confirm…</p>
+          ) : provider === 'razorpay' ? (
+            <>
+              <p>
+                <button type="button" onClick={payWithRazorpay}>
+                  Pay {formatMoney(order.amountPaise)} with Razorpay
+                </button>
+              </p>
+              <p className="muted">
+                Razorpay <strong>test mode</strong>: no real money moves. Use one of Razorpay's test cards (e.g. 4111
+                1111 1111 1111, any future date, any CVV) or test UPI <code>success@razorpay</code>.
+              </p>
+            </>
+          ) : provider === null ? (
+            <p className="muted">Loading payment options…</p>
           ) : (
             <p>
               <button type="button" onClick={() => pay('success')}>
@@ -107,7 +168,7 @@ export function CheckoutPage() {
               </button>
             </p>
           )}
-          <p className="muted">This is a fake payment provider for development — no real money moves.</p>
+          {provider === 'fake' && <p className="muted">This is a fake payment provider for development — no real money moves.</p>}
         </>
       )}
 

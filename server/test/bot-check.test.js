@@ -67,7 +67,8 @@ const userExists = async (address) => (await pool.query('SELECT 1 FROM users WHE
 test('GET /api/config gives the page the PUBLIC site key (never the secret)', async () => {
   const res = await fetch(`${baseUrl}/api/config`);
   const body = await res.json();
-  assert.deepEqual(body, { botCheck: { siteKey: 'test-site-key' } });
+  assert.deepEqual(body.botCheck, { siteKey: 'test-site-key' });
+  assert.deepEqual(body.payments, { provider: 'fake' }, 'no Razorpay keys here: the fake provider');
   assert.ok(!JSON.stringify(body).includes(SECRET));
 });
 

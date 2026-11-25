@@ -8,6 +8,8 @@ import { ensureStock } from '../events/events.service.js';
 import * as eventsRepository from '../events/events.repository.js';
 import * as ordersRepository from '../orders/orders.repository.js';
 import { startPayment } from './fake-provider.js';
+import * as razorpay from './razorpay.js';
+import { env } from '../../config/env.js';
 import { sendMail } from '../../lib/mailer.js';
 import { formatRupees } from '../../lib/money.js';
 
@@ -15,15 +17,100 @@ import { formatRupees } from '../../lib/money.js';
 // Starting a (fake) payment — called by the browser's "Pay" button
 // ---------------------------------------------------------------------------
 
-export async function startFakePayment({ orderId, userId, outcome, webhookUrl }) {
+// The person's own order, still waiting for payment.
+async function payableOrder(orderId, userId) {
   const order = await ordersRepository.findOrderForUser(pool, orderId, userId);
   if (!order) throw new AppError(404, 'ORDER_NOT_FOUND', 'No order with this id');
   if (order.status !== 'pending') {
     throw new AppError(409, 'ORDER_NOT_PENDING', `This order is already ${order.status}`, { status: order.status });
   }
+  return order;
+}
+
+export async function startFakePayment({ orderId, userId, outcome, webhookUrl }) {
+  // With real payments configured, the fake provider is OFF: nobody gets tickets by pressing "Pay".
+  if (env.payments.razorpay.enabled) throw new AppError(404, 'FAKE_PAYMENTS_OFF', 'Payments go through Razorpay');
+  const order = await payableOrder(orderId, userId);
   // Note: the browser only STARTS the payment. Whether the order is paid is decided by the
   // signed webhook below — never by anything the browser says.
   return startPayment({ orderId, amountPaise: order.amountPaise, outcome, webhookUrl });
+}
+
+// ---------------------------------------------------------------------------
+// Razorpay (test mode)
+// ---------------------------------------------------------------------------
+
+// Step 1: "Pay" clicked. Create (once) the Razorpay order for exactly this amount, and give the page
+// what its checkout window needs. Never the secret.
+export async function startRazorpayPayment({ orderId, userId }) {
+  if (!env.payments.razorpay.enabled) throw new AppError(404, 'RAZORPAY_OFF', 'Razorpay is not configured on this server');
+  const order = await payableOrder(orderId, userId);
+  let razorpayOrderId = order.providerOrderId;
+  if (!razorpayOrderId) {
+    const created = await razorpay.createOrder({
+      amountPaise: order.amountPaise,
+      receipt: `order_${order.id}`,
+      notes: { orderId: String(order.id), eventName: order.eventName },
+    });
+    razorpayOrderId = await ordersRepository.setProviderOrderId(pool, order.id, created.id);
+  }
+  return {
+    keyId: env.payments.razorpay.keyId,
+    razorpayOrderId,
+    amountPaise: order.amountPaise,
+    currency: 'INR',
+    description: `${order.quantity} × ${order.eventName}`,
+  };
+}
+
+// Step 3: the page reports Razorpay's answer. A valid signature proves Razorpay says it's paid →
+// the SAME payment transaction as webhooks (idempotent: the webhook for this payment may come too).
+export async function confirmRazorpayPayment({ orderId, userId, razorpayOrderId, razorpayPaymentId, razorpaySignature }) {
+  const order = await ordersRepository.findOrderForUser(pool, orderId, userId);
+  if (!order) throw new AppError(404, 'ORDER_NOT_FOUND', 'No order with this id');
+  if (!order.providerOrderId || order.providerOrderId !== razorpayOrderId || !razorpay.isValidPaymentSignature({ razorpayOrderId, razorpayPaymentId, razorpaySignature })) {
+    throw new AppError(400, 'PAYMENT_SIGNATURE_INVALID', 'This payment confirmation could not be verified');
+  }
+  return handlePaymentEvent(
+    { id: `rzp_pay_${razorpayPaymentId}`, type: 'payment.succeeded', data: { orderId, paymentId: razorpayPaymentId, amountPaise: order.amountPaise } },
+    'razorpay',
+  );
+}
+
+// Step 4: Razorpay's webhook (signed with the webhook secret over the raw body).
+//   payment.captured → paid · anything else → acknowledged, ignored
+// payment.failed is ONE failed attempt: in Razorpay's window the person can try another card right
+// away. Failing the whole order would turn that retry's success into a refund. So the order stays
+// pending; if they give up, it expires after its 5 minutes like any unpaid order (tickets back).
+export async function handleRazorpayWebhook({ rawBody, signature, eventId }) {
+  if (!razorpay.isValidWebhookSignature(rawBody, signature)) {
+    throw new AppError(401, 'INVALID_SIGNATURE', 'Webhook signature is missing or wrong');
+  }
+  let event;
+  try {
+    event = JSON.parse(rawBody.toString('utf8'));
+  } catch {
+    throw new AppError(400, 'INVALID_WEBHOOK', 'Webhook body is not JSON');
+  }
+  if (event.event === 'payment.failed') {
+    console.log(`[razorpay] a payment attempt failed for ${event.payload?.payment?.entity?.order_id}: the person may retry`);
+    return { outcome: 'attempt_failed' };
+  }
+  const type = event.event === 'payment.captured' ? 'payment.succeeded' : null;
+  const payment = event.payload?.payment?.entity;
+  if (!type || !payment?.id || !payment?.order_id) return { outcome: 'ignored' };
+
+  const orderId = await ordersRepository.findOrderIdByProviderOrderId(pool, payment.order_id);
+  if (!orderId) return { outcome: 'unknown_order' };
+  return handlePaymentEvent(
+    {
+      // Razorpay's event id makes repeats of the SAME delivery harmless; without it, one per payment + kind.
+      id: eventId || `rzp_evt_${payment.id}_${event.event}`,
+      type,
+      data: { orderId, paymentId: payment.id, amountPaise: Number(payment.amount) },
+    },
+    'razorpay',
+  );
 }
 
 // ---------------------------------------------------------------------------

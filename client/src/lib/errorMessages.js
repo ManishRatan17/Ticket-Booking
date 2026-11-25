@@ -39,6 +39,9 @@ const MESSAGES = {
   CANNOT_RESTRICT_SELF: 'You cannot restrict your own account.',
   NOT_IN_FORCE: 'This restriction is no longer in force.',
   RESTRICTION_NOT_FOUND: 'That restriction no longer exists.',
+  // Payments
+  PAYMENT_SIGNATURE_INVALID: 'The payment could not be verified. If money was taken, it will be confirmed or refunded automatically.',
+  PAYMENTS_UNAVAILABLE: 'The payment provider is not answering. Please try again in a moment.',
   // Admins run the sale
   ADMINS_CANNOT_BUY: "Admin accounts can't buy tickets. Use a normal account to buy.",
   ADMINS_USE_INBOX: 'Admins answer requests in the Support inbox.',

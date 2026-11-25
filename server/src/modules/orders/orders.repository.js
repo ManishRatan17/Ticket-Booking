@@ -3,7 +3,7 @@
 // One order with its event name and ticket numbers (empty until paid).
 const ORDER_SELECT = `
   SELECT o.id, o.user_id, o.event_id, e.name AS event_name, o.quantity, o.amount_paise, o.status, o.pool,
-         o.hold_id, o.idempotency_key, o.payment_id, o.expires_at, o.paid_at, o.failure_reason, o.created_at,
+         o.hold_id, o.idempotency_key, o.payment_id, o.provider_order_id, o.expires_at, o.paid_at, o.failure_reason, o.created_at,
          COALESCE(array_agg(s.ticket_number ORDER BY s.ticket_number)
                   FILTER (WHERE s.ticket_number IS NOT NULL), '{}') AS ticket_numbers
     FROM orders AS o
@@ -21,6 +21,7 @@ function toOrder(row) {
     status: row.status, // pending → paid | failed | expired
     pool: row.pool, // 'main' or 'lottery' (lucky-draw tickets)
     holdId: row.hold_id,
+    providerOrderId: row.provider_order_id, // Razorpay's order id ("order_…"), once checkout started
     idempotencyKey: row.idempotency_key,
     paymentId: row.payment_id,
     expiresAt: row.expires_at,
@@ -77,6 +78,23 @@ export async function insertOrder(
 
 // Locks the order row until the transaction ends (the payment webhook uses this, so two
 // deliveries of the same payment can't both act on the order).
+// Remember the Razorpay order for one of ours. ONLY if it has none yet: two clicks at once create two
+// Razorpay orders, but just the first is kept (the other is never paid). Returns the one in effect.
+export async function setProviderOrderId(client, orderId, providerOrderId) {
+  const { rows } = await client.query(
+    `UPDATE orders SET provider_order_id = $2, updated_at = now() WHERE id = $1 AND provider_order_id IS NULL RETURNING provider_order_id`,
+    [orderId, providerOrderId],
+  );
+  if (rows.length) return rows[0].provider_order_id;
+  const again = await client.query('SELECT provider_order_id FROM orders WHERE id = $1', [orderId]);
+  return again.rows[0]?.provider_order_id ?? null;
+}
+
+export async function findOrderIdByProviderOrderId(client, providerOrderId) {
+  const { rows } = await client.query('SELECT id FROM orders WHERE provider_order_id = $1', [providerOrderId]);
+  return rows.length === 0 ? null : Number(rows[0].id);
+}
+
 export async function lockOrder(client, orderId) {
   const { rows } = await client.query('SELECT id, status FROM orders WHERE id = $1 FOR UPDATE', [orderId]);
   return rows[0] ?? null;
