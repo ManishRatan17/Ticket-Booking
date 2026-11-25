@@ -68,8 +68,13 @@ export async function createOrder({ userId, holdId, idempotencyKey }) {
       pool: hold.pool, // lucky-draw tickets stay lucky-draw tickets (needed to rebuild each pool's stock)
     });
   } catch (err) {
-    // A DIFFERENT key for a hold that already has an order (e.g. a second tab).
     if (isUniqueViolation(err, 'orders_hold_id_key')) {
+      // The SAME key, inserted by a parallel request a moment ago? Then this is a replay, not a
+      // conflict. (ON CONFLICT only covers the key's unique index; when 20 requests with one key race,
+      // PostgreSQL sometimes reports the clash on the hold's index first. Reproduced: ~15 in 1,200.)
+      const sameKey = await ordersRepository.findOrderByIdempotencyKey(pool, userId, idempotencyKey);
+      if (sameKey) return replay(sameKey, holdId);
+      // A DIFFERENT key for a hold that already has an order (e.g. a second tab).
       const existingId = await ordersRepository.findOrderIdByHold(pool, holdId);
       throw new AppError(409, 'ORDER_EXISTS', 'This hold already has an order', { orderId: existingId });
     }

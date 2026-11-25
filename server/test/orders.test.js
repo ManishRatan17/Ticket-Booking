@@ -10,6 +10,8 @@ import { closeConnections } from '../src/config/connections.js';
 import { stockKey } from '../src/modules/reservation/stock.js';
 import { createEvent } from '../src/modules/events/events.service.js';
 import { createSignedInUsers } from '../test-support/users.js';
+import { createHold } from '../src/modules/reservation/holds.js';
+import { createOrder } from '../src/modules/orders/orders.service.js';
 import { deleteEventKeys } from '../test-support/redis-cleanup.js';
 
 
@@ -114,6 +116,24 @@ test('race: 10 parallel requests with one key → exactly one order in the datab
 
   const { rows } = await pool.query('SELECT count(*)::int AS n FROM orders WHERE hold_id = $1', [h.id]);
   assert.equal(rows[0].n, 1);
+});
+
+// The HTTP race above is gentle (requests pass authenticate first and spread out). This one calls the
+// service directly: 30 rounds × 20 truly simultaneous calls with ONE key. It caught a real bug:
+// PostgreSQL sometimes reports the clash on the hold's unique index before the key's, and we
+// answered ORDER_EXISTS instead of replaying (~15 in 1,200 calls). Every call must get the same order.
+test('race (service level, 30 rounds × 20 at once): one key → every call gets the same order, never ORDER_EXISTS', async () => {
+  const e = await event(100);
+  const people = await users(30);
+  let wrong = 0;
+  for (const u of people) {
+    const { hold } = await createHold({ eventId: e.id, userId: u.id, quantity: 1 });
+    const key = randomUUID();
+    const results = await Promise.allSettled(Array.from({ length: 20 }, () => createOrder({ userId: u.id, holdId: hold.id, idempotencyKey: key })));
+    wrong += results.filter((r) => r.status === 'rejected').length;
+    assert.equal(new Set(results.filter((r) => r.status === 'fulfilled').map((r) => r.value.order.id)).size, 1);
+  }
+  assert.equal(wrong, 0, `${wrong} of 600 calls got an error instead of the same order`);
 });
 
 test('a DIFFERENT key for a hold that already has an order → 409 ORDER_EXISTS with its id', async () => {

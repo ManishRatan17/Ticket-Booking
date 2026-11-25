@@ -33,6 +33,7 @@ Browser                         Our server                                      
 2. The hold must exist, be yours, and still be running by **Redis's clock** (`404 HOLD_NOT_FOUND`, `409 HOLD_EXPIRED`).
 3. `INSERT … ON CONFLICT (user_id, idempotency_key) DO NOTHING` — atomic: 10 parallel clicks with one key create **one** order (tested; without `ON CONFLICT` the test fails).
 4. One order per hold (a partial unique index on `hold_id`): another key for the same hold → `409 ORDER_EXISTS` with the existing order's id (the frontend then opens that order).
+   **But first:** is there already an order with **this same key**? Then it's a replay, not a conflict. `ON CONFLICT` only covers the key's index; when many requests with one key insert at the same instant, PostgreSQL sometimes reports the clash on the **hold's** index first. We used to answer `ORDER_EXISTS` then: **reproduced ~15 times in 1,200 calls** (a stress script, 20 calls at once), found because a test failed once in a full run. Fixed in Phase "support inbox"; a service-level test (30 rounds × 20 at once, 0 errors allowed) now guards it, and fails with the old code.
 5. Same key, different hold → `422 IDEMPOTENCY_KEY_REUSED` (the client is confused; refuse rather than guess).
 
 The browser makes **one random key per hold** (`crypto.randomUUID()`) and re-sends it on every retry of that checkout.
