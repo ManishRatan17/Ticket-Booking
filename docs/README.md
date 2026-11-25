@@ -25,6 +25,7 @@ A ticketing platform built to stay **correct** (never sell a ticket twice) and *
 | 12 | [Orders & payments](12-orders-and-payments.md) | Checkout, idempotency keys, the fake provider, signed webhooks, ticket numbers, late payments, refunds |
 | 13 | [Background jobs](13-background-jobs.md) | BullMQ: delayed expiry jobs, the worker process, retries, dead-letter queue, idempotent jobs |
 | 14 | [Waiting room](14-waiting-room.md) | Admission control: a fair queue (sorted set), the admission worker, passes, the lobby |
+| 15 | [Protection](15-protection.md) | Abuse defences: rate limits on the ticket path, purchase cap, stream cap, bot check |
 
 ---
 
@@ -41,12 +42,12 @@ Roadmap from the original blueprint. ✅ done · 🟡 partly done · ⬜ not sta
 | 2 | Orders & payment: holds → pending orders → (fake) payment → paid, idempotency, `sold_tickets` | ✅ (demo data · orders + idempotency · fake provider + signed webhook · failures, late payments, refunds logged · My orders page) |
 | 3 | Expiry: a background worker (BullMQ) that releases expired holds for everyone | ✅ (delayed job per hold · worker process · safety-net sweep with a sorted-set index · admin Background jobs page with the dead-letter queue and Retry) |
 | 4 | Waiting room: queue, admission worker, live position | ✅ (4a queue + admission worker + pass check · 4b live updates (SSE) · 4c queue screen) |
-| 5 | Protection: rate limit on holds, duplicate-tab and bot defence | 🟡 (auth endpoints are rate-limited; holds are not yet) |
+| 5 | Protection: rate limit on holds, duplicate-tab and bot defence | 🟡 (5a rate limits on the ticket path ✅ · 5b purchase cap ⬜ · 5c stream cap ⬜ · 5d bot check ⬜) |
 | 6 | Proof: k6 load tests with thousands of users, SQL verification | ⬜ |
 | 7 | Polish: styling, Razorpay test mode, deployment, demo video | ⬜ |
 | 8 | Stretch: numbered seats, multiple servers, metrics | ⬜ |
 
-**Numbers today:** 238 server tests + 34 frontend tests, all passing. 300 signed-in users racing for 100 tickets over real HTTP → exactly 100 holds.
+**Numbers today:** 245 server tests + 34 frontend tests, all passing. 300 signed-in users racing for 100 tickets over real HTTP → exactly 100 holds.
 
 ---
 

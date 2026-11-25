@@ -64,6 +64,7 @@ Cookies are attached by the browser **automatically** — including to requests 
 | Google start | IP | 20 / minute |
 | forgot password | IP · email | 5 / hour · 3 / hour |
 | reset password | IP | 10 / 15 min |
+| ticket path (holds, queue, orders, payments) | user · IP | see [15-protection.md](15-protection.md#5a--rate-limits-on-the-ticket-path) |
 
 - **IP + email, not email alone:** a per-email limit would let an attacker lock any victim out by failing on purpose. With the IP in the key the attacker only locks themselves out (tested).
 - **Response:** `429 RATE_LIMITED`, `Retry-After` header, `RateLimit-Limit/Remaining/Reset` headers, message "Try again in N minutes".
@@ -96,7 +97,6 @@ See [04 § cookies](04-authentication.md#4-the-cookies-authcookiesjs). `COOKIE_S
 
 ## Not done yet (honest list)
 
-- Rate limit on ticket holds (Phase 5; one-hold-per-user already limits damage).
 - Email verification at registration and 2FA (future work).
 - A persistent audit-log table (role changes are only logged to the console).
 - A real email provider and HTTPS (deployment, Phase 7).

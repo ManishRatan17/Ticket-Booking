@@ -4,12 +4,14 @@ import { validate } from '../../middleware/validate.js';
 import { authenticate } from '../../middleware/authenticate.js';
 import { createOrderSchema, orderIdParamsSchema } from './orders.schemas.js';
 import * as ordersController from './orders.controller.js';
+import { orderPerUser } from '../../lib/ticketRateLimits.js';
 
 const router = Router();
 
 router.post(
   '/orders',
   authenticate,
+  orderPerUser,
   ordersController.requireIdempotencyKey,
   validate({ body: createOrderSchema }),
   ordersController.createOrder,

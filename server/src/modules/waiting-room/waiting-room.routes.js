@@ -5,14 +5,15 @@ import { validate } from '../../middleware/validate.js';
 import { authenticate } from '../../middleware/authenticate.js';
 import { eventIdParamsSchema } from '../events/events.schemas.js';
 import * as waitingRoom from './waiting-room.service.js';
+import { queueJoinPerIp, queueJoinPerUser, queueStatusPerUser, queueStreamPerUser } from '../../lib/ticketRateLimits.js';
 
 const router = Router();
 
-router.post('/events/:id/queue', authenticate, validate({ params: eventIdParamsSchema }), async (req, res) => {
+router.post('/events/:id/queue', queueJoinPerIp, authenticate, queueJoinPerUser, validate({ params: eventIdParamsSchema }), async (req, res) => {
   res.json(await waitingRoom.join({ eventId: req.validated.params.id, userId: req.user.id }));
 });
 
-router.get('/events/:id/queue', authenticate, validate({ params: eventIdParamsSchema }), async (req, res) => {
+router.get('/events/:id/queue', authenticate, queueStatusPerUser, validate({ params: eventIdParamsSchema }), async (req, res) => {
   res.json(await waitingRoom.getStatus({ eventId: req.validated.params.id, userId: req.user.id }));
 });
 
@@ -33,7 +34,7 @@ const STREAM_CHECK_MS = 1000;
 const STREAM_HEARTBEAT_MS = 15_000; // a comment line now and then stops proxies closing an idle stream
 const STREAM_MAX_MS = 10 * 60_000; // after 10 min the browser simply reconnects (and is re-authenticated)
 
-router.get('/events/:id/queue/stream', authenticate, validate({ params: eventIdParamsSchema }), async (req, res) => {
+router.get('/events/:id/queue/stream', authenticate, queueStreamPerUser, validate({ params: eventIdParamsSchema }), async (req, res) => {
   const args = { eventId: req.validated.params.id, userId: req.user.id };
   const first = await waitingRoom.getStatus(args); // 404 / 409 still answered as normal JSON errors
 

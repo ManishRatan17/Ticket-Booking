@@ -97,6 +97,14 @@ Every significant choice, the alternatives considered, and why. Newest at the bo
 | Queue opens before the sale (lobby) | only after the sale opens | fair order among people who came early; admission starts at sale time |
 | Must be signed in to queue | anonymous queue | one place per account; bots need accounts (Phase 5 adds more) |
 
+## Protection (Phase 5)
+
+| Decision | Rejected | Why |
+|---|---|---|
+| Ticket-path limits per **user** (strict) and per **IP** (generous) | per IP only | many real buyers share one IP (campus Wi-Fi); a per-user limit is exact |
+| Per-IP limit **before** `authenticate`, per-user after | both after | turn floods away before any cookie work; per-user needs `req.user` |
+| Reuse the fixed-window limiter | token bucket, sliding log | already tested; the window-edge burst is harmless when one hold per user is enforced anyway |
+
 ## Frontend
 
 | Decision | Alternatives | Why |

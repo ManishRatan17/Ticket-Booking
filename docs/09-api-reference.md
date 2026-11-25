@@ -123,7 +123,7 @@ Body `{ "name": "3–120 chars", "totalTickets": 1–100000, "saleStartsAt": "20
 ### `GET /events/:id`
 → `200 { "event": {…}, "serverTime" }` · `400` (not a positive integer) · `404 EVENT_NOT_FOUND`
 
-### `POST /events/:id/holds`  · signed in
+### `POST /events/:id/holds`  · signed in · limits 10/min per user, 120/min per IP
 Body `{ "quantity": 1 }` (JSON integer 1–4)
 → `201 { "hold": { "id", "eventId", "quantity", "expiresAt" }, "serverTime" }`
 · `409 SOLD_OUT` (`details.available`) · `409 HOLD_EXISTS` (`details.holdId`) · `409 SALE_NOT_STARTED` (`details.saleStartsAt`) · `404 EVENT_NOT_FOUND` · `400`
@@ -131,14 +131,14 @@ Body `{ "quantity": 1 }` (JSON integer 1–4)
 ### `GET /events/:id/holds/mine`  · signed in
 → `200 { "hold": {…} | null, "serverTime" }` (an expired hold is released and reported as `null`)
 
-### `DELETE /holds/:holdId`  · signed in
+### `DELETE /holds/:holdId`  · signed in · limit 20/min per user
 `holdId` must be a UUID → `204` · `404 HOLD_NOT_FOUND` (not yours, unknown, or already released)
 
-### `POST /events/:id/queue`  · signed in — join the waiting room (or re-join: you keep your place)
-### `GET /events/:id/queue`  · signed in — your status
+### `POST /events/:id/queue`  · signed in · limits 10/min per user, 60/min per IP — join the waiting room (or re-join: you keep your place)
+### `GET /events/:id/queue`  · signed in · limit 60/min per user — your status
 → `200 { "status": "waiting" | "admitted" | "not_in_queue", "position", "total", "passExpiresInSeconds", "admissionPerSecond", "saleStartsAt", "estimatedWaitSeconds", "serverTime" }` · `404 EVENT_NOT_FOUND` · `409 NO_WAITING_ROOM`
 
-### `GET /events/:id/queue/stream`  · signed in — **Server-Sent Events**
+### `GET /events/:id/queue/stream`  · signed in · limit 20 opens/min per user — **Server-Sent Events**
 `Content-Type: text/event-stream`; messages `event: status` with the same JSON as above, sent when the status or position changes; `: ping` every 15 s; ends when you are admitted or after 10 minutes (the browser reconnects).
 
 On a waiting-room event, `POST /events/:id/holds` without a pass → `403 NOT_ADMITTED`.
@@ -147,7 +147,7 @@ On a waiting-room event, `POST /events/:id/holds` without a pass → `403 NOT_AD
 
 ## Orders — `/api` (signed in)
 
-### `POST /orders`
+### `POST /orders`  · limit 10/min per user
 Header **`Idempotency-Key: <8–128 letters, digits, - or _>`** (the browser makes one random key per checkout attempt and re-sends it on retries). Body `{ "holdId": "<uuid>" }`. The amount comes from the database (`price_paise × quantity`); the order's deadline is the hold's deadline.
 → `201 { "order": {…}, "serverTime" }` the first time · `200` + header `Idempotent-Replayed: true` for a retry with the same key (same order)
 · `400 IDEMPOTENCY_KEY_REQUIRED` · `404 HOLD_NOT_FOUND` (unknown or not yours) · `409 HOLD_EXPIRED` · `409 ORDER_EXISTS` (`details.orderId`: this hold already has an order) · `422 IDEMPOTENCY_KEY_REUSED` (same key, different hold)
@@ -164,7 +164,7 @@ Order shape: `{ "id", "eventId", "eventName", "quantity", "amountPaise", "status
 
 ## Payments
 
-### `POST /api/payments/fake/:orderId`  · signed in · development payment provider
+### `POST /api/payments/fake/:orderId`  · signed in · limit 10/min per user · development payment provider
 Body `{ "outcome": "success" | "failure" }` → `202 { "paymentId" }` (the result arrives later by webhook; poll `GET /api/orders/:id`)
 · `404 ORDER_NOT_FOUND` · `409 ORDER_NOT_PENDING` (`details.status`)
 

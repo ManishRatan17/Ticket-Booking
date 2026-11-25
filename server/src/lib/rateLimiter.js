@@ -41,7 +41,8 @@ export function createLimiter({ name, limit, windowSeconds }) {
 }
 
 function humanize(seconds) {
-  return seconds < 60 ? `${seconds} seconds` : `${Math.ceil(seconds / 60)} minutes`;
+  const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
+  return seconds < 60 ? plural(seconds, 'second') : plural(Math.ceil(seconds / 60), 'minute');
 }
 
 // Express middleware.

@@ -9,6 +9,7 @@ import { validate } from '../../middleware/validate.js';
 import { authenticate } from '../../middleware/authenticate.js';
 import { isValidSignature, SIGNATURE_HEADER } from './signature.js';
 import * as paymentsService from './payments.service.js';
+import { payPerUser } from '../../lib/ticketRateLimits.js';
 
 // ---------- browser: start a fake payment ----------
 
@@ -17,6 +18,7 @@ export const paymentsRouter = Router();
 paymentsRouter.post(
   '/payments/fake/:orderId',
   authenticate,
+  payPerUser,
   validate({
     params: z.object({ orderId: z.coerce.number().int().positive() }),
     body: z.object({ outcome: z.enum(['success', 'failure']) }), // the fake form's two buttons
