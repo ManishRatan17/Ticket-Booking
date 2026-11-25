@@ -18,6 +18,7 @@ The database structure lives in numbered SQL files in [server/migrations/](../se
 | `002_auth.sql` | users get `role`, `password_changed_at`, lowercase-email check; new `sessions`, `refresh_tokens`, `password_reset_tokens` |
 | `003_google_login.sql` | `password_hash` becomes optional; users get `email_verified_at`; new `user_identities`; new revoke reason `account_linked` |
 | `005_waiting_room.sql` | events get `admission_per_second` (NULL = no waiting room) |
+| `006_lobby_window.sql` | events get `lobby_minutes` (default 15, `CHECK BETWEEN 1 AND 1440`): the waiting room opens that many minutes before the sale |
 | `004_orders_payments.sql` | events get `price_paise` and `tickets_sold` (with `CHECK tickets_sold BETWEEN 0 AND total_tickets`); orders get `hold_id` (unique), `amount_paise`, `paid_at`, `failure_reason` |
 
 ### Tables

@@ -115,6 +115,13 @@ Every significant choice, the alternatives considered, and why. Newest at the bo
 | Bot check after validation | before | a typo doesn't use up the single-use token |
 | Honeypot answers like a failed check | pretend success | tells a bot nothing, and keeps the code simple |
 
+## Waiting room, part 2 (lobby window, fair draw, chance)
+
+| Decision | Rejected | Why |
+|---|---|---|
+| The lobby opens `lobby_minutes` (default 15) before the sale | joining any time after the event is created | nobody can take place #1 days ahead; a short window keeps the lobby small and honest |
+| Window checked inside `join-queue.lua` with Redis `TIME` | checked in Node | one clock for every server, and the check and the join are one atomic step |
+
 ## Frontend
 
 | Decision | Alternatives | Why |

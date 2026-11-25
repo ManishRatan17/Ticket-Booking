@@ -108,7 +108,7 @@ Body `{ "role": "user" | "admin" }` → `200 { "user": {…} }`
 Demotion revokes all of that user's sessions immediately; promotion applies at their next refresh.
 
 ### `POST /events`
-Body `{ "name": "3–120 chars", "totalTickets": 1–100000, "saleStartsAt": "2026-12-01T18:00:00Z", "pricePaise": 49900, "admissionPerSecond": 50 }` (`admissionPerSecond` 1–10,000, or null = no waiting room) (any date, also past; `pricePaise` whole paise 0–10,000,000, default 0)
+Body `{ "name": "3–120 chars", "totalTickets": 1–100000, "saleStartsAt": "2026-12-01T18:00:00Z", "pricePaise": 49900, "admissionPerSecond": 50 }` (`admissionPerSecond` 1–10,000, or null = no waiting room; `lobbyMinutes` 1–1440, default 15 = the waiting room opens that many minutes before the sale) (any date, also past; `pricePaise` whole paise 0–10,000,000, default 0)
 → `201 { "event": { "id", "name", "totalTickets", "saleStartsAt", "pricePaise", "createdAt", "available", "onSale" } }`
 
 ### `GET /jobs`
@@ -140,7 +140,7 @@ Body `{ "quantity": 1 }` (JSON integer 1–4)
 
 ### `POST /events/:id/queue`  · signed in · limits 10/min per user, 60/min per IP · bot check (header `X-Turnstile-Token`, else `403 BOT_CHECK_FAILED`) — join the waiting room (or re-join: you keep your place)
 ### `GET /events/:id/queue`  · signed in · limit 60/min per user — your status
-→ `200 { "status": "waiting" | "admitted" | "not_in_queue", "position", "total", "passExpiresInSeconds", "admissionPerSecond", "saleStartsAt", "estimatedWaitSeconds", "serverTime" }` · `404 EVENT_NOT_FOUND` · `409 NO_WAITING_ROOM`
+→ `200 { "status": "waiting" | "admitted" | "not_in_queue", "position", "total", "passExpiresInSeconds", "admissionPerSecond", "lobbyOpensAt", "saleStartsAt", "estimatedWaitSeconds", "serverTime" }` · `404 EVENT_NOT_FOUND` · `409 NO_WAITING_ROOM` · `409 LOBBY_NOT_OPEN` (joining before the lobby window; `details.lobbyOpensAt`)
 
 ### `GET /events/:id/queue/stream`  · signed in · limit 20 opens/min per user · at most 3 open at once per user (the 4th → `429 TOO_MANY_STREAMS`, plain JSON) — **Server-Sent Events**
 `Content-Type: text/event-stream`; messages `event: status` with the same JSON as above, sent when the status or position changes; `: ping` every 15 s; ends when you are admitted or after 10 minutes (the browser reconnects).

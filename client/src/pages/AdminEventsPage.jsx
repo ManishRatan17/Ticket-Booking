@@ -8,7 +8,7 @@ import { FormField } from '../components/FormField.jsx'
 import { errorMessage, fieldErrors } from '../lib/errorMessages.js'
 import { formatDate, formatMoney } from '../lib/format.js'
 
-const EMPTY_FORM = { name: '', totalTickets: '100', price: '499', admissionPerSecond: '', saleStartsAt: '' }
+const EMPTY_FORM = { name: '', totalTickets: '100', price: '499', admissionPerSecond: '', lobbyMinutes: '15', saleStartsAt: '' }
 
 export function AdminEventsPage() {
   const [events, setEvents] = useState(null)
@@ -46,6 +46,8 @@ export function AdminEventsPage() {
           pricePaise: Math.round(Number(form.price) * 100),
           // Empty = no waiting room; a number = let that many people in per second.
           admissionPerSecond: form.admissionPerSecond ? Number(form.admissionPerSecond) : null,
+          // The waiting room opens this many minutes before the sale (only matters with a waiting room).
+          lobbyMinutes: Number(form.lobbyMinutes) || 15,
           // <input type="datetime-local"> gives LOCAL time without a zone ("2026-12-01T18:00").
           // new Date() reads it as local time; toISOString() sends it in UTC — unambiguous.
           // Empty = "on sale right now".
@@ -101,6 +103,18 @@ export function AdminEventsPage() {
           onChange={update('admissionPerSecond')}
           error={errors.admissionPerSecond}
         />
+        {form.admissionPerSecond && (
+          <FormField
+            id="lobbyMinutes"
+            label="Waiting room opens this many minutes before the sale"
+            type="number"
+            min="1"
+            max="1440"
+            value={form.lobbyMinutes}
+            onChange={update('lobbyMinutes')}
+            error={errors.lobbyMinutes}
+          />
+        )}
         <FormField
           id="saleStartsAt"
           label="Sale starts (empty = now)"

@@ -11,6 +11,8 @@ export const createEventSchema = z.object({
   pricePaise: z.number().int().min(0).max(10_000_000).default(0),
   // Waiting room: let this many people in per second. null/absent = no waiting room.
   admissionPerSecond: z.number().int().min(1).max(10_000).nullable().default(null),
+  // …and its lobby opens this many minutes before the sale (1 minute to 24 hours).
+  lobbyMinutes: z.number().int().min(1).max(1440).default(15),
 });
 
 export const eventIdParamsSchema = z.object({

@@ -24,6 +24,7 @@ const MESSAGES = {
   ORDER_EXISTS: 'You already started checkout for these tickets.',
   NOT_ADMITTED: "It isn't your turn yet. Join the queue first; you can hold tickets once you're let in.",
   NO_WAITING_ROOM: 'This event has no waiting room.',
+  LOBBY_NOT_OPEN: 'The waiting room is not open yet. It opens a few minutes before the sale.',
   BOT_CHECK_FAILED: "We couldn't confirm you're a person. Please complete the check and try again.",
   ORDER_NOT_PENDING: 'This order is no longer waiting for payment.',
   // Admin

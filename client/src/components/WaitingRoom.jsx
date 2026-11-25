@@ -3,8 +3,22 @@ import { formatCountdown } from '../lib/serverClock.js'
 import { TurnstileWidget } from './TurnstileWidget.jsx'
 
 // human = useHumanCheck() from the page: joining needs the "are you a person?" check (Phase 5d).
-export function WaitingRoom({ status, onJoin, saleOpensIn, human }) {
+// lobbyOpensIn = seconds until the waiting room opens (0 = open).
+export function WaitingRoom({ status, onJoin, saleOpensIn, lobbyOpensIn, human }) {
   if (!status) return <p className="muted">Checking the waiting room…</p>
+
+  // Too early: the waiting room opens a few minutes before the sale (the "lobby window").
+  if (status.status === 'not_in_queue' && lobbyOpensIn > 0) {
+    return (
+      <div className="panel">
+        <p>
+          The waiting room opens in <strong>{formatCountdown(lobbyOpensIn)}</strong> (at{' '}
+          {new Date(status.lobbyOpensAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}).
+        </p>
+        <p className="muted">Come back then: joining any time while it's open gives you the same chance.</p>
+      </div>
+    )
+  }
 
   if (status.status === 'not_in_queue') {
     return (

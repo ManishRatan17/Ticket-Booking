@@ -8,6 +8,7 @@ import { redis } from '../src/config/redis.js';
 import { runMigrations } from '../src/db/migrate.js';
 import { closeConnections } from '../src/config/connections.js';
 import { createEvent } from '../src/modules/events/events.service.js';
+import { createEventSchema } from '../src/modules/events/events.schemas.js';
 import { admitWaiting } from '../src/jobs/processors.js';
 import { ACTIVE_ROOMS, passKey as roomPassKey, queueKey, roomKeysPattern } from '../src/modules/waiting-room/waiting-room.js';
 import { createSignedInUsers } from '../test-support/users.js';
@@ -39,12 +40,13 @@ after(async () => {
   await closeConnections();
 });
 
-async function event({ rate = 2, tickets = 100, startsInMs = -60_000 } = {}) {
+async function event({ rate = 2, tickets = 100, startsInMs = -60_000, lobbyMinutes } = {}) {
   const e = await createEvent({
     name: `${RUN} event ${++n}`,
     totalTickets: tickets,
     saleStartsAt: new Date(Date.now() + startsInMs),
     admissionPerSecond: rate,
+    lobbyMinutes,
   });
   createdEventIds.push(e.id);
   return e;
@@ -139,11 +141,11 @@ test('admitted: holding works, and the pass lasts 10 minutes', async () => {
 });
 
 test('the lobby: before the sale opens people can queue, but nobody is let in yet', async () => {
-  const e = await event({ rate: 10, startsInMs: 3_600_000 });
+  const e = await event({ rate: 10, startsInMs: 5 * 60_000 }); // inside the default 15-minute window
   const [ann] = await users(1);
   const joined = (await join(ann, e.id)).body;
   assert.equal(joined.status, 'waiting');
-  assert.ok(joined.estimatedWaitSeconds > 3500, 'the estimate includes the time until the sale');
+  assert.ok(joined.estimatedWaitSeconds > 290, 'the estimate includes the time until the sale');
 
   await admitWaiting({ eventIds: [e.id] });
   assert.equal((await status(ann, e.id)).body.status, 'waiting');
@@ -181,4 +183,45 @@ test('not signed in → 401; unknown event → 404', async () => {
   assert.equal((await api('POST', '/api/events/1/queue')).status, 401);
   const [ann] = await users(1);
   assert.equal((await join(ann, 999999999)).status, 404);
+});
+
+// ---------- the lobby window ----------
+
+test('lobby window: too early → 409 LOBBY_NOT_OPEN with lobbyOpensAt; nobody is added; status says when it opens', async () => {
+  const startsInMs = 60 * 60_000; // the sale is in 1 hour, the lobby opens 15 minutes before it
+  const e = await event({ startsInMs });
+  const [ann] = await users(1);
+
+  const res = await join(ann, e.id);
+  assert.equal(res.status, 409);
+  assert.equal(res.body.error.code, 'LOBBY_NOT_OPEN');
+  const opensAt = new Date(res.body.error.details.lobbyOpensAt).getTime();
+  assert.equal(opensAt, new Date(e.saleStartsAt).getTime() - 15 * 60_000);
+  assert.equal(await redis.zcard(queueKey(e.id)), 0, 'nobody was added');
+
+  const s = (await status(ann, e.id)).body;
+  assert.equal(s.status, 'not_in_queue');
+  assert.equal(new Date(s.lobbyOpensAt).getTime(), opensAt);
+});
+
+test('lobby window: the event decides how early (lobbyMinutes 60 → joining 30 minutes ahead works)', async () => {
+  const e = await event({ startsInMs: 30 * 60_000, lobbyMinutes: 60 });
+  assert.equal(e.lobbyMinutes, 60);
+  const [ann] = await users(1);
+  assert.equal((await join(ann, e.id)).status, 200);
+});
+
+test('lobby window: someone already in the line keeps their place even if asked again', async () => {
+  const e = await event({ startsInMs: 5 * 60_000 });
+  const [ann] = await users(1);
+  await join(ann, e.id);
+  assert.equal((await join(ann, e.id)).status, 200);
+});
+
+test('lobbyMinutes: default 15, between 1 and 1440 (the admin form is validated)', () => {
+  const base = { name: 'Concert', totalTickets: 10, saleStartsAt: '2030-01-01T10:00:00Z', admissionPerSecond: 5 };
+  assert.equal(createEventSchema.parse(base).lobbyMinutes, 15);
+  assert.equal(createEventSchema.safeParse({ ...base, lobbyMinutes: 0 }).success, false);
+  assert.equal(createEventSchema.safeParse({ ...base, lobbyMinutes: 1441 }).success, false);
+  assert.equal(createEventSchema.parse({ ...base, lobbyMinutes: 60 }).lobbyMinutes, 60);
 });

@@ -41,7 +41,9 @@ The prefix `wr` is configurable (`WAITING_ROOM_PREFIX`); tests use `test-wr` so 
 
 `admit-waiting` runs **every second** (a BullMQ job scheduler, set up by every worker at startup — still one schedule). For each active room whose **sale has started**, admit `admission_per_second` people. Rooms of deleted events are cleaned up. It's only logged when it actually admits someone.
 
-**The lobby:** joining is allowed **before** the sale opens. People gather, keep their arrival order, and admission starts the moment the sale does. The estimated wait includes the time until the sale.
+**The lobby:** joining is allowed **before** the sale opens. People gather, and admission starts the moment the sale does. The estimated wait includes the time until the sale.
+
+**The lobby window (step 4d):** the lobby opens only **`lobby_minutes`** before the sale (migration [006](../server/migrations/006_lobby_window.sql), default **15**, 1–1440, set by the admin per event). Joining earlier → **`409 LOBBY_NOT_OPEN`** with `details.lobbyOpensAt`, and the status says `not_in_queue` with `lobbyOpensAt`, so the page can count down: "The waiting room opens in 12:30 (at 10:45)". Without a window, a bot (or a superfan) could take place #1 three days early. The check is inside [join-queue.lua](../server/src/modules/waiting-room/lua/join-queue.lua) using **Redis's clock** (`TIME`), the same clock as holds and passes, so every server gives the same answer at the same moment. Someone already in the line is never refused. *Tested: too early → 409 and nobody added; `lobbyMinutes: 60` lets people in 30 minutes ahead; the schema accepts 1–1440 and defaults to 15. Mutation: window check removed → the too-early test fails.*
 
 *Tested: 300 people, rate 50 → after each of 6 ticks exactly the first 50, 100, … 300 are in — nobody ever overtakes anybody — and the empty room is no longer checked.*
 

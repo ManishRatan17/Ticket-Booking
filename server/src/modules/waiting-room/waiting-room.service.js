@@ -13,6 +13,9 @@ async function findEventWithRoom(eventId) {
   return event;
 }
 
+// The waiting room ("lobby") opens lobbyMinutes before the sale.
+const lobbyOpensAt = (event) => new Date(new Date(event.saleStartsAt).getTime() - event.lobbyMinutes * 60_000);
+
 // Adds what the page needs: the server's time (for countdowns) and a rough wait estimate.
 // Estimate = (seconds until the sale opens, if it hasn't) + position ÷ people let in per second.
 function describe(status, event, now) {
@@ -20,6 +23,7 @@ function describe(status, event, now) {
   return {
     ...status,
     admissionPerSecond: event.admissionPerSecond,
+    lobbyOpensAt: lobbyOpensAt(event),
     saleStartsAt: event.saleStartsAt,
     estimatedWaitSeconds:
       status.status === 'waiting' ? secondsUntilSale + Math.ceil(status.position / event.admissionPerSecond) : null,
@@ -27,11 +31,17 @@ function describe(status, event, now) {
   };
 }
 
-// Joining is allowed BEFORE the sale opens: people gather in the "lobby", and admission
-// starts the moment the sale does — in the order they arrived.
+// Joining opens lobbyMinutes BEFORE the sale (the "lobby"); admission starts the moment the sale does.
+// Before the lobby opens → 409 LOBBY_NOT_OPEN: nobody can take a place days ahead.
 export async function join({ eventId, userId }) {
   const event = await findEventWithRoom(eventId);
-  const [status, now] = await Promise.all([joinQueue(event.id, userId), redisNow()]);
+  const opensAt = lobbyOpensAt(event);
+  const [status, now] = await Promise.all([joinQueue(event.id, userId, { lobbyOpensAtMs: opensAt.getTime() }), redisNow()]);
+  if (status.status === 'not_open') {
+    throw new AppError(409, 'LOBBY_NOT_OPEN', `The waiting room opens ${event.lobbyMinutes} minutes before the sale`, {
+      lobbyOpensAt: opensAt,
+    });
+  }
   return describe(status, event, now);
 }
 

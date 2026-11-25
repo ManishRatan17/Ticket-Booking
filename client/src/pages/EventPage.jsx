@@ -77,6 +77,11 @@ export function EventPage() {
   const queue = useQueueStatus(id, signedIn && hasRoom && !page?.hold)
   const admitted = queue.status?.status === 'admitted'
   const human = useHumanCheck() // joining the queue needs the "are you a person?" check
+  // Counts down to the lobby window; at 0 the Join button appears (no reload needed).
+  const lobbyOpensIn = useCountdown(
+    queue.status?.status === 'not_in_queue' ? queue.status.lobbyOpensAt : null,
+    page?.offset ?? 0,
+  )
 
   async function handleJoin() {
     setError(null)
@@ -194,6 +199,7 @@ export function EventPage() {
           status={queue.status}
           onJoin={handleJoin}
           saleOpensIn={event.onSale ? 0 : saleSecondsLeft}
+          lobbyOpensIn={lobbyOpensIn}
           human={human}
         />
       ) : !event.onSale ? (

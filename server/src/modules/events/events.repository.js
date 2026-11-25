@@ -2,7 +2,7 @@
 // Redis only keeps a fast working copy of each event's stock.
 import { pool } from '../../config/db.js';
 
-const COLUMNS = 'id, name, total_tickets, sale_starts_at, price_paise, admission_per_second, created_at';
+const COLUMNS = 'id, name, total_tickets, sale_starts_at, price_paise, admission_per_second, lobby_minutes, created_at';
 
 function toEvent(row) {
   return {
@@ -12,15 +12,16 @@ function toEvent(row) {
     saleStartsAt: row.sale_starts_at,
     pricePaise: row.price_paise, // whole paise: ₹499.00 = 49900
     admissionPerSecond: row.admission_per_second, // null = no waiting room
+    lobbyMinutes: row.lobby_minutes, // the waiting room opens this many minutes before the sale
     createdAt: row.created_at,
   };
 }
 
-export async function createEvent({ name, totalTickets, saleStartsAt, pricePaise, admissionPerSecond = null }) {
+export async function createEvent({ name, totalTickets, saleStartsAt, pricePaise, admissionPerSecond = null, lobbyMinutes = 15 }) {
   const { rows } = await pool.query(
-    `INSERT INTO events (name, total_tickets, sale_starts_at, price_paise, admission_per_second)
-     VALUES ($1, $2, $3, $4, $5) RETURNING ${COLUMNS}`,
-    [name, totalTickets, saleStartsAt, pricePaise, admissionPerSecond],
+    `INSERT INTO events (name, total_tickets, sale_starts_at, price_paise, admission_per_second, lobby_minutes)
+     VALUES ($1, $2, $3, $4, $5, $6) RETURNING ${COLUMNS}`,
+    [name, totalTickets, saleStartsAt, pricePaise, admissionPerSecond, lobbyMinutes],
   );
   return toEvent(rows[0]);
 }
@@ -35,16 +36,16 @@ export async function findEventById(id) {
   return rows.length === 0 ? null : toEvent(rows[0]);
 }
 
-// Takes the next `quantity` ticket numbers for an event, atomically (Postgres row lock).
-// The CHECK (tickets_sold <= total_tickets) makes the DATABASE refuse an oversell: if this
-// would go past the total, Postgres throws (constraint events_tickets_sold_within_total).
-// Returns the numbers, e.g. [9, 10].
 // Locks the event row until the transaction ends. Payments for the same event then run one
 // after another, so "how much has this user bought?" can't change while we decide (Phase 5b).
 export async function lockEvent(client, eventId) {
   await client.query('SELECT id FROM events WHERE id = $1 FOR UPDATE', [eventId]);
 }
 
+// Takes the next `quantity` ticket numbers for an event, atomically (Postgres row lock).
+// The CHECK (tickets_sold <= total_tickets) makes the DATABASE refuse an oversell: if this
+// would go past the total, Postgres throws (constraint events_tickets_sold_within_total).
+// Returns the numbers, e.g. [9, 10].
 export async function takeTicketNumbers(client, eventId, quantity) {
   const { rows } = await client.query(
     'UPDATE events SET tickets_sold = tickets_sold + $2 WHERE id = $1 RETURNING tickets_sold',

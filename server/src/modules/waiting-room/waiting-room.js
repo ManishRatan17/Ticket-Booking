@@ -25,8 +25,9 @@ redis.defineCommand('wrAdmit', { numberOfKeys: 2, lua: lua('admit.lua') });
 redis.defineCommand('wrStreamOpen', { numberOfKeys: 1, lua: lua('stream-open.lua') });
 redis.defineCommand('wrStreamClose', { numberOfKeys: 1, lua: lua('stream-close.lua') });
 
-// Join (or re-join: you keep your place). Returns a status (see describe()).
-export async function joinQueue(eventId, userId) {
+// Join (or re-join: you keep your place). Returns a status (see describe()), or
+// { status: 'not_open' } before the lobby window opens.
+export async function joinQueue(eventId, userId, { lobbyOpensAtMs }) {
   const [status, a, b] = await redis.wrJoin(
     queueKey(eventId),
     seqKey(eventId),
@@ -34,7 +35,9 @@ export async function joinQueue(eventId, userId) {
     ACTIVE_ROOMS,
     userId,
     eventId,
+    lobbyOpensAtMs,
   );
+  if (status === 'not_open') return { status };
   return status === 'admitted' ? { status, passExpiresInSeconds: a } : { status, position: a, total: b };
 }
 
