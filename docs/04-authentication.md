@@ -150,7 +150,7 @@ already USED > 10 s ago   → REUSE: revoke the whole session ('token_reuse') �
 - **The first admin** is made from the command line: `npm run set-role -- <email> admin`. No public API can do it; register strips `role`.
 - **Demotion is instant** (all the user's sessions revoked); **promotion applies at the next refresh** (refresh reads the role from the database).
 - **The last admin can't be demoted** (`409 LAST_ADMIN`). The service locks all admin rows (`FOR UPDATE`, in id order) and **re-checks the acting admin's own role inside the transaction** (they may have been demoted a moment ago — time-of-check vs time-of-use).
-- Role changes are logged: `[audit] admin 3 changed user 7 (…): admin → user`.
+- Role changes are **recorded in the audit log** (`role.change`: which admin, whom, the new role; `command line (set-role)` for the script) and also printed: `[audit] admin 3 changed user 7 (…): admin → user`. See [20](20-admin-side.md#audit-log).
 
 ## 9. Password reset
 

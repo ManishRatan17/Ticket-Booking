@@ -25,6 +25,9 @@ export const updateEvent = (id, changes) => api(`/admin/events/${encodeURICompon
 export const listRefunds = (status) => api(`/admin/refunds${status ? `?status=${encodeURIComponent(status)}` : ''}`)
 export const retryRefund = (id) => api(`/admin/refunds/${encodeURIComponent(id)}/retry`, { method: 'POST' })
 
+// The audit log (read-only).
+export const listAudit = (action) => api(`/admin/audit${action ? `?action=${encodeURIComponent(action)}` : ''}`)
+
 // Notifications: new automatic restrictions (bot strikes) no admin has seen yet.
 export const getNotifications = () => api('/admin/notifications')
 export const acknowledgeRestrictions = () => api('/admin/restrictions/acknowledge', { method: 'POST' })

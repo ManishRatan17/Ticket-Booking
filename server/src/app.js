@@ -1,5 +1,6 @@
 import express from 'express';
 import helmet from 'helmet';
+import { auditAdminActions } from './lib/audit.js';
 import { existsSync } from 'node:fs';
 import path from 'node:path';
 import cookieParser from 'cookie-parser';
@@ -53,7 +54,9 @@ export function createApp() {
   app.use('/api/config', configRouter); // public settings for the page (bot-check site key)
   app.use('/api/auth', authRouter);
   // The guard is applied ONCE, to the whole admin router: no admin route can forget it.
-  app.use('/api/admin', authenticate, requireRole('admin'), adminRouter);
+  // …and every successful CHANGE an admin makes is recorded in the audit log, the same way: once, for
+  // the whole router ("default audited").
+  app.use('/api/admin', authenticate, requireRole('admin'), auditAdminActions, adminRouter);
   app.use('/api', eventsRouter); // /api/events…, /api/holds/…
   app.use('/api', ordersRouter); // /api/orders…
   app.use('/api', paymentsRouter); // /api/payments/fake/…

@@ -117,6 +117,9 @@ Body `{ "name": "3–120 chars", "totalTickets": 1–100000, "saleStartsAt": "20
 ### `POST /jobs/:id/retry`
 → `202 { "retried": true }` · `404 JOB_NOT_FOUND` · `409 JOB_NOT_FAILED`
 
+### `GET /audit?action=role.change&limit=200`
+`action` optional (one action name), `limit` 1–500 (default 200) → `200 { "entries": [ { "id", "adminId", "adminEmail", "action", "targetType", "targetId", "details", "createdAt" } ] }` (newest first). Every successful admin request that changes something is recorded; there is no API to change or delete an entry. See [20](20-admin-side.md#audit-log).
+
 ---
 
 ## Events & holds — `/api`

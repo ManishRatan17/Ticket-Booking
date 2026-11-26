@@ -215,6 +215,16 @@ Every significant choice, the alternatives considered, and why. Newest at the bo
 | `UNIQUE (payment_id)` | check in code | a payment can never be refunded twice, whatever runs at the same time |
 | Ask the provider first, tagged with our refund id | trust that a failed call refunded nothing | a timeout can hide a refund that happened |
 
+## Admin audit log
+
+| Decision | Rejected | Why |
+|---|---|---|
+| One middleware on the whole admin router ("default audited") | a `writeAudit` call in every admin route | a new admin route can't forget it, the same idea as "default deny" |
+| Recorded after the response, only if it succeeded | before the action; also failures | only what actually changed is history; a refused request changed nothing |
+| Append-only by a database trigger | "the code never updates it" | even a bug, or someone with the app's database access, can't quietly rewrite history |
+| `admin_email` stored, `admin_id` without a foreign key | a foreign key to users | the record must outlive the admin's account |
+| Writes from the command line recorded too ("command line (set-role)") | HTTP only | making the first admin is the most powerful change of all |
+
 ## Frontend
 
 | Decision | Alternatives | Why |
@@ -238,4 +248,3 @@ Every significant choice, the alternatives considered, and why. Newest at the bo
 
 - Holds are lost if Redis loses its data.
 - Lua scripts are single-Redis (no Cluster hash tags).
-- Role changes are audited only in the console log.

@@ -3,6 +3,7 @@ import { pool, withTransaction } from '../../config/db.js';
 import { AppError } from '../../lib/errors.js';
 import * as revocation from '../auth/revocation.js';
 import * as adminRepository from './admin.repository.js';
+import { writeAudit } from '../../lib/audit.js';
 
 export async function listUsers({ limit, offset }) {
   const page = await adminRepository.listUsers(pool, { limit, offset });
@@ -48,7 +49,8 @@ export async function changeRole({ actorId, targetId, role }) {
       throw new AppError(409, 'LAST_ADMIN', 'Cannot demote the last admin');
     default:
       if (result.from !== result.user.role) {
-        // A simple audit trail in the server log. A real system would store these in a table.
+        // Also printed in the server log. The permanent record is the audit log table (lib/audit.js):
+        // HTTP changes are recorded by its middleware, command-line ones by changeRoleByEmail below.
         console.log(
           `[audit] ${actorId === null ? 'command line' : `admin ${actorId}`} changed user ` +
             `${result.user.id} (${result.user.email}): ${result.from} → ${result.user.role}`,
@@ -61,5 +63,8 @@ export async function changeRole({ actorId, targetId, role }) {
 export async function changeRoleByEmail({ email, role }) {
   const targetId = await adminRepository.findUserIdByEmail(pool, email);
   if (targetId === null) throw new AppError(404, 'USER_NOT_FOUND', `No user with email ${email}`);
-  return changeRole({ actorId: null, targetId, role });
+  const user = await changeRole({ actorId: null, targetId, role });
+  // Recorded too: a change from the command line is still an admin action.
+  await writeAudit({ adminEmail: 'command line (set-role)', action: 'role.change', targetType: 'user', targetId, details: { email, role } });
+  return user;
 }

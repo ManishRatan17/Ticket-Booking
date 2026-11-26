@@ -3,7 +3,7 @@
 Admins **run** the sale; they don't take part in it. This page covers what an admin sees and can do, and the rules behind it.
 
 ```
-Admin nav:  Manage events · Support inbox · Refunds · Restrictions (2 new) · Users · System
+Admin nav:  Manage events · Support inbox · Refunds · Restrictions (2 new) · Users · System · Audit log
 Customer:   Events · My orders · Help
 ```
 
@@ -68,3 +68,29 @@ Accounts have no names, only an email, so the email identifies the person. Migra
 Email notifications to admins need a real email provider: Phase 7.
 
 *Tested in [admin-console.test.js](../server/test/admin-console.test.js): admins → 403 on hold, join, order and pay (normal people unaffected); admins → 403 on sending support requests; the live numbers (3 sold, 2 held, 5 left, ₹1,500 revenue, 1 paid order) and every status; editing before the sale (price, time, waiting room; the shop sees it at once); after the sale only the name (`SALE_STARTED`); a lucky draw keeps its waiting room; validation; admins only; a new automatic strike shows up with the person's email and evidence, a hand-made one doesn't, "mark as seen" clears it. Mutation: the admin rule removed from holds → the test fails.*
+
+## Audit log
+
+`/admin/audit`: **every change an admin made**, newest first, filterable by action: who (their email), what, to which user / event / request / refund, the details (e.g. the new price), when.
+
+```
+admin request (POST / PATCH)  ──► the admin route does its work ──► response sent
+                                                              │
+     auditAdminActions (on the whole /api/admin router)  ◄────┘ 'finish': status < 400?
+                                                              │ yes
+                                     INSERT admin_audit_log (admin, action, target, details)
+```
+
+| Piece | What it does |
+|---|---|
+| [lib/audit.js](../server/src/lib/audit.js) `auditAdminActions` | mounted once with the admin guard: `app.use('/api/admin', authenticate, requireRole('admin'), auditAdminActions, adminRouter)`. Skips GET (reading changes nothing); records a request only if it **succeeded**. Like "default deny", it's **"default audited"**: a new admin route is recorded without anyone remembering to |
+| Action names | a table maps routes to readable names: `PATCH /users/:id/role` → `role.change`, `PATCH /events/:id` → `event.update`, `POST /refunds/:id/retry` → `refund.retry`, … A route not in the table is still recorded, under its method and path |
+| Target | the `:id` in the URL; for creating an event, the new event's id (the route passes it on) |
+| Details | the validated request body (long texts such as support replies shortened to 300 characters) |
+| The command line | `npm run set-role` writes an entry as `command line (set-role)`: making an admin is the most powerful change there is |
+| **Append-only** | migration [014](../server/migrations/014_audit_log.sql) puts a trigger on the table that **refuses every UPDATE and DELETE**, so even code or a person with the app's database access can't rewrite history |
+| Survives the admin | `admin_email` is stored with the entry, and `admin_id` has no foreign key: deleting an account later doesn't delete what it did |
+
+Housekeeping never trims it (see [13](13-background-jobs.md)). Honest limit: the entry is written just after the response; a crash in that instant could lose one entry (it never records something that didn't happen).
+
+*Tested in [audit.test.js](../server/test/audit.test.js): role change, event create + edit, failed actions and reads not recorded, set-role recorded, the database refusing UPDATE/DELETE, reading and filtering, normal users → 403. Mutation: the middleware removed → 3 tests fail.*

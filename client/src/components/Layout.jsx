@@ -34,6 +34,7 @@ function NavBar() {
                 <RestrictionsLink />
                 <NavLink to="/admin/users">Users</NavLink>
                 <NavLink to="/admin/system">System</NavLink>
+                <NavLink to="/admin/audit">Audit log</NavLink>
               </>
             ) : (
               <>

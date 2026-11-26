@@ -105,5 +105,4 @@ See [04 § cookies](04-authentication.md#4-the-cookies-authcookiesjs). `COOKIE_S
 ## Not done yet (honest list)
 
 - Email verification at registration and 2FA (future work).
-- A persistent audit-log table (role changes are only logged to the console).
 - A real email provider and HTTPS (deployment, Phase 7).

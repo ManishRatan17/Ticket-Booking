@@ -18,6 +18,7 @@ The database structure lives in numbered SQL files in [server/migrations/](../se
 | `002_auth.sql` | users get `role`, `password_changed_at`, lowercase-email check; new `sessions`, `refresh_tokens`, `password_reset_tokens` |
 | `003_google_login.sql` | `password_hash` becomes optional; users get `email_verified_at`; new `user_identities`; new revoke reason `account_linked` |
 | `005_waiting_room.sql` | events get `admission_per_second` (NULL = no waiting room) |
+| `014_audit_log.sql` | `admin_audit_log`: which admin (id + email, kept even if the account goes), action, target type + id, details (JSON), when. **Append-only**: a trigger refuses every UPDATE and DELETE |
 | `013_refunds.sql` | `refunds`: order, payment (UNIQUE: one refund per payment), amount, reason, status pending/refunded, the provider's refund id, last error, attempts |
 | `012_razorpay.sql` | orders get `provider_order_id` (the Razorpay order, unique): created once per order; webhooks find our order by it |
 | `011_admin_notifications.sql` | `account_restrictions` get `acknowledged_at` / `acknowledged_by`: an automatic restriction is "new" for admins until one marks it as seen (hand-made ones start as seen) |

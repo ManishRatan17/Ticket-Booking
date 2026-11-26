@@ -60,7 +60,7 @@ Roadmap from the original blueprint. ✅ done · 🟡 partly done · ⬜ not sta
 
 **Load test (laptop, one API process):** 10,000 people for 300 tickets → **exactly 300 sold, 0 duplicates, 0 failed requests**. Through the waiting room: median **3 ms**, p95 **48 ms**. With no waiting room at all, 500 clicks a second: median 6 ms, p95 327 ms. Details: [19](19-load-testing.md).
 
-**Numbers today:** 372 server tests + 41 frontend tests, all passing. 300 signed-in users racing for 100 tickets over real HTTP → exactly 100 holds.
+**Numbers today:** 378 server tests + 41 frontend tests, all passing. 300 signed-in users racing for 100 tickets over real HTTP → exactly 100 holds.
 
 ---
 

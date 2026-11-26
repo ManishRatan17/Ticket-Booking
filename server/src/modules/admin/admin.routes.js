@@ -11,6 +11,7 @@ import * as refunds from '../payments/refunds.js';
 import * as eventsController from '../events/events.controller.js';
 import { z } from 'zod';
 import { AppError } from '../../lib/errors.js';
+import { listAudit } from '../../lib/audit.js';
 import * as adminJobs from './admin.jobs.js';
 import * as support from '../support/support.service.js';
 import * as moderation from '../moderation/moderation.service.js';
@@ -26,7 +27,15 @@ router.patch(
 );
 
 // Events: protected by the same router-level admin guard as everything in this file.
-router.post('/events', validate({ body: createEventSchema }), eventsController.createEvent);
+router.post('/events', validate({ body: createEventSchema }), async (req, res, next) => {
+  // (the audit log records the NEW event's id as the target)
+  const original = res.json.bind(res);
+  res.json = (body) => {
+    res.locals.auditTargetId = body?.event?.id;
+    return original(body);
+  };
+  return eventsController.createEvent(req, res, next);
+});
 // Manage events: every event with live numbers (sold, held, left, revenue, in line…), one event, edit.
 const eventIdParams = z.object({ id: z.coerce.number().int().positive() });
 router.get('/events', async (req, res) => {
@@ -111,6 +120,15 @@ router.post(
   }),
   async (req, res) => {
     res.json({ restriction: await moderation.lift({ adminId: req.user.id, restrictionId: req.validated.params.id, ...req.validated.body }) });
+  },
+);
+
+// The audit log (read-only: entries can't be changed or deleted, the database refuses it).
+router.get(
+  '/audit',
+  validate({ query: z.object({ action: z.string().max(60).optional(), limit: z.coerce.number().int().min(1).max(500).default(200) }) }),
+  async (req, res) => {
+    res.json({ entries: await listAudit(req.validated.query) });
   },
 );
 
