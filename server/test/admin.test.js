@@ -235,7 +235,7 @@ test('race (service level, 10 rounds): mutual demotion never leaves zero admins'
 // ---------- the command-line script ----------
 
 function runSetRole(...args) {
-  return spawnSync(process.execPath, ['--env-file=.env', 'scripts/set-role.js', ...args], {
+  return spawnSync(process.execPath, ['--env-file-if-exists=.env', 'scripts/set-role.js', ...args], {
     cwd: new URL('..', import.meta.url),
     encoding: 'utf8',
   });
