@@ -5,10 +5,14 @@ import { fileURLToPath } from 'node:url';
 import { pool } from '../config/db.js';
 
 const MIGRATIONS_DIR = new URL('../../migrations/', import.meta.url);
+const MIGRATIONS_LOCK = 740_002; // any number, shared by every process that runs migrations
 
 export async function runMigrations({ log = console.log } = {}) {
   const client = await pool.connect(); // borrow ONE connection, so BEGIN/COMMIT apply to it
   try {
+    // Only ONE migration run at a time, across processes: test files start in parallel, and in
+    // production several servers may start together. The others wait here, then find nothing to do.
+    await client.query('SELECT pg_advisory_lock($1)', [MIGRATIONS_LOCK]);
     // Remembers which files have already been applied.
     await client.query(`
       CREATE TABLE IF NOT EXISTS schema_migrations (
@@ -39,6 +43,7 @@ export async function runMigrations({ log = console.log } = {}) {
       }
     }
   } finally {
+    await client.query('SELECT pg_advisory_unlock($1)', [MIGRATIONS_LOCK]).catch(() => {});
     client.release(); // always hand the connection back to the pool
   }
 }

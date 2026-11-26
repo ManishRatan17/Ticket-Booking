@@ -1,0 +1,53 @@
+# Continuous integration: on every push and pull request, GitHub runs ALL the tests on a fresh Linux
+# machine, with real PostgreSQL and Redis (as "service containers", like our docker-compose.yml).
+# The README's badge shows the result.
+name: tests
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: ticketing
+          POSTGRES_PASSWORD: ticketing
+          POSTGRES_DB: ticketing
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U ticketing" --health-interval 5s --health-timeout 3s --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports: ['6379:6379']
+        options: >-
+          --health-cmd "redis-cli ping" --health-interval 5s --health-timeout 3s --health-retries 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      # --ignore-scripts: install scripts don't run (as in development and the Docker image);
+      # argon2 loads its prebuilt Linux binary at runtime.
+      - run: npm ci --ignore-scripts
+
+      - run: npm run lint
+
+      # There's no server/.env here: the test settings come from server/.env.test (committed, no
+      # secrets: the TEST database ticketing_test and Redis database 1), plus a JWT secret made
+      # fresh for this run. `npm test` creates and migrates the test database first.
+      - name: Tests (server, then client)
+        run: |
+          export JWT_ACCESS_SECRET="$(openssl rand -hex 48)"
+          npm test
+
+      - run: npm run build

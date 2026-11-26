@@ -1,5 +1,7 @@
 # Flash-Sale Ticketing System
 
+[![tests](https://github.com/ManishRatan17/Ticket-Booking/actions/workflows/test.yml/badge.svg)](https://github.com/ManishRatan17/Ticket-Booking/actions/workflows/test.yml)
+
 **300 tickets. 10,000 people pressing "buy" at the same second. Nobody gets a ticket that doesn't exist, the server doesn't fall over, and the order is fair.**
 
 A full-stack ticketing platform built around one hard problem: selling a small number of tickets to a huge crowd **correctly** and **fairly**. Built step by step as a learning project, with every decision, trade-off and measurement written down in [docs/](docs/README.md).
@@ -16,7 +18,7 @@ Load-tested with [k6](https://k6.io) against the real system (Linux containers, 
 
 Never oversold in any run, including the first one, before the bottlenecks it found were fixed. The load test exposed a database bottleneck on the hot path (790 errors in the first run → **0**, throughput **×1.9**). Details, before/after numbers and honest limits: [docs/19-load-testing.md](docs/19-load-testing.md).
 
-**404 automated tests** (363 server tests against real PostgreSQL and Redis, 41 client tests with Vitest), with **mutation testing**: every important protection was deliberately broken to prove a test catches it.
+**404 automated tests** (363 server tests against real PostgreSQL and Redis, 41 client tests with Vitest), with **mutation testing**: every important protection was deliberately broken to prove a test catches it. They run on every push (GitHub Actions, real PostgreSQL and Redis), against their own test database.
 
 ## How it works
 

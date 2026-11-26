@@ -198,6 +198,15 @@ Every significant choice, the alternatives considered, and why. Newest at the bo
 | A Razorpay `payment.failed` doesn't fail the order | fail it | it's one attempt; the person can retry in the same window; expiry handles giving up |
 | Fake provider OFF when Razorpay is configured | keep both | nobody should get tickets with a fake "Pay" on a real deployment |
 
+## Test database and CI
+
+| Decision | Rejected | Why |
+|---|---|---|
+| A separate test database (`ticketing_test`) and Redis database 1, created + migrated by `pretest` | sharing the development data | tests and development kept affecting each other (skipped admin tests, load-test users, leftovers) |
+| Advisory lock around migrations | hope files don't migrate at the same time | parallel test files (and several servers starting) would race on a fresh database |
+| Outside services forced off in `.env.test` | trust `.env` | a developer's real keys must never make tests send real emails or payments |
+| GitHub Actions with service containers | no CI; mocks | the same real PostgreSQL and Redis as development, on every push |
+
 ## Frontend
 
 | Decision | Alternatives | Why |
@@ -221,6 +230,5 @@ Every significant choice, the alternatives considered, and why. Newest at the bo
 
 - Other users' expired holds wait for the Phase 3 worker.
 - Holds are lost if Redis loses its data.
-- Tests share the development database.
 - Lua scripts are single-Redis (no Cluster hash tags).
 - Role changes are audited only in the console log.

@@ -5,7 +5,17 @@ docker compose up -d     # the server tests use the real PostgreSQL and Redis
 npm test                 # server (node:test) then client (Vitest)
 ```
 
-Today: **363 server tests + 41 client tests**, all passing (about 10–15 s for the server suite).
+Today: **363 server tests + 41 client tests**, all passing, none skipped.
+
+## Their own database, and CI
+
+**Tests never touch development data.** [server/.env.test](../server/.env.test) points them at the database `ticketing_test` (same PostgreSQL container) and at **Redis database 1** (development uses 0). Before every run, `npm test` runs [scripts/prepare-test-db.js](../server/scripts/prepare-test-db.js) (the `pretest` script): it creates the test database if needed and migrates it. It refuses any database whose name doesn't contain "test". Real outside services (Razorpay, Resend) are switched off in `.env.test` whatever `server/.env` says; their tests use fakes.
+
+Why: while tests shared the development database, a real admin made the 3 "last admin" tests **skip**, 10,000 load-test users pushed a test's admin off a page, and interrupted runs left test users behind. Now: **0 skipped**.
+
+Test files start 4 at a time; on a fresh database they'd all migrate at once. The migration runner takes a PostgreSQL **advisory lock**: one migrates, the others wait and find nothing to do (the same protects deployments with several servers starting together).
+
+**CI:** [.github/workflows/test.yml](../.github/workflows/test.yml) runs on every push and pull request. A fresh Ubuntu machine gets PostgreSQL 16 and Redis 7 (service containers), runs `npm ci`, lint, **all tests** and the build. A JWT secret is made fresh for each run. The README's badge shows the latest result.
 
 ## How the server tests run
 
@@ -24,7 +34,7 @@ Today: **363 server tests + 41 client tests**, all passing (about 10–15 s for 
 - Every file uses a random run prefix (`test-login-3fa9…`) for emails, event names and Redis keys, and deletes exactly those at the end.
 - Schema tests run inside `BEGIN … ROLLBACK`.
 - Rate-limit tests use their own Redis key prefix.
-- Tests run against the **development database**. One consequence: the "last admin" tests **skip** (with a message) if real admins exist. A separate test database is on the to-do list.
+- Tests run against their **own** database and Redis database (above), never the development data.
 
 ## Test helpers ([server/test-support/](../server/test-support/))
 
