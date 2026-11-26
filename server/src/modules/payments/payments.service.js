@@ -153,6 +153,9 @@ export async function handlePaymentEvent(event, provider = 'fake') {
     if (order.status === 'failed') {
       return { outcome: 'refund_needed', refundId: await refund('order_already_failed') };
     }
+    if (order.status === 'cancelled') {
+      return { outcome: 'refund_needed', refundId: await refund('event_cancelled') }; // cancelled while being paid
+    }
     if (amountPaise !== order.amountPaise) {
       await ordersRepository.markFailed(client, { orderId, paymentId, reason: 'amount_mismatch' });
       return { outcome: 'failed', releaseHoldId: order.holdId, refundId: await refund('amount_mismatch') }; // what was PAID goes back
@@ -163,7 +166,13 @@ export async function handlePaymentEvent(event, provider = 'fake') {
     //     orders paid for at once (an old pending order paid late + a new one), or a Redis that
     //     lost its counts. Locking the event row first makes payments for this event take turns,
     //     so two of them can't both read "0 bought" and both pass.
-    await eventsRepository.lockEvent(client, order.eventId);
+    const { cancelledAt } = await eventsRepository.lockEvent(client, order.eventId);
+    // The event was cancelled (an order created just before, paid just after): no tickets, money back.
+    // Checked under the event's lock, so it can't change between this check and the commit.
+    if (cancelledAt) {
+      await ordersRepository.markCancelled(client, { orderId, paymentId });
+      return { outcome: 'refund_needed', releaseHoldId: order.holdId, refundId: await refund('event_cancelled') };
+    }
     const paidBefore = await ordersRepository.paidQuantityForUser(client, order.eventId, order.userId);
     const limit = await purchaseLimitFor(order.eventId, order.userId, client); // 4, or more if an admin approved
     if (paidBefore + order.quantity > limit) {

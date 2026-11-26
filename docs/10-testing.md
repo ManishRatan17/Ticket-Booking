@@ -5,7 +5,7 @@ docker compose up -d     # the server tests use the real PostgreSQL and Redis
 npm test                 # server (node:test) then client (Vitest)
 ```
 
-Today: **378 server tests + 41 client tests**, all passing, none skipped.
+Today: **383 server tests + 42 client tests**, all passing, none skipped.
 
 ## Their own database, and CI
 
@@ -93,6 +93,7 @@ Kept outside `test/` because Node runs every file inside `test/` as a test.
 | `razorpay.test.js` | Razorpay test mode against a fake Razorpay: public key only, fake provider off, one Razorpay order for the exact amount, a valid signature pays (once), a forged signature or another order's payment → 400, the webhook alone pays, page + webhook at once → tickets once, a failed attempt keeps the order payable, webhook signature / duplicates / unknown orders, a wrong amount fails |
 | `refunds.test.js` | money that bought no tickets goes back: recorded with the payment, refunded, emailed, shown in the order; one refund per payment; a wrong amount → the paid amount back; admin list and Retry |
 | `audit.test.js` | the admin audit log: a role change (which admin, their email, whom, the role), creating + editing an event (the new event's id as the target), failed actions and reads NOT recorded, a set-role change recorded as "command line", **the database refuses UPDATE and DELETE**, admins read it (newest first, filter), normal users → 403 |
+| `cancel-event.test.js` | cancelling an event: paid orders cancelled + refunded + emailed, unpaid ones ended, holds / orders / the queue → 409, the shop and admin show it; twice, unknown, short reason, no edits, admins only, audited; a payment for an order that slipped in → refunded; **8 payments racing the cancel (3 rounds)** → one refund each, nothing paid, no deadlock; the waiting room emptied |
 | `housekeeping.test.js` | the daily cleanup removes long-dead sessions (and their refresh tokens), stale reset links and old webhook records, and keeps living sessions, recently logged-out ones, fresh links and recent webhooks |
 | `holds-http.test.js` | the holds API: every status code, IDOR, CSRF, lazy release on read, **300 users × 100 tickets over HTTP** |
 
@@ -160,6 +161,9 @@ A test only proves something once it has been seen to **fail for the right reaso
 | client createEvent sending only name/tickets/sale time (the old code) | the client createEvent test |
 | hold rate limiters (per user and per IP) removed | both hold rate-limit tests |
 | audit middleware removed from the admin mount | 3 audit tests (role change, event create/edit, reading the log) |
+| holds not checking whether the event was cancelled | the cancel test (a hold → 200) |
+| the payment ignoring a cancelled event | the slipped-in-order test (tickets for a cancelled event) |
+| the cancel locking the event row first (the opposite order to payments) | the race test: "deadlock detected", 3 of 3 runs |
 | purchase-cap check removed from `create-hold.lua` | the hold-refused tests |
 | purchase-cap check removed from the payment transaction | the simultaneous-payments test (8 tickets paid) |
 | stream cap removed from `stream-open.lua` | 2 stream-cap tests |
@@ -174,6 +178,8 @@ Thousands of users are tested separately, with k6 and SQL verification afterward
 ## Lessons from flaky and broken runs
 
 - **A test that failed once in a full run (orders, same-key race):** it passed 5/5 alone, so it would have been easy to call it "flaky". A stress script (60 rounds × 20 simultaneous calls) reproduced it every time: ~15 errors in 1,200, a real bug since Phase 2 (see [12](12-orders-and-payments.md#orders-and-idempotency-step-2a)). Lesson: a rare failure under load is usually a real race; make it frequent, then fix it.
+
+- **A failing race test that left data behind (cancel an event):** while checking that the race test catches a deadlock, each failed run left users and paid orders in the test database. The test failed as soon as the cancel deadlocked, but its 8 payments were still running; the cleanup ran under them, and tickets written afterwards blocked the deletes. 9 runs later, the leftover admins made the 3 "last admin" tests **skip** and pushed another test's admin off a 100-user page (**fail**). Fix: `Promise.allSettled`, so the test waits for every payment before it fails. Lesson: a test must finish its own work before failing, or its cleanup races it.
 
 - **A test file that never ends (support inbox):** all 10 tests passed, then the file hung. Its cleanup threw (a real bug: deleting an event broke a table rule on its support requests) before releasing the admin lock and closing connections, so the process never exited. Fixes: the rule (see [17](17-support-inbox.md)), and cleanup in `try … finally`. Lesson: a hanging run often hides an error in `after()`; run the file with `--test-reporter=spec` into a file to see it.
 

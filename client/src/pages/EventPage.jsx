@@ -76,7 +76,8 @@ export function EventPage() {
   // Waiting room (Phase 4): only for events with an admission rate. Not needed once you hold tickets.
   const hasRoom = Boolean(event?.admissionPerSecond)
   const isAdmin = user?.role === 'admin' // admins run the sale, they don't buy (the server refuses too)
-  const queue = useQueueStatus(id, signedIn && !isAdmin && hasRoom && !page?.hold)
+  const cancelled = Boolean(event?.cancelledAt)
+  const queue = useQueueStatus(id, signedIn && !isAdmin && hasRoom && !page?.hold && !cancelled)
   const admitted = queue.status?.status === 'admitted'
   // A lucky-draw winner may hold lucky-draw tickets while their lucky pass lasts, line or no line.
   const draw = queue.status?.lottery
@@ -180,19 +181,30 @@ export function EventPage() {
       <Alert>{error}</Alert>
       <Alert kind="info">{notice}</Alert>
 
-      {hasRoom && <p className="muted">This sale has a waiting room ({event.admissionPerSecond} people let in per second).</p>}
+      {hasRoom && !cancelled && <p className="muted">This sale has a waiting room ({event.admissionPerSecond} people let in per second).</p>}
       {draw ? (
         <LuckyDrawPanel draw={draw} eventId={event.id} userId={user?.id} />
       ) : (
         event.lotteryTickets > 0 &&
-        !event.lotteryClosedAt && (
+        !event.lotteryClosedAt &&
+        !cancelled && (
           <p className="muted">
             🎟 {event.lotteryTickets} of the tickets go to a lucky draw among everyone in the waiting room.
           </p>
         )
       )}
 
-      {page.hold ? (
+      {cancelled ? (
+        <div className="panel">
+          <p>
+            <strong>This event has been cancelled.</strong> {event.cancelReason}
+          </p>
+          <p>
+            Everyone who paid gets their money back automatically and is told by email.{' '}
+            {signedIn && !isAdmin && <Link to="/orders">See your orders</Link>}
+          </p>
+        </div>
+      ) : page.hold ? (
         <div>
           <p>
             You're holding <strong>{page.hold.quantity}</strong> ticket{page.hold.quantity > 1 ? 's' : ''}. Hold

@@ -75,7 +75,7 @@ async function withAvailability(event, now) {
   return {
     ...event,
     available: await ensureStock(event),
-    onSale: new Date(event.saleStartsAt) <= now,
+    onSale: !event.cancelledAt && new Date(event.saleStartsAt) <= now,
   };
 }
 
@@ -133,6 +133,9 @@ export async function findEventCached(eventId) {
   return eventCache.get(String(eventId), () => eventsRepository.findEventById(eventId));
 }
 
+export const eventCancelledError = (event) =>
+  new AppError(409, 'EVENT_CANCELLED', 'This event has been cancelled', { reason: event.cancelReason, cancelledAt: event.cancelledAt });
+
 async function findEventOr404(eventId) {
   const event = await eventsRepository.findEventById(eventId);
   if (!event) throw new AppError(404, 'EVENT_NOT_FOUND', 'No event with this id');
@@ -155,6 +158,7 @@ function toPublicHold(hold) {
 export async function holdTickets({ eventId, userId, quantity }) {
   const [event, now] = await Promise.all([findEventCached(eventId), redisNow()]);
   if (!event) throw new AppError(404, 'EVENT_NOT_FOUND', 'No event with this id');
+  if (event.cancelledAt) throw eventCancelledError(event);
 
   // The SERVER decides when a sale opens. Hiding a button in the browser protects nothing.
   if (new Date(event.saleStartsAt) > now) {

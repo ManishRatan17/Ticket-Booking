@@ -4,4 +4,5 @@ export const EVENT_STATUS_TEXT = {
   on_sale: 'On sale',
   all_held: 'All held (unpaid holds may come back)',
   sold_out: 'Sold out',
+  cancelled: 'Cancelled',
 }

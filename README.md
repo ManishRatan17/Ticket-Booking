@@ -18,7 +18,7 @@ Load-tested with [k6](https://k6.io) against the real system (Linux containers, 
 
 Never oversold in any run, including the first one, before the bottlenecks it found were fixed. The load test exposed a database bottleneck on the hot path (790 errors in the first run → **0**, throughput **×1.9**). Details, before/after numbers and honest limits: [docs/19-load-testing.md](docs/19-load-testing.md).
 
-**419 automated tests** (378 server tests against real PostgreSQL and Redis, 41 client tests with Vitest), with **mutation testing**: every important protection was deliberately broken to prove a test catches it. They run on every push (GitHub Actions, real PostgreSQL and Redis), against their own test database.
+**425 automated tests** (383 server tests against real PostgreSQL and Redis, 41 client tests with Vitest), with **mutation testing**: every important protection was deliberately broken to prove a test catches it. They run on every push (GitHub Actions, real PostgreSQL and Redis), against their own test database.
 
 ## How it works
 
@@ -46,6 +46,7 @@ flowchart LR
 | **Double clicks, retries, duplicate webhooks** | idempotency keys on orders; processed-webhook ids; one transaction per payment |
 | **Payments** | Razorpay (test mode): the server creates the Razorpay order, checks the payment signature, and Razorpay's signed webhook is the backup; both go through one idempotent transaction |
 | **Late payment after the hold expired** | confirm if tickets are still available, otherwise fail and refund |
+| **Refunds and cancelled events** | every payment that bought no tickets is refunded (recorded in the payment transaction, never twice); an admin can cancel an event: the sale stops, every buyer is refunded and emailed, even someone paying at that very moment |
 | **Bots and scalpers** | per-user and per-IP rate limits, a 4-ticket cap per person per event, Cloudflare Turnstile, a hidden honeypot, and **bot strikes**: 1st → booking paused 15 days, 2nd within a year → banned, with appeals |
 | **Accounts** | argon2id passwords, JWT in HttpOnly cookies with rotating refresh tokens and reuse detection, Google sign-in (OIDC + PKCE), CSRF protection, password reset |
 
@@ -82,4 +83,4 @@ Everything is in [docs/](docs/README.md): architecture, every table and Redis ke
 - Load-tested on one laptop with one API process; the API is stateless, so it scales out behind a load balancer, but that's not measured yet. 10,000 simultaneous live-update connections weren't tested.
 - Payments: **Razorpay test mode** when keys are set (tested against a fake Razorpay; not yet tried with real test keys), otherwise a built-in fake provider. Emails go through Resend in production and are printed to the console in development.
 - Styling is deliberately minimal for now.
-- Out of scope: seat maps, a refunds UI, multi-region, a mobile app, real money.
+- Out of scope: seat maps, multi-region, a mobile app, real money.

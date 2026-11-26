@@ -225,6 +225,16 @@ Every significant choice, the alternatives considered, and why. Newest at the bo
 | `admin_email` stored, `admin_id` without a foreign key | a foreign key to users | the record must outlive the admin's account |
 | Writes from the command line recorded too ("command line (set-role)") | HTTP only | making the first admin is the most powerful change of all |
 
+## Cancelling an event
+
+| Decision | Rejected | Why |
+|---|---|---|
+| Mark cancelled, keep everything | delete the event | the event and its orders are the record of who paid and who is owed money |
+| The refunds recorded in the cancel's transaction | refund one by one afterwards | if the cancel commits, every refund owed is on record; nobody can be forgotten |
+| Orders locked first, the event row last | lock the event first (simpler to read) | payments lock order → event; the opposite order deadlocks (measured: 6 of 8 race runs) |
+| The payment re-checks `cancelled_at` under the event lock | trust that the cancel saw every order | an order created in the instant of the cancel would otherwise become tickets for a cancelled event |
+| A new order status `cancelled` | reuse `failed` | "the event was cancelled" isn't a failed payment; My orders says which |
+
 ## Frontend
 
 | Decision | Alternatives | Why |

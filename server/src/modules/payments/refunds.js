@@ -27,6 +27,7 @@ export const REASON_TEXT = {
 // Called INSIDE the payment transaction. Returns the refund's id, or null if this payment already
 // has one (a repeated delivery).
 export async function recordRefund(client, { orderId, userId, provider, paymentId, amountPaise, reason }) {
+  if (!(amountPaise > 0) || !paymentId) return null; // a free order: nothing was paid, nothing to give back
   const { rows } = await client.query(
     `INSERT INTO refunds (order_id, user_id, provider, payment_id, amount_paise, reason)
      VALUES ($1, $2, $3, $4, $5, $6)

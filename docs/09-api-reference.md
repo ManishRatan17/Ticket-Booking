@@ -159,7 +159,7 @@ Header **`Idempotency-Key: <8–128 letters, digits, - or _>`** (the browser mak
 → `201 { "order": {…}, "serverTime" }` the first time · `200` + header `Idempotent-Replayed: true` for a retry with the same key (same order)
 · `400 IDEMPOTENCY_KEY_REQUIRED` · `404 HOLD_NOT_FOUND` (unknown or not yours) · `409 HOLD_EXPIRED` · `409 ORDER_EXISTS` (`details.orderId`: this hold already has an order) · `422 IDEMPOTENCY_KEY_REUSED` (same key, different hold)
 
-Order shape: `{ "id", "eventId", "eventName", "quantity", "amountPaise", "status": "pending|paid|failed|expired", "expiresAt", "paidAt", "failureReason", "ticketNumbers": [], "createdAt" }`
+Order shape: `{ "id", "eventId", "eventName", "quantity", "amountPaise", "status": "pending|paid|failed|expired|cancelled", "expiresAt", "paidAt", "failureReason", "ticketNumbers": [], "createdAt" }`
 
 ### `GET /orders/:id`
 → `200 { "order": {…}, "serverTime" }` · `404 ORDER_NOT_FOUND` (unknown or not yours). A pending order past its deadline is marked `expired` here and its held tickets return to sale.
@@ -221,14 +221,20 @@ Orders carry `refund`: `null`, or `{ "status": "pending" | "refunded", "amountPa
 ### `GET /admin/refunds?status=pending|refunded` → `200 { "refunds": [ { "id", "orderId", "userEmail", "eventName", "amountPaise", "reason", "status", "provider", "paymentId", "providerRefundId", "error", "attempts", "createdAt", "refundedAt" } ] }` (pending first)
 ### `POST /admin/refunds/:id/retry` → `202 { "retried": true }` · `404 REFUND_NOT_FOUND` · `409 ALREADY_REFUNDED`
 
+## Cancelled events
+
+Every event carries `cancelledAt` (null = not cancelled) and `cancelReason`; a cancelled event has `onSale: false`. Then `POST /events/:id/holds`, `POST /orders`, `POST`/`GET /events/:id/queue` (and its live stream) → **`409 EVENT_CANCELLED`** with `details: { reason, cancelledAt }`. Its orders have the status `cancelled`; paid ones carry a `refund` with the reason `event_cancelled`.
+
 ## Admins run the sale
 
 Admins → `403 ADMINS_CANNOT_BUY` on `POST /events/:id/holds`, `POST /events/:id/queue`, `POST /orders`, `POST /payments/fake/:orderId`; `403 ADMINS_USE_INBOX` on `POST /support/requests` and `POST /support/requests/:id/messages`. See [20](20-admin-side.md).
 
-### `GET /admin/events` → `200 { "events": [ { …event, "status": "upcoming" | "on_sale" | "all_held" | "sold_out", "sold", "held", "available", "revenuePaise", "paidOrders", "inLine", "luckyDraw": null | { "tickets", "left", "entered", "open" } } ], "serverTime" }`
+### `GET /admin/events` → `200 { "events": [ { …event, "status": "upcoming" | "on_sale" | "all_held" | "sold_out" | "cancelled", "sold", "held", "available", "revenuePaise", "paidOrders", "inLine", "luckyDraw": null | { "tickets", "left", "entered", "open" } } ], "serverTime" }`
 ### `GET /admin/events/:id` → `200 { "event": { …the same } }` · `404 EVENT_NOT_FOUND`
 ### `PATCH /admin/events/:id`
-Body: any of `{ "name", "pricePaise", "saleStartsAt", "admissionPerSecond" (null = no waiting room), "lobbyMinutes" }` → `200 { "event" }` · `400` (nothing to change, invalid) · `409 SALE_STARTED` (after the sale opened only the name may change) · `409 LOTTERY_NEEDS_ROOM`
+Body: any of `{ "name", "pricePaise", "saleStartsAt", "admissionPerSecond" (null = no waiting room), "lobbyMinutes" }` → `200 { "event" }` · `400` (nothing to change, invalid) · `409 SALE_STARTED` (after the sale opened only the name may change) · `409 LOTTERY_NEEDS_ROOM` · `409 EVENT_CANCELLED`
+### `POST /admin/events/:id/cancel`
+Body `{ "reason": "3–500 chars" }` (shown to customers and in their email) → `200 { "cancelled": true, "ordersCancelled", "paidOrdersRefunded", "refundTotalPaise" }` · `400` · `404 EVENT_NOT_FOUND` · `409 ALREADY_CANCELLED`. Can't be undone. See [12](12-orders-and-payments.md#cancelling-an-event).
 ### `GET /admin/notifications` → `200 { "count", "latest": [ restriction… ] }` (automatic restrictions no admin has marked as seen)
 ### `POST /admin/restrictions/acknowledge` → `200 { "acknowledged": n }`
 

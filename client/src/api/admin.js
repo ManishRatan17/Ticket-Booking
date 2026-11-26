@@ -20,6 +20,8 @@ export const retryJob = (jobId) => api(`/admin/jobs/${encodeURIComponent(jobId)}
 export const listAdminEvents = () => api('/admin/events')
 export const getAdminEvent = (id) => api(`/admin/events/${encodeURIComponent(id)}`)
 export const updateEvent = (id, changes) => api(`/admin/events/${encodeURIComponent(id)}`, { method: 'PATCH', body: changes })
+// Cancel: stops the sale, refunds every paid order, emails ticket holders. Can't be undone.
+export const cancelEvent = (id, reason) => api(`/admin/events/${encodeURIComponent(id)}/cancel`, { method: 'POST', body: { reason } })
 
 // Refunds: list (pending first) and retry a pending one.
 export const listRefunds = (status) => api(`/admin/refunds${status ? `?status=${encodeURIComponent(status)}` : ''}`)

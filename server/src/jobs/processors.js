@@ -94,7 +94,7 @@ export async function admitWaiting({ eventIds } = {}) {
   if (roomIds.length === 0) return { admitted: 0 };
 
   const { rows } = await pool.query(
-    'SELECT id, admission_per_second, sale_starts_at FROM events WHERE id = ANY($1::bigint[])',
+    'SELECT id, admission_per_second, sale_starts_at FROM events WHERE id = ANY($1::bigint[]) AND cancelled_at IS NULL',
     [roomIds],
   );
   const now = await redisNow();
@@ -108,7 +108,7 @@ export async function admitWaiting({ eventIds } = {}) {
     if (stock !== null && Number(stock) <= 0) continue;
     admitted += (await admitNext(event.id, event.admission_per_second)).length;
   }
-  // Rooms of events that no longer exist: clean them up.
+  // Rooms of events that no longer exist (or were cancelled): clean them up.
   const known = new Set(rows.map((r) => String(r.id)));
   if (!eventIds) for (const id of roomIds) if (!known.has(String(id))) await dropRoom(id);
   return { admitted };

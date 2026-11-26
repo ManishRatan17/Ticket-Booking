@@ -20,7 +20,7 @@ function toOrder(row) {
     eventName: row.event_name,
     quantity: row.quantity,
     amountPaise: row.amount_paise,
-    status: row.status, // pending → paid | failed | expired
+    status: row.status, // pending → paid | failed | expired; 'cancelled' = the event was cancelled
     pool: row.pool, // 'main' or 'lottery' (lucky-draw tickets)
     holdId: row.hold_id,
     providerOrderId: row.provider_order_id, // Razorpay's order id ("order_…"), once checkout started
@@ -151,6 +151,15 @@ export async function markFailed(client, { orderId, paymentId, reason }) {
     `UPDATE orders SET status = 'failed', payment_id = COALESCE($2, payment_id), failure_reason = $3, updated_at = now()
       WHERE id = $1`,
     [orderId, paymentId, reason],
+  );
+}
+
+// The event was cancelled (a payment arriving afterwards): no tickets, and the money goes back.
+export async function markCancelled(client, { orderId, paymentId }) {
+  await client.query(
+    `UPDATE orders SET status = 'cancelled', payment_id = COALESCE($2, payment_id), failure_reason = 'event_cancelled', updated_at = now()
+      WHERE id = $1`,
+    [orderId, paymentId],
   );
 }
 

@@ -28,11 +28,11 @@ export async function lockDraw(client, eventId) {
   };
 }
 
-// Events whose draw is open and due (the draw time has come). Optionally only some (tests).
+// Events (not cancelled) whose draw is open and due (the draw time has come). Optionally only some (tests).
 export async function dueDrawEventIds(client, eventIds = null) {
   const { rows } = await client.query(
     `SELECT e.id FROM events AS e JOIN lottery_draws AS d ON d.event_id = e.id
-      WHERE e.lottery_closed_at IS NULL
+      WHERE e.lottery_closed_at IS NULL AND e.cancelled_at IS NULL -- a cancelled event draws nobody
         AND e.sale_starts_at + make_interval(mins => e.lottery_draw_minutes) <= now()
         AND ($1::bigint[] IS NULL OR e.id = ANY($1::bigint[]))`,
     [eventIds],

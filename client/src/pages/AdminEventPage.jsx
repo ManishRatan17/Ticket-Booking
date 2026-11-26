@@ -3,7 +3,7 @@
 // (the server enforces it: 409 SALE_STARTED). Tickets and lucky-draw settings are fixed at creation.
 import { useCallback, useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { getAdminEvent, updateEvent, withFreshRole } from '../api/admin.js'
+import { cancelEvent, getAdminEvent, updateEvent, withFreshRole } from '../api/admin.js'
 import { Alert } from '../components/Alert.jsx'
 import { FormField } from '../components/FormField.jsx'
 import { EVENT_STATUS_TEXT } from '../lib/eventStatus.js'
@@ -33,6 +33,7 @@ export function AdminEventPage() {
   const [error, setError] = useState(null)
   const [notice, setNotice] = useState(null)
   const [busy, setBusy] = useState(false)
+  const [cancelReason, setCancelReason] = useState('')
 
   const load = useCallback(async () => {
     const { event: fresh } = await withFreshRole(() => getAdminEvent(id))
@@ -84,6 +85,29 @@ export function AdminEventPage() {
       setNotice('Saved. The shop shows the change right away.')
     } catch (err) {
       setErrors(fieldErrors(err))
+      setError(errorMessage(err))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  // Cancelling can't be undone: the browser asks once more before sending it.
+  async function handleCancel(e) {
+    e.preventDefault()
+    const sure = window.confirm(
+      `Cancel "${event.name}"? The sale stops at once, every paid order (${event.paidOrders}) is refunded and its buyer emailed. This can't be undone.`,
+    )
+    if (!sure) return
+    setBusy(true)
+    setError(null)
+    setNotice(null)
+    try {
+      const result = await cancelEvent(id, cancelReason)
+      setNotice(
+        `Cancelled. ${result.ordersCancelled} orders ended; ${result.paidOrdersRefunded} refunds (${formatMoney(result.refundTotalPaise)}) are on their way. See the Refunds page.`,
+      )
+      await load()
+    } catch (err) {
       setError(errorMessage(err))
     } finally {
       setBusy(false)
@@ -151,33 +175,66 @@ export function AdminEventPage() {
       </div>
       <p className="muted">Sale starts {formatDate(event.saleStartsAt)}. Numbers refresh every 5 seconds.</p>
 
-      <h2>Edit</h2>
-      {started && (
-        <p className="muted">
-          The sale has started, so only the name can change now (changing the price or time after people queued
-          or paid would be unfair).
-        </p>
+      {event.cancelledAt && (
+        <div className="panel">
+          <p>
+            <strong>Cancelled</strong> {formatDate(event.cancelledAt)}: {event.cancelReason}
+          </p>
+          <p className="muted">
+            Paid orders were cancelled and refunded (<Link to="/admin/refunds">Refunds</Link>). A cancelled event
+            can't be edited.
+          </p>
+        </div>
       )}
-      <form onSubmit={handleSubmit} noValidate>
-        <FormField id="name" label="Name" value={form.name} onChange={update('name')} error={errors.name} />
-        <FormField id="price" label="Price per ticket (₹)" type="number" min="0" step="0.01" value={form.price} onChange={update('price')} error={errors.pricePaise} disabled={started} />
-        <FormField id="saleStartsAt" label="Sale starts" type="datetime-local" value={form.saleStartsAt} onChange={update('saleStartsAt')} error={errors.saleStartsAt} disabled={started} />
-        <FormField
-          id="admissionPerSecond"
-          label="Waiting room: people let in per second (empty = none)"
-          type="number"
-          min="1"
-          value={form.admissionPerSecond}
-          onChange={update('admissionPerSecond')}
-          error={errors.admissionPerSecond}
-          disabled={started}
-        />
-        <FormField id="lobbyMinutes" label="Waiting room opens this many minutes before" type="number" min="1" max="1440" value={form.lobbyMinutes} onChange={update('lobbyMinutes')} error={errors.lobbyMinutes} disabled={started} />
-        <p className="muted">Tickets ({event.totalTickets}) and the lucky-draw settings are fixed once an event exists.</p>
-        <button type="submit" disabled={busy}>
-          {busy ? 'Saving…' : 'Save'}
-        </button>
-      </form>
+
+      {!event.cancelledAt && (
+        <>
+          <h2>Edit</h2>
+          {started && (
+            <p className="muted">
+              The sale has started, so only the name can change now (changing the price or time after people queued
+              or paid would be unfair).
+            </p>
+          )}
+          <form onSubmit={handleSubmit} noValidate>
+            <FormField id="name" label="Name" value={form.name} onChange={update('name')} error={errors.name} />
+            <FormField id="price" label="Price per ticket (₹)" type="number" min="0" step="0.01" value={form.price} onChange={update('price')} error={errors.pricePaise} disabled={started} />
+            <FormField id="saleStartsAt" label="Sale starts" type="datetime-local" value={form.saleStartsAt} onChange={update('saleStartsAt')} error={errors.saleStartsAt} disabled={started} />
+            <FormField
+              id="admissionPerSecond"
+              label="Waiting room: people let in per second (empty = none)"
+              type="number"
+              min="1"
+              value={form.admissionPerSecond}
+              onChange={update('admissionPerSecond')}
+              error={errors.admissionPerSecond}
+              disabled={started}
+            />
+            <FormField id="lobbyMinutes" label="Waiting room opens this many minutes before" type="number" min="1" max="1440" value={form.lobbyMinutes} onChange={update('lobbyMinutes')} error={errors.lobbyMinutes} disabled={started} />
+            <p className="muted">Tickets ({event.totalTickets}) and the lucky-draw settings are fixed once an event exists.</p>
+            <button type="submit" disabled={busy}>
+              {busy ? 'Saving…' : 'Save'}
+            </button>
+          </form>
+
+          <h2>Cancel this event</h2>
+          <p className="muted">
+            Stops the sale and the waiting room at once, ends unpaid orders, refunds every paid order and emails its buyer.
+            It can't be undone.
+          </p>
+          <form onSubmit={handleCancel} noValidate>
+            <FormField
+              id="cancelReason"
+              label="Reason (shown to customers and in their email)"
+              value={cancelReason}
+              onChange={(e) => setCancelReason(e.target.value)}
+            />
+            <button type="submit" disabled={busy || cancelReason.trim().length < 3}>
+              Cancel event and refund everyone
+            </button>
+          </form>
+        </>
+      )}
     </section>
   )
 }

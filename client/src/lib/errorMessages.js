@@ -49,6 +49,8 @@ const MESSAGES = {
   ADMINS_USE_INBOX: 'Admins answer requests in the Support inbox.',
   SALE_STARTED: 'The sale has started: only the name can be changed now.',
   LOTTERY_NEEDS_ROOM: 'This event has a lucky draw, which needs its waiting room.',
+  EVENT_CANCELLED: 'This event has been cancelled. Anyone who paid gets their money back automatically.',
+  ALREADY_CANCELLED: 'This event is already cancelled.',
   // Admin
   FORBIDDEN: 'You do not have permission to do this.',
   LAST_ADMIN: 'This is the only admin left. Make someone else an admin first.',

@@ -161,3 +161,34 @@ after the commit ─────► job "process-refund" (worker; retried with g
 **People** see it in My orders: "refunded ₹998.00 (paid after the hold expired; sold out by then)", and get an email. **Admins:** the **Refunds** page (pending first, with the provider's error and Retry).
 
 *Tested in [refunds.test.js](../server/test/refunds.test.js) (fake provider: recorded with the payment, refunded, email, shown in the order; the same payment twice → one refund; a wrong amount → the paid amount back; the admin list, Retry, 409 when already refunded, 403 for users) and [razorpay.test.js](../server/test/razorpay.test.js) (Razorpay's refund API with the amount and our refund id; Razorpay down → pending with the error, a retry refunds; a lost answer → refunded once).*
+
+## Cancelling an event
+
+An admin cancels an event on its admin page, with a reason (`POST /api/admin/events/:id/cancel`, [events.cancel.js](../server/src/modules/events/events.cancel.js), migration [015](../server/migrations/015_event_cancellation.sql)). **Nothing is deleted**: the event and its orders stay, as the record of who paid what.
+
+```
+ONE transaction:  lock the event's open orders (pending + paid)  ─►  events.cancelled_at = now()
+                  paid orders    → 'cancelled' + a refund row each (event_cancelled)
+                  pending orders → 'cancelled' (nothing was paid)
+after the commit: forget the cached event · drop the waiting room · release the held tickets
+                  process the refunds (jobs, retried) · email everyone who had paid
+```
+
+| What | How |
+|---|---|
+| The sale stops | holds, orders, joining or watching the queue → `409 EVENT_CANCELLED` (the shop page shows "This event has been cancelled" with the reason) |
+| Unpaid orders end | they become `cancelled`; their holds are released |
+| **Everyone who paid gets the money back** | a refund per paid order, recorded **in the same transaction** as the cancel: the event can't be cancelled with a refund forgotten. Processed like every refund (above): retried, Refunds page, email |
+| Ticket holders are told | an email "Cancelled: …" with the reason and the amount being refunded (then the refund's own email) |
+| Background work stops | the admission job skips it (and drops its room), the lucky draw draws nobody |
+| No edits afterwards | `PATCH` → `409 EVENT_CANCELLED`; cancelling twice → `409 ALREADY_CANCELLED` |
+| Free tickets | nothing paid → nothing refunded (no refund row for ₹0), still emailed |
+
+**Payments racing the cancel.** A person may be paying at the very moment the admin cancels. Two rules make every outcome safe:
+
+1. **Lock order.** Payments lock the order, then the event. The cancel does the same: the orders first, the event row **last**. Taken the other way round, a payment and a cancel each wait for the other: a **deadlock**. Measured: with the cancel locking the event first, PostgreSQL reported "deadlock detected" in 6 of 8 runs of the race test; with the right order, never.
+2. **The payment checks under the event lock.** `lockEvent` returns `cancelledAt` read under that lock. Cancelled → the order becomes `cancelled` and the money goes back (`event_cancelled`), no tickets. So an order that slipped in just before the cancel (the cancel didn't see it) is still caught when its payment arrives. A payment for an order the cancel already ended is refunded the same way.
+
+Either the payment finished first (paid → then cancelled and refunded by the cancel), or the cancel did (the payment is refunded). Either way: **one refund per payment, no tickets for a cancelled event.**
+
+*Tested in [cancel-event.test.js](../server/test/cancel-event.test.js): 2 paid + 1 pending order + 1 hold → paid ones cancelled and refunded, emailed (with the reason and amount), the pending one cancelled with no refund, new holds and orders from an old hold → 409, the shop and admin show it; twice → 409, unknown → 404, short reason → 400, no edits, admins only, the audit entry; a payment for an order that slipped in → refunded, no tickets; **8 payments racing the cancel, 3 rounds** → nothing stays paid, exactly one refund each, no deadlock; the waiting room is emptied and closed. Mutations: holds not checking cancellation → the first test fails; the payment ignoring a cancelled event → the slipped-in test fails; the cancel locking the event first → the race test fails with "deadlock detected", 3 of 3 runs.*

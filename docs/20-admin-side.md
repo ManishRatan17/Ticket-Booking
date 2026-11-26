@@ -21,7 +21,7 @@ Customer:   Events · My orders · Help
 
 | Column | Where it comes from |
 |---|---|
-| Status: Upcoming · On sale · All held · Sold out | the sale time; sold = total → sold out; nothing left but not all paid → all held |
+| Status: Upcoming · On sale · All held · Sold out · Cancelled | the sale time; sold = total → sold out; nothing left but not all paid → all held; cancelled by an admin |
 | Sold | PostgreSQL `tickets_sold` (paid tickets: the record) |
 | Left | Redis: the normal stock + what the lucky draw still has |
 | Held | total − sold − left: in someone's hold right now |
@@ -41,6 +41,8 @@ The "Create an event" form is folded below the table.
 | Number of tickets, lucky-draw settings | never: the stock and the draw's committed seed are built on them |
 
 An edit clears this server's 1-second copy of the event ([19](19-load-testing.md)), so the shop shows it at once.
+
+**Cancelling** (bottom of the event's page): a reason (shown to customers), then "Cancel event and refund everyone", confirmed once more by the browser. The sale and the waiting room stop at once, unpaid orders end, every paid order is refunded and its buyer emailed. It can't be undone, and a cancelled event can't be edited. The page then shows "Cancelled" with the date and reason; the refunds appear on the Refunds page. How it stays safe while people are paying: [12](12-orders-and-payments.md#cancelling-an-event).
 
 ## System (was "Jobs")
 

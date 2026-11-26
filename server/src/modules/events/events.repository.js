@@ -3,7 +3,7 @@
 import { pool } from '../../config/db.js';
 
 const COLUMNS = `id, name, total_tickets, tickets_sold, sale_starts_at, price_paise, admission_per_second, lobby_minutes,
-  lottery_percent, lottery_tickets, lottery_draw_minutes, lottery_per_winner, lottery_closed_at, created_at`;
+  lottery_percent, lottery_tickets, lottery_draw_minutes, lottery_per_winner, lottery_closed_at, cancelled_at, cancel_reason, created_at`;
 
 function toEvent(row) {
   return {
@@ -22,6 +22,8 @@ function toEvent(row) {
     lotteryDrawMinutes: row.lottery_draw_minutes,
     lotteryPerWinner: row.lottery_per_winner,
     lotteryClosedAt: row.lottery_closed_at,
+    cancelledAt: row.cancelled_at, // null = not cancelled (migration 015); paid orders were refunded
+    cancelReason: row.cancel_reason,
     createdAt: row.created_at,
   };
 }
@@ -61,8 +63,10 @@ export async function findEventById(id) {
 
 // Locks the event row until the transaction ends. Payments for the same event then run one
 // after another, so "how much has this user bought?" can't change while we decide (Phase 5b).
+// Returns { cancelledAt }: read UNDER the lock, so a cancel can't slip in between (events.cancel.js).
 export async function lockEvent(client, eventId) {
-  await client.query('SELECT id FROM events WHERE id = $1 FOR UPDATE', [eventId]);
+  const { rows } = await client.query('SELECT cancelled_at FROM events WHERE id = $1 FOR UPDATE', [eventId]);
+  return { cancelledAt: rows[0]?.cancelled_at ?? null };
 }
 
 // Takes the next `quantity` ticket numbers for an event, atomically (Postgres row lock).

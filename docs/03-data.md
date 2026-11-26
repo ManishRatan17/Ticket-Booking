@@ -18,6 +18,7 @@ The database structure lives in numbered SQL files in [server/migrations/](../se
 | `002_auth.sql` | users get `role`, `password_changed_at`, lowercase-email check; new `sessions`, `refresh_tokens`, `password_reset_tokens` |
 | `003_google_login.sql` | `password_hash` becomes optional; users get `email_verified_at`; new `user_identities`; new revoke reason `account_linked` |
 | `005_waiting_room.sql` | events get `admission_per_second` (NULL = no waiting room) |
+| `015_event_cancellation.sql` | events get `cancelled_at` (NULL = not cancelled) and `cancel_reason`; orders get the status `cancelled` |
 | `014_audit_log.sql` | `admin_audit_log`: which admin (id + email, kept even if the account goes), action, target type + id, details (JSON), when. **Append-only**: a trigger refuses every UPDATE and DELETE |
 | `013_refunds.sql` | `refunds`: order, payment (UNIQUE: one refund per payment), amount, reason, status pending/refunded, the provider's refund id, last error, attempts |
 | `012_razorpay.sql` | orders get `provider_order_id` (the Razorpay order, unique): created once per order; webhooks find our order by it |
@@ -81,7 +82,7 @@ Index: `sessions_active_user_id_idx ON (user_id) WHERE revoked_at IS NULL` — a
 
 #### `orders` (used from Phase 2)
 Added by 004: `hold_id` (**unique** — one order per hold), `amount_paise` (price × quantity, computed on the server), `paid_at`, `failure_reason`. Original columns:
-`user_id`, `event_id`, `quantity` (`> 0`), `status` (`pending` → `paid` | `failed` | `expired`), `idempotency_key` with `UNIQUE (user_id, idempotency_key)` (a retried request can't create a second order), `payment_id`, `expires_at`, `created_at`, `updated_at`. Indexes on `user_id` and `(event_id, status)`.
+`user_id`, `event_id`, `quantity` (`> 0`), `status` (`pending` → `paid` | `failed` | `expired` | `cancelled` — the event was cancelled, migration 015), `idempotency_key` with `UNIQUE (user_id, idempotency_key)` (a retried request can't create a second order), `payment_id`, `expires_at`, `created_at`, `updated_at`. Indexes on `user_id` and `(event_id, status)`.
 
 #### `sold_tickets` (used from Phase 2)
 `event_id`, `ticket_number` (`> 0`), `order_id`, with **`UNIQUE (event_id, ticket_number)` — the safety net of the whole project**: even if every other layer failed, the database refuses to sell ticket #7 of an event twice. Used today to rebuild Redis stock (`total − sold`).

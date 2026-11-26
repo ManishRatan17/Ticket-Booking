@@ -9,7 +9,7 @@
 import { pool } from '../../config/db.js';
 import { redis } from '../../config/redis.js';
 import { AppError } from '../../lib/errors.js';
-import { ensureStock, forgetEvent, lotteryOpen, lotteryStockLeft } from '../events/events.service.js';
+import { ensureStock, eventCancelledError, forgetEvent, lotteryOpen, lotteryStockLeft } from '../events/events.service.js';
 import { redisNow } from '../reservation/holds.js';
 import { entrantsKey, queueKey } from '../waiting-room/waiting-room.js';
 import * as eventsRepository from '../events/events.repository.js';
@@ -34,11 +34,11 @@ async function withLiveNumbers(event, now, money) {
   const available = Math.max(0, left) + lotteryLeft;
   const held = Math.max(0, event.totalTickets - sold - available);
   const started = new Date(event.saleStartsAt) <= now;
-  const status =
-    sold >= event.totalTickets ? 'sold_out' : !started ? 'upcoming' : available === 0 ? 'all_held' : 'on_sale';
+  let status = sold >= event.totalTickets ? 'sold_out' : !started ? 'upcoming' : available === 0 ? 'all_held' : 'on_sale';
+  if (event.cancelledAt) status = 'cancelled';
   return {
     ...event,
-    status, // upcoming | on_sale | all_held (none left, some only held) | sold_out
+    status, // upcoming | on_sale | all_held (none left, some only held) | sold_out | cancelled
     sold,
     held,
     available,
@@ -69,6 +69,7 @@ export async function getEventWithNumbers(id) {
 export async function updateEvent(id, changes) {
   const event = await eventsRepository.findEventById(id);
   if (!event) throw new AppError(404, 'EVENT_NOT_FOUND', 'No event with this id');
+  if (event.cancelledAt) throw eventCancelledError(event); // a cancelled event is history: no edits
   const now = await redisNow();
   const saleChanges = ['pricePaise', 'saleStartsAt', 'admissionPerSecond', 'lobbyMinutes'].filter((k) => k in changes);
   if (saleChanges.length > 0 && new Date(event.saleStartsAt) <= now) {

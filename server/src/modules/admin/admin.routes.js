@@ -7,6 +7,7 @@ import { listUsersQuerySchema, userIdParamsSchema, changeRoleBodySchema } from '
 import * as adminController from './admin.controller.js';
 import { createEventSchema, updateEventSchema } from '../events/events.schemas.js';
 import * as adminEvents from './admin.events.js';
+import { cancelEvent } from '../events/events.cancel.js';
 import * as refunds from '../payments/refunds.js';
 import * as eventsController from '../events/events.controller.js';
 import { z } from 'zod';
@@ -47,6 +48,16 @@ router.get('/events/:id', validate({ params: eventIdParams }), async (req, res) 
 router.patch('/events/:id', validate({ params: eventIdParams, body: updateEventSchema }), async (req, res) => {
   res.json(await adminEvents.updateEvent(req.validated.params.id, req.validated.body));
 });
+// Cancel: stop the sale, end unpaid orders, refund every paid one, email ticket holders (events.cancel.js).
+router.post(
+  '/events/:id/cancel',
+  validate({ params: eventIdParams, body: z.object({ reason: z.string().trim().min(3).max(500) }) }),
+  async (req, res) => {
+    const result = await cancelEvent({ eventId: req.validated.params.id, reason: req.validated.body.reason });
+    res.locals.auditDetails = result; // the audit log keeps how many orders and how much money
+    res.json({ cancelled: true, ...result });
+  },
+);
 
 // Background jobs (Phase 3): overview + retrying a failed job from the dead-letter queue.
 router.get('/jobs', async (req, res) => {

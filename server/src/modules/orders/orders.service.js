@@ -9,6 +9,7 @@ import { AppError } from '../../lib/errors.js';
 import { isUniqueViolation } from '../../lib/db-errors.js';
 import { getHold, releaseHold, redisNow } from '../reservation/holds.js';
 import * as eventsRepository from '../events/events.repository.js';
+import { eventCancelledError } from '../events/events.service.js';
 import * as ordersRepository from './orders.repository.js';
 
 // What the browser sees. (userId, holdId, idempotencyKey stay on the server.)
@@ -54,6 +55,7 @@ export async function createOrder({ userId, holdId, idempotencyKey }) {
 
   // 3. Price is read from the DATABASE, never from the request: the client can't choose it.
   const event = await eventsRepository.findEventById(Number(hold.eventId));
+  if (event.cancelledAt) throw eventCancelledError(event); // a hold from just before the cancel
   const amountPaise = event.pricePaise * hold.quantity;
 
   let orderId;

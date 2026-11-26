@@ -33,7 +33,9 @@ export function EventsPage() {
           {data.events.map((event) => (
             <li key={event.id}>
               <Link to={`/events/${event.id}`}>{event.name}</Link> — {formatMoney(event.pricePaise)} —{' '}
-              {event.onSale
+              {event.cancelledAt
+                ? 'cancelled'
+                : event.onSale
                 ? `${event.available} of ${event.totalTickets} tickets left`
                 : `on sale in ${formatCountdown(secondsUntil(event.saleStartsAt, data.offset))}`}
             </li>

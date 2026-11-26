@@ -12,6 +12,7 @@ const STATUS_TEXT = {
   paid: 'paid',
   failed: 'payment failed',
   expired: 'expired (not paid in time)',
+  cancelled: 'cancelled (the event was cancelled)',
 }
 
 export function OrdersPage() {
