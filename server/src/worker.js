@@ -5,7 +5,7 @@
 // With several worker processes, BullMQ still hands each job to exactly ONE of them.
 import { env } from './config/env.js';
 import { createWorker } from './jobs/worker.js';
-import { scheduleSweep, scheduleAdmissions, scheduleLottery } from './jobs/queue.js';
+import { scheduleSweep, scheduleAdmissions, scheduleLottery, scheduleHousekeeping } from './jobs/queue.js';
 import { indexAllHolds } from './modules/reservation/holds.js';
 import { closeConnections } from './config/connections.js';
 
@@ -20,7 +20,8 @@ try {
   await scheduleSweep();
   await scheduleAdmissions();
   await scheduleLottery();
-  console.log(`[worker] sweep every 60 s, waiting-room admission every 1 s, lucky draws every 5 s; ${indexed} existing hold(s) indexed`);
+  await scheduleHousekeeping();
+  console.log(`[worker] sweep every 60 s, waiting-room admission every 1 s, lucky draws every 5 s, housekeeping daily; ${indexed} existing hold(s) indexed`);
 } catch (err) {
   console.error(`[worker] could not set up the sweep: ${err.message}`);
 }

@@ -5,7 +5,7 @@ docker compose up -d     # the server tests use the real PostgreSQL and Redis
 npm test                 # server (node:test) then client (Vitest)
 ```
 
-Today: **370 server tests + 41 client tests**, all passing, none skipped.
+Today: **372 server tests + 41 client tests**, all passing, none skipped.
 
 ## Their own database, and CI
 
@@ -92,6 +92,7 @@ Kept outside `test/` because Node runs every file inside `test/` as a test.
 | `mail.test.js` | real email against a fake Resend: the request it receives, a 500 makes delivery fail (so the job retries), `sendMail` queues a `send-email` job that isn't kept after delivery |
 | `razorpay.test.js` | Razorpay test mode against a fake Razorpay: public key only, fake provider off, one Razorpay order for the exact amount, a valid signature pays (once), a forged signature or another order's payment → 400, the webhook alone pays, page + webhook at once → tickets once, a failed attempt keeps the order payable, webhook signature / duplicates / unknown orders, a wrong amount fails |
 | `refunds.test.js` | money that bought no tickets goes back: recorded with the payment, refunded, emailed, shown in the order; one refund per payment; a wrong amount → the paid amount back; admin list and Retry |
+| `housekeeping.test.js` | the daily cleanup removes long-dead sessions (and their refresh tokens), stale reset links and old webhook records, and keeps living sessions, recently logged-out ones, fresh links and recent webhooks |
 | `holds-http.test.js` | the holds API: every status code, IDOR, CSRF, lazy release on read, **300 users × 100 tickets over HTTP** |
 
 ## Client test files (Vitest)

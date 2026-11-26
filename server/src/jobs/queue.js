@@ -83,6 +83,12 @@ export async function scheduleLottery() {
   await getQueue().upsertJobScheduler('lottery-tick', { every: LOTTERY_EVERY_MS }, { name: 'lottery-tick', data: {} });
 }
 
+// Housekeeping once a day (housekeeping.js).
+export const HOUSEKEEPING_EVERY_MS = 24 * 60 * 60 * 1000;
+export async function scheduleHousekeeping() {
+  await getQueue().upsertJobScheduler('housekeeping', { every: HOUSEKEEPING_EVERY_MS }, { name: 'housekeeping', data: {} });
+}
+
 export async function closeQueue() {
   if (queue) {
     await queue.close();

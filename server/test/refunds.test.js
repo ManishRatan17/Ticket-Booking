@@ -103,7 +103,14 @@ test('paid after expiry and sold out → a refund is RECORDED with the payment, 
   assert.deepEqual([r.reason, r.amount_paise, r.payment_id, r.provider, r.status], ['sold_out_after_expiry', 99_800, `pay_${RUN}_late`, 'fake', 'refunded']);
   assert.match(r.provider_refund_id, /^rfnd_fake_/);
 
-  const mail = mails.find((m) => m.to === ann.email && /Refund/.test(m.subject));
+  // The email goes out AFTER the refund is marked done (not awaited: a mail problem must never undo a
+  // refund), so wait for it too. (Checking at once failed under the full suite's load: a test race.)
+  let mail;
+  for (let i = 0; i < 100 && !mail; i++) {
+    mail = mails.find((m) => m.to === ann.email && /Refund/.test(m.subject));
+    if (!mail) await new Promise((res) => setTimeout(res, 20));
+  }
+  assert.ok(mail, 'the refund email was sent');
   assert.match(mail.subject, /₹998\.00/);
   assert.match(mail.text, /sold out/);
 

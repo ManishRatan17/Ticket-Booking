@@ -50,6 +50,8 @@ An edit clears this server's 1-second copy of the event ([19](19-load-testing.md
 - a safety sweep every 60 seconds
 - letting people in from waiting rooms every second
 - running lucky draws every 5 seconds
+- processing refunds, sending emails
+- daily housekeeping (old sessions, expired reset links, old webhook records)
 
 A **green / red light** says whether the background worker is running (red: "expired holds are NOT released, nobody is let in, lucky draws don't happen"). Failed jobs are listed with **Retry**.
 
