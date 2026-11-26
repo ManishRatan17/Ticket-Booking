@@ -152,8 +152,9 @@ export function CheckoutPage() {
                 </button>
               </p>
               <p className="muted">
-                Razorpay <strong>test mode</strong>: no real money moves. Use one of Razorpay's test cards (e.g. 4111
-                1111 1111 1111, any future date, any CVV) or test UPI <code>success@razorpay</code>.
+                Razorpay <strong>test mode</strong>: no real money moves. Easiest: UPI <code>success@razorpay</code>. Or an
+                Indian test card: <code>4100 2800 0000 1007</code>, any future date, any CVV, and an OTP of 4–10 digits.
+                (International cards are refused unless your Razorpay account enables them.)
               </p>
             </>
           ) : provider === null ? (

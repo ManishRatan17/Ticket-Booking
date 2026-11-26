@@ -124,7 +124,7 @@ With `RAZORPAY_KEY_ID` + `RAZORPAY_KEY_SECRET` set, payments go through **Razorp
 | The amount comes from **our** order (step 3) or Razorpay's payment (step 4), and a mismatch fails the order | never sell for the wrong price (tested) |
 | A Razorpay order is created once per our order (`UPDATE … WHERE provider_order_id IS NULL`) | double clicks don't create two payable orders |
 
-**Test mode:** Razorpay's test keys (`rzp_test_…`) take no real money; pay with Razorpay's test cards (e.g. `4111 1111 1111 1111`, any future date, any CVV) or test UPI `success@razorpay`. In the dashboard, make sure payments are **captured automatically** (Account & Settings → Payment capture), otherwise `payment.captured` never comes.
+**Test mode:** Razorpay's test keys (`rzp_test_…`) take no real money; pay with test UPI `success@razorpay` (`failure@razorpay` to see a failure), or an **Indian** test card such as Visa `4100 2800 0000 1007` (any future date, any CVV, an OTP of 4–10 digits). **International** cards (e.g. `4111 1111 1111 1111`) are refused with "International cards are not supported" unless the Razorpay account enables them. Source: Razorpay's test card and test UPI pages. In the dashboard, make sure payments are **captured automatically** (Account & Settings → Payment capture), otherwise `payment.captured` never comes.
 
 **Content-Security-Policy:** the page may load `https://checkout.razorpay.com` (script) and Razorpay's frames (`api.razorpay.com`, `checkout.razorpay.com`).
 
