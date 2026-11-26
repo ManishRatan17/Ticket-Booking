@@ -9,6 +9,7 @@ import * as eventsRepository from '../events/events.repository.js';
 import * as ordersRepository from '../orders/orders.repository.js';
 import { startPayment } from './fake-provider.js';
 import * as razorpay from './razorpay.js';
+import { recordRefund, requestRefund } from './refunds.js';
 import { env } from '../../config/env.js';
 import { sendMail } from '../../lib/mailer.js';
 import { formatRupees } from '../../lib/money.js';
@@ -145,14 +146,16 @@ export async function handlePaymentEvent(event, provider = 'fake') {
 
     // 3b. Payment succeeded.
     if (order.status === 'paid') return { outcome: 'already_paid' }; // another delivery got here first
+    // Money taken, no tickets: a REFUND, recorded in this same transaction (refunds.js).
+    const refund = (reason, amount = amountPaise) =>
+      recordRefund(client, { orderId, userId: order.userId, provider, paymentId, amountPaise: amount, reason });
+
     if (order.status === 'failed') {
-      console.warn(`[refund] order ${orderId} already failed, but payment ${paymentId} succeeded: refund it`);
-      return { outcome: 'refund_needed' };
+      return { outcome: 'refund_needed', refundId: await refund('order_already_failed') };
     }
     if (amountPaise !== order.amountPaise) {
       await ordersRepository.markFailed(client, { orderId, paymentId, reason: 'amount_mismatch' });
-      console.warn(`[refund] order ${orderId}: paid ${amountPaise}, expected ${order.amountPaise}: refund it`);
-      return { outcome: 'failed', releaseHoldId: order.holdId };
+      return { outcome: 'failed', releaseHoldId: order.holdId, refundId: await refund('amount_mismatch') }; // what was PAID goes back
     }
 
     // 3c. Purchase cap (Phase 5b), checked against the TRUTH: paid orders in PostgreSQL.
@@ -165,8 +168,7 @@ export async function handlePaymentEvent(event, provider = 'fake') {
     const limit = await purchaseLimitFor(order.eventId, order.userId, client); // 4, or more if an admin approved
     if (paidBefore + order.quantity > limit) {
       await ordersRepository.markFailed(client, { orderId, paymentId, reason: 'purchase_limit' });
-      console.warn(`[refund] order ${orderId}: over the ${limit}-ticket limit: refund payment ${paymentId}`);
-      return { outcome: 'refund_needed', releaseHoldId: order.holdId };
+      return { outcome: 'refund_needed', releaseHoldId: order.holdId, refundId: await refund('purchase_limit') };
     }
 
     // 4. Make sure the tickets are really set aside — in REDIS, before we commit.
@@ -185,8 +187,7 @@ export async function handlePaymentEvent(event, provider = 'fake') {
     if (!reserved) {
       // Late AND sold out meanwhile: we can't deliver. Fail the order; the money must go back.
       await ordersRepository.markFailed(client, { orderId, paymentId, reason: 'sold_out_after_expiry' });
-      console.warn(`[refund] order ${orderId}: paid after expiry and sold out: refund payment ${paymentId}`);
-      return { outcome: 'refund_needed' };
+      return { outcome: 'refund_needed', refundId: await refund('sold_out_after_expiry') };
     }
 
     // 5. Hand out ticket numbers — atomically, and the CHECK (tickets_sold <= total_tickets)
@@ -200,10 +201,12 @@ export async function handlePaymentEvent(event, provider = 'fake') {
   // After the commit: give a failed order's held tickets back. (If this fails, the hold simply
   // expires and is released later — tickets come back either way.)
   if (result.releaseHoldId) await releaseHold(result.releaseHoldId);
+  // The refund itself happens after the commit, in the background (retried if it fails).
+  if (result.refundId) await requestRefund(result.refundId);
   // A receipt (Phase 7). Not awaited: the provider's webhook gets its answer at once, and a mail
   // problem can't undo a payment (sendMail queues it; the worker retries).
   if (result.outcome === 'paid') sendReceipt(orderId).catch((err) => console.warn(`[mail] receipt for order ${orderId}: ${err.message}`));
-  const { releaseHoldId: _, ...answer } = result;
+  const { releaseHoldId: _, refundId: __, ...answer } = result;
   return answer;
 }
 

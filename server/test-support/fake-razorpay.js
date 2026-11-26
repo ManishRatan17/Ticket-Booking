@@ -26,6 +26,21 @@ export async function startFakeRazorpay({ keyId, keySecret, webhookSecret }) {
     res.json(order);
   });
 
+  // Refunds. refundMode: 'ok' | 'fail' (500) | 'timeout_after_refund' (refunds, then answers 504 as if
+  // the answer got lost: the case where a retry must NOT refund again).
+  const refunds = []; // { id, payment_id, amount, notes }
+  let refundMode = 'ok';
+  app.get('/v1/payments/:id/refunds', (req, res) => {
+    res.json({ entity: 'collection', items: refunds.filter((r) => r.payment_id === req.params.id) });
+  });
+  app.post('/v1/payments/:id/refund', (req, res) => {
+    if (refundMode === 'fail') return res.status(500).json({ error: { code: 'SERVER_ERROR', description: 'try later' } });
+    const refund = { id: rid('rfnd'), entity: 'refund', payment_id: req.params.id, amount: req.body.amount, notes: req.body.notes, status: 'processed' };
+    refunds.push(refund);
+    if (refundMode === 'timeout_after_refund') return res.status(504).json({ error: { code: 'GATEWAY_TIMEOUT' } });
+    res.json(refund);
+  });
+
   const server = app.listen(0);
   await once(server, 'listening');
 
@@ -33,6 +48,8 @@ export async function startFakeRazorpay({ keyId, keySecret, webhookSecret }) {
     apiUrl: `http://localhost:${server.address().port}/v1`,
     calls,
     orders,
+    refunds,
+    setRefundMode: (mode) => (refundMode = mode),
     // The checkout window's answer for a successful payment.
     pay(orderId, { secret = keySecret } = {}) {
       const paymentId = rid('pay');

@@ -24,6 +24,7 @@ import { SupportRequestPage } from './pages/SupportRequestPage.jsx'
 import { AdminSupportPage } from './pages/AdminSupportPage.jsx'
 import { AdminRestrictionsPage } from './pages/AdminRestrictionsPage.jsx'
 import { AdminEventPage } from './pages/AdminEventPage.jsx'
+import { AdminRefundsPage } from './pages/AdminRefundsPage.jsx'
 
 function App() {
   return (
@@ -59,6 +60,7 @@ function App() {
               <Route path="admin/events" element={<AdminEventsPage />} />
               <Route path="admin/events/:id" element={<AdminEventPage />} />
               <Route path="admin/system" element={<AdminJobsPage />} />
+              <Route path="admin/refunds" element={<AdminRefundsPage />} />
               <Route path="admin/jobs" element={<Navigate to="/admin/system" replace />} />
               <Route path="admin/support" element={<AdminSupportPage />} />
               <Route path="admin/restrictions" element={<AdminRestrictionsPage />} />

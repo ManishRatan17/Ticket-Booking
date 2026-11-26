@@ -30,6 +30,7 @@ function NavBar() {
               <>
                 <NavLink to="/admin/events">Manage events</NavLink>
                 <NavLink to="/admin/support">Support inbox</NavLink>
+                <NavLink to="/admin/refunds">Refunds</NavLink>
                 <RestrictionsLink />
                 <NavLink to="/admin/users">Users</NavLink>
                 <NavLink to="/admin/system">System</NavLink>

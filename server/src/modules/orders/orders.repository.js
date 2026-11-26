@@ -4,6 +4,8 @@
 const ORDER_SELECT = `
   SELECT o.id, o.user_id, o.event_id, e.name AS event_name, o.quantity, o.amount_paise, o.status, o.pool,
          o.hold_id, o.idempotency_key, o.payment_id, o.provider_order_id, o.expires_at, o.paid_at, o.failure_reason, o.created_at,
+         (SELECT json_build_object('status', rf.status, 'amountPaise', rf.amount_paise, 'reason', rf.reason, 'refundedAt', rf.refunded_at)
+            FROM refunds AS rf WHERE rf.order_id = o.id ORDER BY rf.id DESC LIMIT 1) AS refund,
          COALESCE(array_agg(s.ticket_number ORDER BY s.ticket_number)
                   FILTER (WHERE s.ticket_number IS NOT NULL), '{}') AS ticket_numbers
     FROM orders AS o
@@ -29,6 +31,7 @@ function toOrder(row) {
     failureReason: row.failure_reason,
     createdAt: row.created_at,
     ticketNumbers: row.ticket_numbers,
+    refund: row.refund ?? null, // { status: 'pending' | 'refunded', amountPaise, reason, refundedAt } or null
   };
 }
 

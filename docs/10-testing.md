@@ -5,7 +5,7 @@ docker compose up -d     # the server tests use the real PostgreSQL and Redis
 npm test                 # server (node:test) then client (Vitest)
 ```
 
-Today: **363 server tests + 41 client tests**, all passing, none skipped.
+Today: **370 server tests + 41 client tests**, all passing, none skipped.
 
 ## Their own database, and CI
 
@@ -91,6 +91,7 @@ Kept outside `test/` because Node runs every file inside `test/` as a test.
 | `website.test.js` | the API serving the built website (Phase 7): pages → index.html, `/api` stays JSON (JSON 404), year-long caching of built files, the security policy |
 | `mail.test.js` | real email against a fake Resend: the request it receives, a 500 makes delivery fail (so the job retries), `sendMail` queues a `send-email` job that isn't kept after delivery |
 | `razorpay.test.js` | Razorpay test mode against a fake Razorpay: public key only, fake provider off, one Razorpay order for the exact amount, a valid signature pays (once), a forged signature or another order's payment → 400, the webhook alone pays, page + webhook at once → tickets once, a failed attempt keeps the order payable, webhook signature / duplicates / unknown orders, a wrong amount fails |
+| `refunds.test.js` | money that bought no tickets goes back: recorded with the payment, refunded, emailed, shown in the order; one refund per payment; a wrong amount → the paid amount back; admin list and Retry |
 | `holds-http.test.js` | the holds API: every status code, IDOR, CSRF, lazy release on read, **300 users × 100 tickets over HTTP** |
 
 ## Client test files (Vitest)
@@ -151,6 +152,7 @@ A test only proves something once it has been seen to **fail for the right reaso
 | "admins can't buy" removed from the hold route | the admin-booking test |
 | the admin email alert after an automatic strike removed | the email test |
 | Razorpay: payment not checked against THIS order / any signature accepted | the forged-payment test (both) |
+| refund without first asking Razorpay whether it already happened | the lost-answer test (money sent back twice) |
 | "already restricted" guard removed from `strike()` | the two-strikes-at-once test |
 | payment check ignoring a raised limit | the approval test |
 | client createEvent sending only name/tickets/sale time (the old code) | the client createEvent test |

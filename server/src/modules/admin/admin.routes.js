@@ -7,6 +7,7 @@ import { listUsersQuerySchema, userIdParamsSchema, changeRoleBodySchema } from '
 import * as adminController from './admin.controller.js';
 import { createEventSchema, updateEventSchema } from '../events/events.schemas.js';
 import * as adminEvents from './admin.events.js';
+import * as refunds from '../payments/refunds.js';
 import * as eventsController from '../events/events.controller.js';
 import { z } from 'zod';
 import { AppError } from '../../lib/errors.js';
@@ -63,6 +64,15 @@ router.post('/support/:id/messages', validate({ params: requestIdParamsSchema, b
 });
 router.post('/support/:id/decision', validate({ params: requestIdParamsSchema, body: decisionSchema }), async (req, res) => {
   res.json({ request: await support.decide(req.user.id, req.validated.params.id, req.validated.body) });
+});
+
+// Refunds: pending ones first (with their last error), and retrying one.
+router.get('/refunds', validate({ query: z.object({ status: z.enum(['pending', 'refunded']).optional() }) }), async (req, res) => {
+  res.json({ refunds: await refunds.listRefunds({ status: req.validated.query.status }) });
+});
+router.post('/refunds/:id/retry', validate({ params: z.object({ id: z.coerce.number().int().positive() }) }), async (req, res) => {
+  await refunds.retryRefund(req.validated.params.id);
+  res.status(202).json({ retried: true });
 });
 
 // Notifications for admins: new automatic restrictions (bot strikes) nobody has looked at yet.

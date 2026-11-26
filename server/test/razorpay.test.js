@@ -223,3 +223,68 @@ test('webhook with a different AMOUNT than the order → failed (never sell for 
   assert.equal((await sendWebhook(razorpay.webhook('payment.captured', rzp.razorpayOrderId, { amount: 100 }))).body.outcome, 'failed');
   assert.equal((await getOrder(ann, order)).failureReason, 'amount_mismatch');
 });
+
+// ---------- refunds through Razorpay ----------
+
+const { processRefund } = await import('../src/modules/payments/refunds.js');
+const refundOf = async (order) => (await pool.query('SELECT * FROM refunds WHERE order_id = $1', [order.id])).rows[0];
+async function settled(order) {
+  for (let i = 0; i < 100; i++) {
+    const r = await refundOf(order);
+    if (r && (r.status === 'refunded' || r.error)) return r;
+    await new Promise((res) => setTimeout(res, 20));
+  }
+  return refundOf(order);
+}
+
+test('refund via Razorpay: POST /payments/:id/refund for the amount, tagged with our refund id', async () => {
+  const e = await event();
+  const [ann] = await users(1);
+  const order = await pendingOrder(ann, e, 1);
+  const rzp = (await start(ann, order)).body;
+  const hook = razorpay.webhook('payment.captured', rzp.razorpayOrderId, { amount: 100 }); // wrong amount → refund
+  assert.equal((await sendWebhook(hook)).body.outcome, 'failed');
+
+  const r = await settled(order);
+  assert.equal(r.status, 'refunded');
+  const atRazorpay = razorpay.refunds.filter((x) => x.payment_id === hook.paymentId);
+  assert.equal(atRazorpay.length, 1);
+  assert.deepEqual([atRazorpay[0].amount, atRazorpay[0].notes.refundId], [100, String(r.id)]);
+  assert.equal(r.provider_refund_id, atRazorpay[0].id);
+});
+
+test('Razorpay down → the refund stays pending WITH the error; a retry later refunds it', async (t) => {
+  t.after(() => razorpay.setRefundMode('ok'));
+  const e = await event();
+  const [ann] = await users(1);
+  const order = await pendingOrder(ann, e, 1);
+  const rzp = (await start(ann, order)).body;
+  razorpay.setRefundMode('fail');
+  await sendWebhook(razorpay.webhook('payment.captured', rzp.razorpayOrderId, { amount: 100 }));
+
+  const pending = await settled(order);
+  assert.equal(pending.status, 'pending');
+  assert.match(pending.error, /Razorpay refused the refund: 500/);
+
+  razorpay.setRefundMode('ok');
+  assert.deepEqual(await processRefund({ refundId: Number(pending.id) }), { status: 'refunded' });
+  assert.equal((await refundOf(order)).error, null);
+});
+
+test('the answer got LOST after Razorpay refunded (timeout) → the retry finds that refund: refunded ONCE', async (t) => {
+  t.after(() => razorpay.setRefundMode('ok'));
+  const e = await event();
+  const [ann] = await users(1);
+  const order = await pendingOrder(ann, e, 1);
+  const rzp = (await start(ann, order)).body;
+  razorpay.setRefundMode('timeout_after_refund');
+  const hook = razorpay.webhook('payment.captured', rzp.razorpayOrderId, { amount: 100 });
+  await sendWebhook(hook);
+  const first = await settled(order);
+  assert.equal(first.status, 'pending', 'we got no answer, so we don\'t know yet');
+
+  razorpay.setRefundMode('ok');
+  await processRefund({ refundId: Number(first.id) });
+  assert.equal((await refundOf(order)).status, 'refunded');
+  assert.equal(razorpay.refunds.filter((x) => x.payment_id === hook.paymentId).length, 1, 'money sent back once');
+});

@@ -21,6 +21,10 @@ export const listAdminEvents = () => api('/admin/events')
 export const getAdminEvent = (id) => api(`/admin/events/${encodeURIComponent(id)}`)
 export const updateEvent = (id, changes) => api(`/admin/events/${encodeURIComponent(id)}`, { method: 'PATCH', body: changes })
 
+// Refunds: list (pending first) and retry a pending one.
+export const listRefunds = (status) => api(`/admin/refunds${status ? `?status=${encodeURIComponent(status)}` : ''}`)
+export const retryRefund = (id) => api(`/admin/refunds/${encodeURIComponent(id)}/retry`, { method: 'POST' })
+
 // Notifications: new automatic restrictions (bot strikes) no admin has seen yet.
 export const getNotifications = () => api('/admin/notifications')
 export const acknowledgeRestrictions = () => api('/admin/restrictions/acknowledge', { method: 'POST' })

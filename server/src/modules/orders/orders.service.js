@@ -25,6 +25,7 @@ export function toPublicOrder(order) {
     paidAt: order.paidAt,
     failureReason: order.failureReason,
     ticketNumbers: order.ticketNumbers,
+    refund: order.refund, // money given back (payment that bought no tickets, cancelled event)
     createdAt: order.createdAt,
   };
 }

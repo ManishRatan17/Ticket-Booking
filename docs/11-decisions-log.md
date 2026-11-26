@@ -207,6 +207,14 @@ Every significant choice, the alternatives considered, and why. Newest at the bo
 | Outside services forced off in `.env.test` | trust `.env` | a developer's real keys must never make tests send real emails or payments |
 | GitHub Actions with service containers | no CI; mocks | the same real PostgreSQL and Redis as development, on every push |
 
+## Refunds
+
+| Decision | Rejected | Why |
+|---|---|---|
+| A `refunds` row in the payment transaction, processed by a job | refund inline in the webhook | the webhook answers at once; the refund is retried if the provider is down; nothing owed is forgotten |
+| `UNIQUE (payment_id)` | check in code | a payment can never be refunded twice, whatever runs at the same time |
+| Ask the provider first, tagged with our refund id | trust that a failed call refunded nothing | a timeout can hide a refund that happened |
+
 ## Frontend
 
 | Decision | Alternatives | Why |
@@ -228,7 +236,6 @@ Every significant choice, the alternatives considered, and why. Newest at the bo
 
 ## Known limitations (accepted for now)
 
-- Other users' expired holds wait for the Phase 3 worker.
 - Holds are lost if Redis loses its data.
 - Lua scripts are single-Redis (no Cluster hash tags).
 - Role changes are audited only in the console log.

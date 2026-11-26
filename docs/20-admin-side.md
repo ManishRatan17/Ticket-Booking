@@ -3,7 +3,7 @@
 Admins **run** the sale; they don't take part in it. This page covers what an admin sees and can do, and the rules behind it.
 
 ```
-Admin nav:  Manage events · Support inbox · Restrictions (2 new) · Users · System
+Admin nav:  Manage events · Support inbox · Refunds · Restrictions (2 new) · Users · System
 Customer:   Events · My orders · Help
 ```
 

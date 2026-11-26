@@ -5,6 +5,7 @@ import { listOrders } from '../api/orders.js'
 import { Alert } from '../components/Alert.jsx'
 import { errorMessage } from '../lib/errorMessages.js'
 import { formatDate, formatMoney } from '../lib/format.js'
+import { REFUND_REASON_TEXT } from '../lib/refunds.js'
 
 const STATUS_TEXT = {
   pending: 'waiting for payment',
@@ -49,6 +50,13 @@ export function OrdersPage() {
               <>
                 {' '}
                 — <Link to={`/checkout/${order.id}`}>pay now</Link>
+              </>
+            )}
+            {order.refund && (
+              <>
+                {' '}
+                — <strong>{order.refund.status === 'refunded' ? `refunded ${formatMoney(order.refund.amountPaise)}` : `refund of ${formatMoney(order.refund.amountPaise)} on its way`}</strong>{' '}
+                <span className="muted">({REFUND_REASON_TEXT[order.refund.reason] ?? order.refund.reason})</span>
               </>
             )}
             <span className="muted"> · {formatDate(order.createdAt)}</span>

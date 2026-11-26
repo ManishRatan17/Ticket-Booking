@@ -211,6 +211,13 @@ Body: Razorpay's answer `{ "razorpay_order_id", "razorpay_payment_id", "razorpay
 ### `POST /api/webhooks/razorpay`  · called by Razorpay
 Signed: `X-Razorpay-Signature` = HMAC-SHA256(webhook secret, raw body). `payment.captured` → paid; `payment.failed` → `attempt_failed` (the order stays pending: the person may retry); others ignored. `401 INVALID_SIGNATURE`. With Razorpay on, `POST /payments/fake/:orderId` → `404 FAKE_PAYMENTS_OFF`.
 
+## Refunds
+
+Orders carry `refund`: `null`, or `{ "status": "pending" | "refunded", "amountPaise", "reason", "refundedAt" }`.
+
+### `GET /admin/refunds?status=pending|refunded` → `200 { "refunds": [ { "id", "orderId", "userEmail", "eventName", "amountPaise", "reason", "status", "provider", "paymentId", "providerRefundId", "error", "attempts", "createdAt", "refundedAt" } ] }` (pending first)
+### `POST /admin/refunds/:id/retry` → `202 { "retried": true }` · `404 REFUND_NOT_FOUND` · `409 ALREADY_REFUNDED`
+
 ## Admins run the sale
 
 Admins → `403 ADMINS_CANNOT_BUY` on `POST /events/:id/holds`, `POST /events/:id/queue`, `POST /orders`, `POST /payments/fake/:orderId`; `403 ADMINS_USE_INBOX` on `POST /support/requests` and `POST /support/requests/:id/messages`. See [20](20-admin-side.md).

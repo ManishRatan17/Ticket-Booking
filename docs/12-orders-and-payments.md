@@ -129,3 +129,35 @@ With `RAZORPAY_KEY_ID` + `RAZORPAY_KEY_SECRET` set, payments go through **Razorp
 **Content-Security-Policy:** the page may load `https://checkout.razorpay.com` (script) and Razorpay's frames (`api.razorpay.com`, `checkout.razorpay.com`).
 
 *Tested in [razorpay.test.js](../server/test/razorpay.test.js) against a fake Razorpay ([fake-razorpay.js](../server/test-support/fake-razorpay.js), same shapes and signatures): the page gets the public key id, never the secret; the fake provider is off; a Razorpay order for exactly the amount, created once; someone else's order → 404, not pending → 409; a valid signature → paid with ticket numbers, confirming twice → `duplicate`; a forged signature or another order's real payment → 400, still pending; `payment.captured` webhook alone → paid; page + webhook at the same moment → one payment, tickets once; a failed attempt keeps the order pending and a retry pays; wrong webhook signature → 401, the same delivery twice → duplicate, unknown orders / other events ignored; a wrong amount → failed. Mutations: not checking the payment belongs to this order, or accepting any signature → the forged-payment test fails. **Not yet tried with your real test keys** (needs your Razorpay account).*
+
+## Refunds
+
+Until now, four situations only printed `[refund] … refund it` in the log: money taken, no tickets, and nothing sent back. With real payments that matters. Now every such payment is **refunded** and **on record** ([refunds.js](../server/src/modules/payments/refunds.js), migration [013](../server/migrations/013_refunds.sql)).
+
+| Reason | When |
+|---|---|
+| `sold_out_after_expiry` | paid after the hold expired, and the tickets had sold out by then |
+| `purchase_limit` | the payment would take the person over their limit |
+| `amount_mismatch` | a different amount was paid than the order's: **what was paid** goes back |
+| `order_already_failed` | a payment for an order that had already failed |
+| `event_cancelled` | the admin cancelled the event (see below) |
+
+```
+payment transaction ──► refunds row (INSIDE the same transaction, UNIQUE per payment)
+after the commit ─────► job "process-refund" (worker; retried with growing pauses)
+                         locks the row · Razorpay: ASK "already refunded?" (by our refund id), else refund
+                         ──► 'refunded' + an email "₹998.00 refunded for …, because …"
+                         failure ──► stays 'pending' with the error (Refunds page: Retry)
+```
+
+| Rule | Why |
+|---|---|
+| Recorded **in the payment transaction** | "the order failed" and "this money is owed back" are written together, or not at all |
+| `UNIQUE (payment_id)` | however many deliveries, retries or admins: one refund per payment (tested) |
+| **Ask first**, then refund (Razorpay: `GET /payments/:id/refunds`, our refund id in `notes`) | if Razorpay refunded but its answer got lost (a timeout), a retry must not refund again. Tested: a lost answer, then a retry → refunded **once** (mutation: without the check, twice) |
+| The row is locked while it's processed (`SELECT … FOR UPDATE`) | the worker's retry and an admin's Retry can't refund at the same moment |
+| Failures keep the error and the attempt count | admins see why on the Refunds page; BullMQ retries 5 times, then the dead-letter queue (System page) |
+
+**People** see it in My orders: "refunded ₹998.00 (paid after the hold expired; sold out by then)", and get an email. **Admins:** the **Refunds** page (pending first, with the provider's error and Retry).
+
+*Tested in [refunds.test.js](../server/test/refunds.test.js) (fake provider: recorded with the payment, refunded, email, shown in the order; the same payment twice → one refund; a wrong amount → the paid amount back; the admin list, Retry, 409 when already refunded, 403 for users) and [razorpay.test.js](../server/test/razorpay.test.js) (Razorpay's refund API with the amount and our refund id; Razorpay down → pending with the error, a retry refunds; a lost answer → refunded once).*

@@ -21,16 +21,18 @@ function sameHex(a, b) {
   return timingSafeEqual(Buffer.from(a), Buffer.from(b));
 }
 
+const authHeaders = () => ({
+  Authorization: `Basic ${Buffer.from(`${env.payments.razorpay.keyId}:${env.payments.razorpay.keySecret}`).toString('base64')}`,
+  'Content-Type': 'application/json',
+});
+
 export async function createOrder({ amountPaise, receipt, notes }) {
-  const { keyId, keySecret, apiUrl } = env.payments.razorpay;
+  const { apiUrl } = env.payments.razorpay;
   let res;
   try {
     res = await fetch(`${apiUrl}/orders`, {
       method: 'POST',
-      headers: {
-        Authorization: `Basic ${Buffer.from(`${keyId}:${keySecret}`).toString('base64')}`,
-        'Content-Type': 'application/json',
-      },
+      headers: authHeaders(),
       body: JSON.stringify({ amount: amountPaise, currency: 'INR', receipt, notes }),
       signal: AbortSignal.timeout(10_000),
     });
@@ -42,6 +44,27 @@ export async function createOrder({ amountPaise, receipt, notes }) {
     throw new AppError(503, 'PAYMENTS_UNAVAILABLE', 'The payment provider refused to start the payment. Please try again.');
   }
   return res.json(); // { id: "order_…", amount, currency, receipt, status: "created", … }
+}
+
+// Refund a payment (fully). SAFE TO RETRY: first ask Razorpay for this payment's refunds and look for
+// ours (we tag it with our refund id). A retry after a timeout — when the first call may have
+// worked — then finds it instead of refunding twice. Returns Razorpay's refund id ("rfnd_…").
+// Throws on failure (the job is retried).
+export async function refundPayment({ paymentId, amountPaise, refundId }) {
+  const { apiUrl } = env.payments.razorpay;
+  const listed = await fetch(`${apiUrl}/payments/${encodeURIComponent(paymentId)}/refunds`, { headers: authHeaders(), signal: AbortSignal.timeout(10_000) });
+  if (listed.ok) {
+    const existing = ((await listed.json()).items ?? []).find((r) => r.notes?.refundId === String(refundId));
+    if (existing) return existing.id;
+  }
+  const res = await fetch(`${apiUrl}/payments/${encodeURIComponent(paymentId)}/refund`, {
+    method: 'POST',
+    headers: authHeaders(),
+    body: JSON.stringify({ amount: amountPaise, receipt: `refund_${refundId}`, notes: { refundId: String(refundId) } }),
+    signal: AbortSignal.timeout(10_000),
+  });
+  if (!res.ok) throw new Error(`Razorpay refused the refund: ${res.status} ${(await res.text()).slice(0, 200)}`);
+  return (await res.json()).id;
 }
 
 export const isValidPaymentSignature = ({ razorpayOrderId, razorpayPaymentId, razorpaySignature }) =>
