@@ -6,7 +6,7 @@ every step, in the same commit.** Details live in `docs/` — read only the doc 
 
 ## Where we are (updated 2026-11-26)
 
-- Last commit: `89abd92` feat: cancel an event (pushed to `main`; CI green before it).
+- Last commits: `fe88816` landing page + transitions, `7d559a2` train-error fixes (step 1). Next: step 2, bus module.
 - Tests: **389 server + 50 client**, all passing, 0 skipped. Migrations up to **015** (dev DB migrated).
 - **Backend features are complete.** Done, in order: auth (+Google), holds (Redis Lua), orders +
   payments (fake + Razorpay test mode), background jobs (BullMQ), waiting room, protection (rate
@@ -24,7 +24,7 @@ every step, in the same commit.** Details live in `docs/` — read only the doc 
 - **Frontend (2026-11-27):** landing page with 4 categories, each opening with its own full-screen animation
   (components/transitions/, lib/transitionRun.js, route /book/:category). Train + Bus bookable (events → booking);
   Movie + Flight = full-screen ComingSoon (`available: false` in lib/categories.js). TrainLoader was removed.
-  Not committed yet. Browser checks: a CDP script driving headless Chrome (in the session scratchpad).
+  Committed. Browser checks: a CDP script driving headless Chrome (in the session scratchpad).
   The user designs the rest of the UI; only build the UI they ask for.
 - `project.txt` (repo root) is the user's own notes file: never commit or edit it.
 
