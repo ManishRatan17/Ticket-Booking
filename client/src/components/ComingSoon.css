@@ -1,0 +1,325 @@
+/* Full-screen "Coming soon" (ComingSoon.jsx): a themed scene above, the message card below.
+   Same language as the transitions: the movie scene's theatre, the flight scene's sky. */
+.coming-soon {
+  position: fixed;
+  inset: 0;
+  z-index: 900;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 1rem;
+  padding: 1rem 1rem max(1.5rem, 5vh);
+  overflow: hidden;
+  animation: cs-in 0.45s ease-out both;
+}
+
+.coming-soon--movie {
+  background: radial-gradient(ellipse at 50% 30%, #3f0d1d 0%, #12060a 70%);
+}
+
+.coming-soon--flight {
+  background: linear-gradient(180deg, #0369a1 0%, #0ea5e9 45%, #bae6fd 100%);
+}
+
+.coming-soon__scene {
+  position: absolute;
+  inset: 0 0 auto;
+  height: 58%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.coming-soon__card {
+  position: relative;
+  width: min(480px, 100%);
+  padding: 1.5rem;
+  text-align: center;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  box-shadow: 0 24px 60px -18px rgba(15, 23, 42, 0.55);
+}
+
+.coming-soon__card h1 {
+  margin: 0.75rem 0 0.5rem;
+  font-size: clamp(1.4rem, 4vw, 1.9rem);
+  line-height: 1.15;
+  letter-spacing: -0.01em;
+}
+
+.coming-soon__card p {
+  margin: 0 0 1.1rem;
+}
+
+.coming-soon__badge {
+  display: inline-block;
+  padding: 0.25rem 0.75rem;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+/* "Under construction" progress: hazard stripes rolling along a bar that never quite fills. */
+.coming-soon__progress {
+  height: 10px;
+  margin: 0 auto 1.25rem;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #e5e7eb;
+}
+
+.coming-soon__progress span {
+  display: block;
+  width: 68%;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(-45deg, #facc15 25%, #1f2937 25% 50%, #facc15 50% 75%, #1f2937 75%) 0 0 / 20px 20px;
+  animation: cs-stripes 0.7s linear infinite;
+}
+
+/* ---------- movie ---------- */
+.cs-spot {
+  position: absolute;
+  bottom: 0;
+  width: 26vw;
+  height: 100%;
+  background: linear-gradient(to top, rgba(254, 249, 195, 0.32), rgba(254, 249, 195, 0));
+  clip-path: polygon(45% 100%, 55% 100%, 100% 0, 0 0);
+  transform-origin: bottom center;
+}
+
+.cs-spot--left {
+  left: 6%;
+  animation: cs-sweep-left 3.2s ease-in-out infinite alternate;
+}
+
+.cs-spot--right {
+  right: 6%;
+  animation: cs-sweep-right 3.2s ease-in-out infinite alternate;
+}
+
+.cs-movie__clapper {
+  position: relative;
+  width: clamp(150px, 26vw, 260px);
+  height: auto;
+  filter: drop-shadow(0 16px 20px rgba(0, 0, 0, 0.5));
+}
+
+.cs-movie__stick {
+  transform-box: fill-box;
+  transform-origin: 3% 100%;
+  animation: cs-clap 2.2s cubic-bezier(0.5, 0, 0.3, 1) infinite;
+}
+
+.cs-movie__film {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 6%;
+  height: clamp(46px, 7vw, 64px);
+  background:
+    linear-gradient(90deg, #f8fafc 0 12px, transparent 12px) 0 5px / 24px 7px repeat-x,
+    linear-gradient(90deg, #f8fafc 0 12px, transparent 12px) 0 calc(100% - 5px) / 24px 7px repeat-x,
+    linear-gradient(90deg, transparent 0 112px, #0b0b0f 112px) 0 0 / 120px 100% repeat-x,
+    linear-gradient(-45deg, #facc15 25%, #111827 25% 50%, #facc15 50% 75%, #111827 75%) 0 50% / 40px 40px repeat-x,
+    #0b0b0f;
+  background-clip: border-box;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.5);
+  transform: rotate(-3deg);
+  animation: cs-film 1.6s linear infinite;
+}
+
+/* ---------- flight ---------- */
+.cs-cloud {
+  position: absolute;
+  width: clamp(110px, 18vw, 220px);
+  aspect-ratio: 2.4;
+  background:
+    radial-gradient(ellipse 28% 42% at 30% 56%, #fff 96%, transparent 100%),
+    radial-gradient(ellipse 27% 50% at 58% 50%, #fff 96%, transparent 100%),
+    radial-gradient(ellipse 45% 28% at 50% 72%, #fff 96%, transparent 100%);
+  opacity: 0.9;
+}
+
+.cs-cloud--one {
+  top: 12%;
+  animation: cs-drift 14s linear infinite;
+}
+
+.cs-cloud--two {
+  top: 32%;
+  width: clamp(80px, 12vw, 150px);
+  animation: cs-drift 20s linear -8s infinite;
+}
+
+.cs-flight__hangar {
+  position: relative;
+  width: min(92vw, 560px);
+  height: auto;
+  filter: drop-shadow(0 14px 16px rgba(3, 105, 161, 0.35));
+}
+
+.cs-flight__fin,
+.cs-flight__cable {
+  transform-box: fill-box;
+  animation-duration: 3s;
+  animation-timing-function: ease-in-out;
+  animation-iteration-count: infinite;
+}
+
+.cs-flight__fin {
+  animation-name: cs-fin;
+}
+
+.cs-flight__cable {
+  transform-origin: top center;
+  animation-name: cs-cable;
+}
+
+.cs-flight__spark {
+  opacity: 0;
+  transform-box: fill-box;
+  animation: cs-spark 3s ease-out infinite;
+}
+
+@keyframes cs-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes cs-stripes {
+  to {
+    background-position: 20px 0;
+  }
+}
+
+@keyframes cs-sweep-left {
+  from {
+    transform: rotate(-22deg);
+  }
+  to {
+    transform: rotate(14deg);
+  }
+}
+
+@keyframes cs-sweep-right {
+  from {
+    transform: rotate(22deg);
+  }
+  to {
+    transform: rotate(-14deg);
+  }
+}
+
+/* open … SNAP shut … open again slowly */
+@keyframes cs-clap {
+  0%,
+  45% {
+    transform: rotate(-24deg);
+  }
+  55% {
+    transform: rotate(0deg);
+  }
+  62% {
+    transform: rotate(-4deg);
+  }
+  68% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(-24deg);
+  }
+}
+
+@keyframes cs-film {
+  to {
+    background-position:
+      -120px 5px,
+      -120px calc(100% - 5px),
+      -120px 0,
+      -120px 50%,
+      0 0;
+  }
+}
+
+@keyframes cs-drift {
+  from {
+    transform: translateX(-30vw);
+  }
+  to {
+    transform: translateX(130vw);
+  }
+}
+
+/* The fin is lowered onto the tail (0 → 40 %), held while it's welded, lifted again. The cable's
+   length follows it exactly: same timing, from 16 px (fin up) to 38 px (fin down). */
+@keyframes cs-fin {
+  0%,
+  100% {
+    transform: translateY(-22px);
+  }
+  40%,
+  75% {
+    transform: translateY(0);
+  }
+}
+
+@keyframes cs-cable {
+  0%,
+  100% {
+    transform: scaleY(0.42);
+  }
+  40%,
+  75% {
+    transform: scaleY(1);
+  }
+}
+
+@keyframes cs-spark {
+  0%,
+  42% {
+    opacity: 0;
+    transform: translate(0, 0);
+  }
+  48% {
+    opacity: 1;
+  }
+  72% {
+    opacity: 0;
+    transform: translate(calc((var(--i) - 2) * 9px), calc(-8px - var(--i) * 2px));
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .coming-soon,
+  .coming-soon__progress span,
+  .cs-spot,
+  .cs-movie__stick,
+  .cs-movie__film,
+  .cs-cloud,
+  .cs-flight__fin,
+  .cs-flight__cable,
+  .cs-flight__spark {
+    animation: none;
+  }
+
+  .cs-cloud--one {
+    left: 8%;
+  }
+
+  .cs-cloud--two {
+    right: 10%;
+  }
+}

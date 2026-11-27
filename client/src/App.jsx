@@ -17,6 +17,7 @@ import { AdminEventsPage } from './pages/AdminEventsPage.jsx'
 import { AdminJobsPage } from './pages/AdminJobsPage.jsx'
 import { EventsPage } from './pages/EventsPage.jsx'
 import { EventPage } from './pages/EventPage.jsx'
+import { CategoryPage } from './pages/CategoryPage.jsx'
 import { CheckoutPage } from './pages/CheckoutPage.jsx'
 import { OrdersPage } from './pages/OrdersPage.jsx'
 import { SupportPage } from './pages/SupportPage.jsx'
@@ -38,6 +39,7 @@ function App() {
             {/* Anyone can browse; the event page asks you to log in before holding */}
             <Route path="events" element={<EventsPage />} />
             <Route path="events/:id" element={<EventPage />} />
+            <Route path="book/:category" element={<CategoryPage />} />
 
             {/* Only for signed-out visitors */}
             <Route element={<GuestOnly />}>

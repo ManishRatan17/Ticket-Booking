@@ -1,0 +1,219 @@
+/* Bus: sunset, a city skyline, the road rising into view, the bus driving in with dust and smoke. */
+.bus-scene {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  background: linear-gradient(180deg, #0c4a6e 0%, #0369a1 32%, #fb923c 66%, #fde68a 76%);
+}
+
+.bus-scene__sun {
+  position: absolute;
+  right: 16%;
+  top: 22%;
+  width: clamp(70px, 11vw, 130px);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: radial-gradient(circle, #fff7ed 0%, #fed7aa 55%, rgba(254, 215, 170, 0) 72%);
+}
+
+/* Buildings in three repeating layers; they scroll at different speeds (parallax) and loop seamlessly. */
+.bus-scene__city {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 30%;
+  height: 26%;
+  background:
+    linear-gradient(90deg, #1e293b 0 54px, transparent 54px) 0 100% / 130px 62% repeat-x,
+    linear-gradient(90deg, transparent 0 70px, #334155 70px 112px, transparent 112px) 0 100% / 170px 92% repeat-x,
+    linear-gradient(90deg, transparent 0 20px, #475569 20px 80px, transparent 80px) 0 100% / 230px 45% repeat-x;
+  opacity: 0.85;
+  animation: bus-scene-city 4s linear infinite;
+}
+
+.bus-scene__road {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 30%;
+  background: linear-gradient(180deg, #64748b 0 5px, #1f2937 5px, #111827);
+  transform-origin: bottom;
+  animation: bus-scene-road 0.55s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+
+.bus-scene__lane {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 42%;
+  height: 6px;
+  background: repeating-linear-gradient(90deg, #fde68a 0 48px, transparent 48px 96px);
+  animation: bus-scene-lane 0.45s linear infinite;
+}
+
+.bus-scene__vehicle {
+  position: absolute;
+  left: 50%;
+  bottom: 12%;
+  width: clamp(220px, 38vw, 440px);
+  translate: -50% 0;
+  animation: bus-scene-arrive 1.2s cubic-bezier(0.2, 0.8, 0.25, 1) 0.45s both;
+}
+
+.bus-scene__bus {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: auto;
+  filter: drop-shadow(0 10px 8px rgba(0, 0, 0, 0.35));
+}
+
+.bus-scene__body {
+  animation: bus-scene-bob 0.36s ease-in-out infinite alternate;
+}
+
+.bus-scene__wheel {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: bus-scene-spin 0.5s linear infinite;
+}
+
+/* Dust from the rear wheel, smoke from the exhaust: puffs that grow, drift back and fade. */
+.bus-scene__dust,
+.bus-scene__smoke {
+  position: absolute;
+  left: 4%;
+}
+
+.bus-scene__dust {
+  bottom: 2%;
+}
+
+.bus-scene__smoke {
+  bottom: 18%;
+  left: 1%;
+}
+
+.bus-scene__dust span,
+.bus-scene__smoke span {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: clamp(18px, 3vw, 30px);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  opacity: 0;
+  animation: bus-scene-puff 1s ease-out infinite;
+  animation-delay: calc(var(--i) * 0.25s + 1.2s);
+}
+
+.bus-scene__dust span {
+  background: radial-gradient(circle, rgba(222, 200, 170, 0.9), rgba(222, 200, 170, 0) 70%);
+}
+
+.bus-scene__smoke span {
+  width: clamp(12px, 2vw, 20px);
+  background: radial-gradient(circle, rgba(148, 163, 184, 0.8), rgba(148, 163, 184, 0) 70%);
+  animation-duration: 1.3s;
+}
+
+@keyframes bus-scene-city {
+  to {
+    background-position:
+      -130px 100%,
+      -170px 100%,
+      -230px 100%;
+  }
+}
+
+@keyframes bus-scene-road {
+  from {
+    transform: scaleY(0);
+  }
+  to {
+    transform: scaleY(1);
+  }
+}
+
+@keyframes bus-scene-lane {
+  to {
+    background-position: -96px 0;
+  }
+}
+
+@keyframes bus-scene-arrive {
+  from {
+    transform: translateX(-100vw);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+@keyframes bus-scene-bob {
+  to {
+    transform: translateY(-1.5px);
+  }
+}
+
+@keyframes bus-scene-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes bus-scene-puff {
+  0% {
+    opacity: 0.9;
+    transform: translate(0, 0) scale(0.4);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-90px, -26px) scale(2.3);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bus-scene__city,
+  .bus-scene__road,
+  .bus-scene__lane,
+  .bus-scene__vehicle,
+  .bus-scene__body,
+  .bus-scene__wheel {
+    animation: none;
+  }
+
+  .bus-scene__dust,
+  .bus-scene__smoke {
+    display: none;
+  }
+}
+
+/* The page is ready: the bus accelerates hard and leaves to the right (wheels and road speed up). */
+.bus-scene--leaving .bus-scene__vehicle {
+  animation: bus-scene-depart 0.75s cubic-bezier(0.55, 0, 0.9, 0.35) forwards;
+}
+
+.bus-scene--leaving .bus-scene__wheel {
+  animation-duration: 0.18s;
+}
+
+.bus-scene--leaving .bus-scene__lane {
+  animation-duration: 0.18s;
+}
+
+@keyframes bus-scene-depart {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(110vw);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bus-scene--leaving .bus-scene__vehicle {
+    animation: none;
+  }
+}

@@ -84,6 +84,27 @@ A laptop 3 minutes fast or 10 minutes slow still shows 5:00 for a new hold (unit
 10. **Restricted accounts**: [RestrictionBanner](../client/src/components/RestrictionBanner.jsx) on every page ("Unusual, automated activity was detected … booking paused until … appeal"), from `user.restriction` (login and `/me`). A refused booking with `ACCOUNT_RESTRICTED` reloads "who am I" so the banner appears at once. Help offers "Appeal" while restricted. Details: [18-bot-strikes.md](18-bot-strikes.md).
 11. **Admins**: the nav shows only admin pages (Manage events · Support inbox · Restrictions with a "2 new" badge · Users · System); the event page tells an admin they can't buy; `/support` sends admins to the inbox. Details: [20-admin-side.md](20-admin-side.md).
 
+## Landing page and category transitions
+
+The home page shows four booking categories (Train, Bus, Movie, Flight, [lib/categories.js](../client/src/lib/categories.js)). A click opens that category's **own full-screen animation** while its data loads, then its page `/book/:category` ([CategoryPage.jsx](../client/src/pages/CategoryPage.jsx)).
+
+- **Train and Bus are bookable:** their page lists what's on sale, and each event leads to the real booking flow (hold → checkout → pay). The backend has no categories yet, so both load the events list: `loadCategory()` is the one place to change.
+- **Movie and Flight are "Coming soon"** (`available: false`): same card, plus a badge and "Take a peek". After their transition, a full-screen [ComingSoon](../client/src/components/ComingSoon.jsx) page: "We're building something exciting!", an animated construction scene (Movie: sweeping spotlights, a snapping clapperboard, a rolling hazard-stripe film strip; Flight: a crane lowering the tail fin onto an airliner, welding sparks, drifting clouds), a progress bar and **Back to Home**. No booking, no data loaded.
+
+| Rule | How |
+|---|---|
+| Loading starts at the click | [transitionRun.js](../client/src/lib/transitionRun.js) calls `load()` at once, while the animation plays |
+| At least 2.5 s of animation | the page opens only when the minimum has passed **and** the data is there |
+| At most 10 s of animation | still no data → the animation stops; a normal "Still loading…" state with Cancel |
+| Errors | shown after the minimum (never cutting the animation short), with **Try again** and **Back** |
+| One at a time | [useCategoryTransition.js](../client/src/hooks/useCategoryTransition.js) ignores clicks while a transition runs (double clicks, other cards) |
+| Into the next page | the scene dissolves (0.45 s), the page fades in; its data arrives with the navigation (`location.state`); a direct visit loads it itself |
+| Reduced motion | every scene has a static version under `prefers-reduced-motion: reduce`; the timing rules stay |
+
+The four scenes are independent components, each with its own CSS file, in [components/transitions/](../client/src/components/transitions/): **Train** (rails laid, then a high-speed train, locomotive and two coaches, crossing at speed with overhead-line poles streaming past), **Bus** (the road rises, the bus drives in with dust and exhaust, lanes and skyline streaming past; when the page is ready it accelerates hard and leaves to the right, `exitMs` 950), **Movie** (the curtains start closed and open onto the glowing screen showing a seat-booking view, seats picked one by one), **Flight** (cloud banks rise, the plane climbs through them with contrails). CSS animations and inline SVG only: no new dependency.
+
+*Tested: [transitionRun.test.js](../client/src/lib/transitionRun.test.js) with fake timers (instant data still waits 2.5 s; 4 s data opens at 4 s; 12 s data → loading state at 10 s, then opens; an error only after the minimum, Try again; cancel; opens exactly once). [categories.test.js](../client/src/lib/categories.test.js): Train/Bus bookable, Movie/Flight not, a coming-soon category loads nothing. Checked in headless Chrome with screenshots: all four flows (Train/Bus → events → the event's booking page; Movie/Flight → Coming soon → Back to Home), double clicks, slow data, an error and retry, reduced motion (0 running animations), a phone-sized screen, and the frame rate of each scene (Train 137–145 fps, Bus 146, Flight 145, Movie 63). Measured in the page: Train/Movie/Flight open at ~2.96 s (2.5 s + 0.45 s fade), Bus at ~3.46 s (its drive-off).*
+
 ## Other details
 
 - **Google result:** the callback redirects to `/?login=…`; `Layout` reads it **once** (when it's created after the full page load), shows a message, and removes it from the address bar.

@@ -1,0 +1,120 @@
+/* The full-screen overlay around a category's animation (CategoryTransition.jsx). */
+.ct-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  background: var(--page);
+  animation: ct-in 0.25s ease-out both;
+}
+
+.ct-overlay:focus {
+  outline: none;
+}
+
+.ct-scene {
+  position: absolute;
+  inset: 0;
+  transition:
+    opacity 0.45s ease,
+    transform 0.45s ease;
+}
+
+/* Ready: the scene dissolves into the page background, and the next page fades in. */
+.ct-overlay--leaving .ct-scene {
+  opacity: 0;
+  transform: scale(1.04);
+  transition-delay: var(--ct-fade-delay, 0ms); /* e.g. the bus drives off first */
+}
+
+/* A dark pill: readable on every scene, light clouds included. */
+.ct-caption {
+  position: absolute;
+  left: 50%;
+  bottom: max(1.25rem, 4vh);
+  z-index: 10;
+  max-width: calc(100% - 2rem);
+  margin: 0;
+  padding: 0.45rem 1.1rem;
+  translate: -50% 0;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.55);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+  color: #fff;
+  font-size: clamp(1rem, 2.4vw, 1.3rem);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-align: center;
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.45);
+}
+
+.ct-status {
+  width: min(360px, calc(100% - 2rem));
+  padding: 1.5rem;
+  text-align: center;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  box-shadow: 0 20px 50px rgba(15, 23, 42, 0.12);
+}
+
+.ct-status h2 {
+  margin: 0.25rem 0 0.5rem;
+  font-size: 1.15rem;
+}
+
+.ct-status p {
+  margin: 0;
+}
+
+.ct-status__icon {
+  font-size: 2.25rem;
+}
+
+.ct-status__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.5rem;
+  margin-top: 1.25rem;
+}
+
+.ct-spinner {
+  width: 30px;
+  height: 30px;
+  margin: 0 auto 0.75rem;
+  border: 3px solid var(--border);
+  border-top-color: var(--primary);
+  border-radius: 50%;
+  animation: ct-spin 0.8s linear infinite;
+}
+
+@keyframes ct-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes ct-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ct-overlay,
+  .ct-spinner {
+    animation: none;
+  }
+
+  .ct-scene {
+    transition: none;
+  }
+}

@@ -1,0 +1,220 @@
+/* Movie: a dark theatre; the velvet curtains (closed at first) open onto the screen, which shows a
+   seat-booking view; the projector beam lights up. */
+.movie-scene {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  background: radial-gradient(ellipse at 50% 30%, #3f0d1d 0%, #12060a 70%);
+}
+
+.movie-scene__screen {
+  position: absolute;
+  left: 50%;
+  top: 13%;
+  width: min(78vw, 900px, calc(56vh * 16 / 9));
+  aspect-ratio: 16 / 9;
+  display: grid;
+  place-items: center;
+  border-radius: 6px;
+  background: radial-gradient(ellipse at center, #fefce8 0%, #e5e7eb 60%, #94a3b8 100%);
+  box-shadow: 0 0 90px rgba(254, 249, 195, 0.3);
+  translate: -50% 0;
+  animation: movie-scene-glow 1.4s ease-in-out 1.3s infinite alternate;
+}
+
+/* The seat-booking view on the screen: a curved "screen" bar, the seat map, a button. */
+.movie-scene__booking {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4.5%;
+  width: 70%;
+  height: 78%;
+  padding: 3% 4%;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.85);
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.18);
+  animation: movie-scene-fade 0.5s ease-out 0.8s both;
+}
+
+.movie-scene__screen-label {
+  width: 70%;
+  padding-top: 1.5%;
+  border-top: 3px solid #e11d48;
+  border-radius: 50% 50% 0 0 / 14px 14px 0 0;
+  color: #9f1239;
+  font-size: clamp(0.5rem, 1.2vw, 0.75rem);
+  font-weight: 700;
+  letter-spacing: 0.3em;
+  text-align: center;
+}
+
+.movie-scene__seatmap {
+  display: grid;
+  grid-template-columns: repeat(10, 1fr);
+  gap: 6% 3%;
+  width: 82%;
+}
+
+.movie-scene__seat {
+  aspect-ratio: 1.15;
+  border-radius: 4px 4px 2px 2px;
+  border: 1.5px solid #94a3b8;
+  background: #fff;
+}
+
+.movie-scene__seat--taken {
+  border-color: #cbd5e1;
+  background: #cbd5e1;
+}
+
+/* Picked one after another once the screen is visible. */
+.movie-scene__seat--picked {
+  animation: movie-scene-pick 0.35s ease-out both;
+  animation-delay: calc(1.3s + var(--n) * 0.22s);
+}
+
+.movie-scene__cta {
+  margin-top: auto;
+  padding: 1.2% 5%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #fb7185, #be123c);
+  color: #fff;
+  font-size: clamp(0.55rem, 1.3vw, 0.85rem);
+  font-weight: 700;
+  animation: movie-scene-fade 0.35s ease-out 1.95s both;
+}
+
+.movie-scene__beam {
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  width: min(80vw, 900px);
+  height: 72%;
+  translate: -50% 0;
+  background: linear-gradient(to top, rgba(254, 249, 195, 0.28), rgba(254, 249, 195, 0));
+  clip-path: polygon(47% 100%, 53% 100%, 100% 0, 0 0);
+  opacity: 0;
+  animation: movie-scene-beam 1.6s ease-in-out 1s infinite alternate both;
+}
+
+/* Two rows of seat backs, the front one darker. */
+.movie-scene__seats {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 15%;
+  background:
+    radial-gradient(ellipse 44% 70% at 50% 100%, #050203 96%, transparent 100%) 0 100% / 84px 70% repeat-x,
+    radial-gradient(ellipse 44% 70% at 50% 100%, #1c0a10 96%, transparent 100%) 42px 0 / 84px 70% repeat-x;
+}
+
+/* Velvet: folds from a repeating gradient, shadowed at the hem. Open = gathered to the side. */
+.movie-scene__curtain {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 51%;
+  background:
+    linear-gradient(180deg, transparent 65%, rgba(0, 0, 0, 0.45)),
+    repeating-linear-gradient(90deg, #7f1d1d 0, #b91c1c 2.2%, #dc2626 3.4%, #991b1b 5.2%, #7f1d1d 6.5%);
+  box-shadow: 0 0 40px rgba(0, 0, 0, 0.6);
+  animation: movie-scene-open 1.4s cubic-bezier(0.65, 0, 0.35, 1) 0.2s both;
+}
+
+.movie-scene__curtain--left {
+  left: 0;
+  transform-origin: left center;
+}
+
+.movie-scene__curtain--right {
+  right: 0;
+  transform-origin: right center;
+}
+
+.movie-scene__valance {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 9%;
+  background: repeating-linear-gradient(90deg, #6b1515 0, #991b1b 2%, #6b1515 4%);
+  border-bottom: 4px solid #ca8a04;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.55);
+}
+
+/* closed → open (only opening: the curtains start closed) */
+@keyframes movie-scene-open {
+  from {
+    transform: scaleX(1);
+  }
+  to {
+    transform: scaleX(0.16);
+  }
+}
+
+@keyframes movie-scene-glow {
+  to {
+    box-shadow: 0 0 130px rgba(254, 249, 195, 0.45);
+    filter: brightness(1.05);
+  }
+}
+
+@keyframes movie-scene-fade {
+  from {
+    opacity: 0;
+    transform: scale(0.94);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes movie-scene-pick {
+  from {
+    transform: scale(0.6);
+  }
+  60% {
+    transform: scale(1.2);
+  }
+  to {
+    transform: scale(1);
+    border-color: #be123c;
+    background: #e11d48;
+  }
+}
+
+@keyframes movie-scene-beam {
+  from {
+    opacity: 0.55;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .movie-scene__screen {
+    animation: none;
+  }
+
+  .movie-scene__booking,
+  .movie-scene__cta,
+  .movie-scene__beam {
+    opacity: 1;
+    animation: none;
+  }
+
+  .movie-scene__seat--picked {
+    border-color: #be123c;
+    background: #e11d48;
+    animation: none;
+  }
+
+  .movie-scene__curtain {
+    transform: scaleX(0.16);
+    animation: none;
+  }
+}
