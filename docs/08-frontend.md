@@ -100,6 +100,26 @@ One premium platform with four categories, not four websites. **All colours live
 
 Shared building blocks (CSS classes in `App.css`, built only from tokens): `.button` (+ `-secondary`, `-small`, `-danger`), `.card`, `.panel`, `.badge` (+ `.badge-alert` for counts that need attention: fixes a clash where the account page's "This device" badge showed in alert red), `.alert-*`, `.field`, `.stat`, tables; plus the React components `SceneBackdrop`, `CategoryTransition`, `ComingSoon`, `Alert`, `FormField`. **A new page uses these and the tokens; never a raw colour.**
 
+## The app shell and page styles
+
+Every page sits in one shell ([Layout.jsx](../client/src/components/Layout.jsx)): a **sticky navbar** (brand mark, pill-style links, an avatar chip, Log out; a ☰ menu on phones), the page (a subtle fade-in, off for reduced motion), and a footer. **Admin pages** (`/admin/…`) get a **sidebar** with all ten admin links; the top bar shows a single "Admin" link.
+
+| Building block (App.css, tokens only) | Used for |
+|---|---|
+| `.page-header`, the first `h1` of a page | page titles with a subtitle |
+| `.event-grid` / `.event-card` ([EventCard](../client/src/components/EventCard.jsx)), `.availability` | events and "On sale now": status pill, price, how full |
+| `.event-hero`, `.purchase-card` | the event page: a gradient hero, then holding / checkout / the waiting room in one card |
+| `.table` / `.admin-table` | every table: header row, hover, rounded card |
+| `.stat-row` / `.stat` | live numbers as cards |
+| `.pill` (`--success / --warning / --danger / --info`), `.badge` | statuses |
+| `.empty-state`, `.skeleton` | nothing yet; loading placeholders |
+| plain `<ul>` in a page, plain forms in a page | automatically a card of rows / a card of readable width |
+| plain `<button>` | automatically the primary button |
+| `section.card` (login, register, password pages) | a brand panel appears beside the form (CSS `:has()`) |
+| `.thread` | support conversations as chat bubbles |
+
+*Checked with a screenshot tour of all 28 pages (desktop and phone; no sideways scrolling anywhere), and the end-to-end run (17 checks, including the flash sale: event page → hold → checkout → pay → ticket numbers).*
+
 ## Bus and train booking pages
 
 | Page | What it does |

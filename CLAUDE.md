@@ -6,8 +6,9 @@ every step, in the same commit.** Details live in `docs/` — read only the doc 
 
 ## Where we are (updated 2026-11-26)
 
-- Last step: the bus + train booking PAGES (search, seat map, class, passengers, payment, ticket, My bookings,
-  admin Trips page). Next: deploy (needs the user's accounts: Railway, Cloudflare Turnstile, Resend).
+- Last step: modern styles on every page (app shell: sticky navbar + phone menu + admin sidebar + footer; event
+  cards/hero; auth split layout; tables/stats/lists/forms). Next: deploy (needs the user's accounts: Railway,
+  Cloudflare Turnstile, Resend). Optional later: a dark theme (the tokens make it easy).
 - Tests: **419 server + 54 client** + an end-to-end page run (14 checks; see docs/10), all passing, 0 skipped. Migrations up to **018** (dev DB migrated).
 - **Backend features are complete.** Done, in order: auth (+Google), holds (Redis Lua), orders +
   payments (fake + Razorpay test mode), background jobs (BullMQ), waiting room, protection (rate

@@ -235,6 +235,15 @@ Every significant choice, the alternatives considered, and why. Newest at the bo
 | The payment re-checks `cancelled_at` under the event lock | trust that the cancel saw every order | an order created in the instant of the cancel would otherwise become tickets for a cancelled event |
 | A new order status `cancelled` | reuse `failed` | "the event was cancelled" isn't a failed payment; My orders says which |
 
+## Modern page styles (2026-11-28)
+
+| Decision | Rejected | Why |
+|---|---|---|
+| Restyle with CSS on the existing markup, plus small markup changes where needed (event cards, event hero, 404) | rewrite every page / a UI library | no behaviour changes, no new dependency; the tests and flows keep working |
+| A sidebar for the admin area | ten links in the top bar | they didn't fit, especially on phones |
+| Plain lists, forms and buttons styled automatically | a class on every element | older pages look right without touching each one |
+| A brand panel beside the login form via `:has()` | edit four pages | one CSS rule; modern browsers support it |
+
 ## Bus and train booking pages
 
 | Decision | Rejected | Why |

@@ -1800,3 +1800,83 @@ button:not([class]):disabled {
 .purchase-card > p:first-child {
   margin-top: 0;
 }
+
+/* ============================================================================================
+   LISTS AND ADMIN PAGES (tokens only)
+   ============================================================================================ */
+
+/* A plain list on a page (support requests, job counts…): a clean card of rows. */
+.app section > ul:not([class]) {
+  margin: var(--space-3) 0 var(--space-5);
+  padding: 0;
+  overflow: hidden;
+  list-style: none;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+}
+.app section > ul:not([class]) > li {
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--border);
+}
+.app section > ul:not([class]) > li:last-child {
+  border-bottom: none;
+}
+.app section > ul:not([class]) > li:hover {
+  background: var(--brand-50);
+}
+
+/* Forms on a page (not inside a card): a card with a readable width, not the whole screen. */
+.app section:not(.card) > form:not([class]),
+.app--admin details {
+  max-width: 760px;
+  padding: var(--space-5);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+}
+.app--admin details > summary {
+  font-weight: 700;
+  cursor: pointer;
+}
+.app--admin details[open] > summary {
+  margin-bottom: var(--space-4);
+}
+.app--admin .admin-trips > form {
+  max-width: none;
+}
+.app section:not(.card) > form:not([class]) .button,
+.app--admin details .button {
+  width: auto;
+}
+.app--admin h2 {
+  margin-top: var(--space-6);
+}
+
+/* The worker's light (System page): a clear banner. */
+.light {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: var(--space-2) 0;
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius-md);
+  font-weight: 600;
+}
+.light-ok {
+  background: var(--success-bg);
+  color: var(--success);
+}
+.light-bad {
+  background: var(--danger-bg);
+  color: var(--danger);
+}
+
+/* filters above lists ("Show: Open"): aligned */
+.app section > label + select,
+.app section > select {
+  margin: 0 var(--space-2) var(--space-3);
+  padding: 0.4rem 0.6rem;
+}
