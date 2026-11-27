@@ -22,20 +22,36 @@ export const REASON_TEXT = {
   amount_mismatch: 'the amount paid did not match the order',
   order_already_failed: 'the order had already failed when the payment arrived',
   event_cancelled: 'the event was cancelled',
+  booking_cancelled: 'you cancelled the booking',
+  seats_unavailable: 'your payment arrived after your seats were released, and they had been taken by then',
+  booking_not_payable: 'the booking was already cancelled or already paid when the payment arrived',
 };
+
+// What a refund was for, in words: an event order, or a bus / train booking (migration 018).
+// Used by the refund email and the admin list.
+const REFUND_ITEM = `
+  LEFT JOIN orders AS o ON o.id = r.order_id
+  LEFT JOIN events AS e ON e.id = o.event_id
+  LEFT JOIN bus_bookings AS bb ON r.booking_kind = 'bus' AND bb.id = r.booking_id
+  LEFT JOIN bus_trips AS bt ON bt.id = bb.trip_id
+  LEFT JOIN train_bookings AS tb ON r.booking_kind = 'train' AND tb.id = r.booking_id
+  LEFT JOIN train_trips AS tt ON tt.id = tb.trip_id`;
+const ITEM_NAME = `COALESCE(e.name, 'Bus ' || bt.origin || ' → ' || bt.destination,
+  'Train ' || tt.train_number || ' ' || tt.origin || ' → ' || tt.destination) AS item_name`;
 
 // Called INSIDE the payment transaction. Returns the refund's id, or null if this payment already
 // has one (a repeated delivery).
-export async function recordRefund(client, { orderId, userId, provider, paymentId, amountPaise, reason }) {
+// A refund belongs to an event order (orderId) or to a bus / train booking (bookingKind + bookingId).
+export async function recordRefund(client, { orderId = null, bookingKind = null, bookingId = null, userId, provider, paymentId, amountPaise, reason }) {
   if (!(amountPaise > 0) || !paymentId) return null; // a free order: nothing was paid, nothing to give back
   const { rows } = await client.query(
-    `INSERT INTO refunds (order_id, user_id, provider, payment_id, amount_paise, reason)
-     VALUES ($1, $2, $3, $4, $5, $6)
+    `INSERT INTO refunds (order_id, booking_kind, booking_id, user_id, provider, payment_id, amount_paise, reason)
+     VALUES ($1, $7, $8, $2, $3, $4, $5, $6)
      ON CONFLICT (payment_id) DO NOTHING
      RETURNING id`,
-    [orderId, userId, provider, paymentId, amountPaise, reason],
+    [orderId, userId, provider, paymentId, amountPaise, reason, bookingKind, bookingId],
   );
-  console.warn(`[refund] order ${orderId}: ${reason}, payment ${paymentId}: refund ${rows.length ? `#${rows[0].id} recorded` : 'already recorded'}`);
+  console.warn(`[refund] ${orderId ? `order ${orderId}` : `${bookingKind} booking ${bookingId}`}: ${reason}, payment ${paymentId}: refund ${rows.length ? `#${rows[0].id} recorded` : 'already recorded'}`);
   return rows[0] ? Number(rows[0].id) : null;
 }
 
@@ -88,16 +104,16 @@ export async function processRefund({ refundId }) {
 
 async function emailRefund(refund) {
   const { rows } = await pool.query(
-    `SELECT u.email, e.name AS event_name FROM orders AS o JOIN events AS e ON e.id = o.event_id
-       LEFT JOIN users AS u ON u.id = o.user_id WHERE o.id = $1`,
-    [refund.order_id],
+    `SELECT u.email, ${ITEM_NAME} FROM refunds AS r ${REFUND_ITEM} LEFT JOIN users AS u ON u.id = r.user_id WHERE r.id = $1`,
+    [refund.id],
   );
   if (!rows[0]?.email) return;
+  const what = refund.order_id ? `order ${refund.order_id}` : `${refund.booking_kind} booking ${refund.booking_id}`;
   await sendMail({
     to: rows[0].email,
-    subject: `Refund: ${formatRupees(refund.amount_paise)} for ${rows[0].event_name}`,
+    subject: `Refund: ${formatRupees(refund.amount_paise)} for ${rows[0].item_name}`,
     text:
-      `We've refunded ${formatRupees(refund.amount_paise)} for your order ${refund.order_id} (${rows[0].event_name}), ` +
+      `We've refunded ${formatRupees(refund.amount_paise)} for your ${what} (${rows[0].item_name}), ` +
       `because ${REASON_TEXT[refund.reason]}.\n\n` +
       `It goes back to the card or account you paid with; banks usually show it within 5–7 working days.`,
   });
@@ -108,8 +124,8 @@ async function emailRefund(refund) {
 export async function listRefunds({ status }) {
   const { rows } = await pool.query(
     `SELECT r.id, r.order_id, r.provider, r.payment_id, r.amount_paise, r.reason, r.status, r.provider_refund_id,
-            r.error, r.attempts, r.created_at, r.refunded_at, u.email AS user_email, e.name AS event_name
-       FROM refunds AS r JOIN orders AS o ON o.id = r.order_id JOIN events AS e ON e.id = o.event_id
+            r.error, r.attempts, r.created_at, r.refunded_at, u.email AS user_email, ${ITEM_NAME}, r.booking_kind, r.booking_id
+       FROM refunds AS r ${REFUND_ITEM}
        LEFT JOIN users AS u ON u.id = r.user_id
       WHERE ($1::text IS NULL OR r.status = $1::text)
       ORDER BY (r.status = 'pending') DESC, r.created_at DESC LIMIT 200`,
@@ -117,7 +133,9 @@ export async function listRefunds({ status }) {
   );
   return rows.map((r) => ({
     id: Number(r.id),
-    orderId: Number(r.order_id),
+    orderId: r.order_id === null ? null : Number(r.order_id),
+    bookingKind: r.booking_kind, // 'bus' | 'train' for a booking's refund
+    bookingId: r.booking_id === null ? null : Number(r.booking_id),
     provider: r.provider,
     paymentId: r.payment_id,
     amountPaise: r.amount_paise,
@@ -129,7 +147,7 @@ export async function listRefunds({ status }) {
     createdAt: r.created_at,
     refundedAt: r.refunded_at,
     userEmail: r.user_email,
-    eventName: r.event_name,
+    eventName: r.item_name, // the event, or "Bus Pune → Goa" / "Train 12123 Mumbai → Pune"
   }));
 }
 

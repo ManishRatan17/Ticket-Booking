@@ -110,7 +110,17 @@ test('search: cities in any case, Indian travel date, optional class filter, ava
   assert.equal((await api('GET', '/api/train/trips/999999999')).body.error.code, 'TRAIN_TRIP_NOT_FOUND');
 });
 
-test('hold: the server allocates berths in order → confirm with travellers → a PNR → in my history', async () => {
+async function payAndWait(as, bookingId) {
+  assert.equal((await api('POST', `/api/train/bookings/${bookingId}/pay/fake`, { as, body: { outcome: 'success' } })).status, 202);
+  for (let i = 0; i < 100; i++) {
+    const b = (await api('GET', `/api/train/bookings/${bookingId}`, { as })).body.booking;
+    if (b.status !== 'held') return b;
+    await new Promise((r) => setTimeout(r, 20));
+  }
+  return (await api('GET', `/api/train/bookings/${bookingId}`, { as })).body.booking;
+}
+
+test('hold: the server allocates berths in order → travellers → PAY → confirmed with a PNR → in my history', async () => {
   const t = await trip();
   const [ann] = await users(1);
   const held = await hold(ann, t.id, '3A', 2);
@@ -123,7 +133,8 @@ test('hold: the server allocates berths in order → confirm with travellers →
 
   const ok = await api('POST', `/api/train/bookings/${b.id}/confirm`, { as: ann, body: { passengers: people(2), contactPhone: '+91 98765 43210' } });
   assert.equal(ok.status, 200, JSON.stringify(ok.body));
-  const c = ok.body.booking;
+  assert.deepEqual([ok.body.booking.status, ok.body.booking.pnr, ok.body.booking.passengersGiven], ['held', null, true], 'waits for payment');
+  const c = await payAndWait(ann, b.id);
   assert.equal(c.status, 'confirmed');
   assert.match(c.pnr, /^\d{10}$/);
   assert.deepEqual(c.travellers.map((x) => [x.berth, x.passenger.name]), [['B1-1', 'Traveller 1'], ['B1-2', 'Traveller 2']]);

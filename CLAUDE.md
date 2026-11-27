@@ -6,17 +6,18 @@ every step, in the same commit.** Details live in `docs/` — read only the doc 
 
 ## Where we are (updated 2026-11-26)
 
-- Last step: train module (step 3). Next: step 4, payments for bus + train.
-- Tests: **408 server + 50 client**, all passing, 0 skipped. Migrations up to **017** (dev DB migrated).
+- Last step: payments for bus + train (step 4). Next: the bus/train booking PAGES on the website (not built yet),
+  then deploy (needs the user's accounts).
+- Tests: **417 server + 50 client**, all passing, 0 skipped. Migrations up to **018** (dev DB migrated).
 - **Backend features are complete.** Done, in order: auth (+Google), holds (Redis Lua), orders +
   payments (fake + Razorpay test mode), background jobs (BullMQ), waiting room, protection (rate
   limits, cap, Turnstile, honeypot), lucky draw, support inbox, bot strikes, admin side, load test
   (10,000 users → exactly 300 sold), email (Resend), refunds, daily housekeeping, admin audit log,
   cancelling an event.
 - **Backend phase (2026-11-27), agreed plan:** (1) train-error fixes DONE (proxy 502 API_UNREACHABLE, worker in
-  /api/health, lib/httpClient.js); (2) bus module DONE (modules/bus, docs/23); (3) train module DONE (modules/train, docs/24: TRAIN_PROVIDER local | external → 503/501); (4) NEXT: payments
-  for bus + train bookings (reuse the fake provider / Razorpay; refunds on cancel).
-  Bookings confirm WITHOUT payment in steps 2–3. Seats: DB-enforced one active booking per seat per trip.
+  /api/health, lib/httpClient.js); (2) bus module DONE (modules/bus, docs/23); (3) train module DONE (modules/train, docs/24: TRAIN_PROVIDER local | external → 503/501); (4) payments for bus + train DONE
+  (modules/booking-payments, docs/12 "Paying for bus and train bookings"). Backend plan complete.
+  A booking with a fare is confirmed by PAYING (fake provider / Razorpay); free trips by the passenger details. Seats: DB-enforced one active booking per seat per trip.
 - **Deploy (later):** — Railway recommended (Dockerfile ready, guide in
   `docs/21-deployment.md`). Needs the user's own accounts: Railway, Cloudflare Turnstile, Resend;
   then set the Razorpay webhook URL to the public site. Secrets go into Railway's settings, never into chat or git.
@@ -84,7 +85,7 @@ The user usually runs the app in a window titled "TicketBooking - npm run dev". 
 - `server/src/modules/` — auth, events (+ `events.cancel.js`), reservation (Redis Lua holds/stock),
   orders, payments (fake, razorpay, refunds), waiting-room, lottery, support, moderation, admin.
 - `server/src/jobs/` — BullMQ queue, processors, housekeeping. `server/src/lib/` — audit, mailer, rate limits, shortCache.
-- `server/migrations/001–017` · `server/test/` (one file per feature) · `server/test-support/` (fakes, helpers).
+- `server/migrations/001–018` · `server/test/` (one file per feature) · `server/test-support/` (fakes, helpers).
 - `client/src/` — pages, api, components, hooks, lib (error texts, statuses). React 19 + Vite.
 - `loadtest/` — k6 in Docker. `.github/workflows/test.yml` — CI. `server/Dockerfile` — deploy image.
 

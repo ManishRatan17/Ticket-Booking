@@ -15,6 +15,7 @@ import waitingRoomRouter from './modules/waiting-room/waiting-room.routes.js';
 import supportRouter from './modules/support/support.routes.js';
 import { busRouter } from './modules/bus/bus.routes.js';
 import { trainRouter } from './modules/train/train.routes.js';
+import { bookingWebhooksRouter } from './modules/booking-payments/booking-payments.routes.js';
 import { authenticate } from './middleware/authenticate.js';
 import { requireRole } from './middleware/authorize.js';
 import { rejectCrossSiteRequests } from './middleware/csrf.js';
@@ -47,6 +48,7 @@ export function createApp() {
   // Payment webhooks BEFORE express.json(): their signature covers the exact raw bytes,
   // so the body must reach the handler unparsed. (Server-to-server: no cookies involved.)
   app.use('/api/webhooks', webhooksRouter);
+  app.use('/api/webhooks', bookingWebhooksRouter); // bus / train booking payments (fake provider)
 
   app.use(express.json({ limit: '10kb' })); // parse JSON bodies; refuse anything bigger than 10 KB
   app.use(cookieParser()); // read cookies into req.cookies (both tokens live in cookies)

@@ -2,7 +2,7 @@
 
 A booking system of its own, next to the flash-sale events: [server/src/modules/bus/](../server/src/modules/bus/) with its own routes, controller, service, repository (SQL), validation and tables ([migration 016](../server/migrations/016_bus.sql)). It shares only the platform's general tools: sign-in, validation, errors, rate limits, the Idempotency-Key middleware, the admin guard and the audit log. A change in one booking system can't break the other.
 
-**Trips are the platform's own inventory**, added by admins. Nothing comes from an outside provider, so there is no external dependency, credential or environment variable for buses. **Payment is not part of this step:** passenger details confirm a booking. Payment (the existing fake provider / Razorpay) comes in a later step.
+**Trips are the platform's own inventory**, added by admins. Nothing comes from an outside provider, so there is no external dependency, credential or environment variable for buses. **Payment:** a trip with a fare is confirmed by paying (step 4, below); a free trip by the passenger details.
 
 ## The flow
 
@@ -60,9 +60,11 @@ A booking: `{ id, status, trip: { id, operator, busNumber, from, to, departsAt, 
 
 ## Not done yet (honest list)
 
-- **Payment** for bus bookings (agreed as its own step, after the train module).
 - Admins can't yet edit or cancel a trip (cancelling one will need refunds once payment exists).
 - No website pages for bus booking yet (backend only, as asked); the Bus card still lists events.
 - Expired holds are marked `expired` when the next hold on that trip happens; their seats are free immediately either way.
 
 *Tested in [bus.test.js](../server/test/bus.test.js) (9 tests). Mutations: no trip lock → the 10-retries-at-once test failed (fixed: duplicate-key fallback; now passes even without the lock); no lock **and** no unique seat index → both seat races fail (double bookings); overdue holds never expired → the expiry test fails.*
+
+
+**Payment (step 4):** a bus booking with a fare is confirmed by **paying**, not by the passenger details: see [12 · Paying for bus and train bookings](12-orders-and-payments.md#paying-for-bus-and-train-bookings). Cancelling a paid booking refunds it.

@@ -288,3 +288,55 @@ test('the answer got LOST after Razorpay refunded (timeout) → the retry finds 
   assert.equal((await refundOf(order)).status, 'refunded');
   assert.equal(razorpay.refunds.filter((x) => x.payment_id === hook.paymentId).length, 1, 'money sent back once');
 });
+
+// ---------- bus and train BOOKINGS through Razorpay (modules/booking-payments) ----------
+const busService = await import('../src/modules/bus/bus.service.js');
+const trainService = await import('../src/modules/train/train.service.js');
+const later = (days) => new Date(Date.now() + days * 86_400_000);
+
+test('a BUS booking paid through Razorpay: one Razorpay order for the exact fare; the page\'s signed answer confirms it; a forged one → 400', async () => {
+  const trip = await busService.createTrip(
+    { operator: `${RUN} Bus`, busNumber: 'MH01', from: `Pune ${RUN}`, to: `Goa ${RUN}`, departsAt: later(3).toISOString(), arrivesAt: later(3.1).toISOString(), farePaise: 45_000, rows: 1, seatColumns: 'AB' },
+    null,
+  );
+  try {
+    const [ann] = await users(1);
+    const b = (await api('POST', `/api/bus/trips/${trip.id}/holds`, { as: ann, body: { seats: ['1A', '1B'] }, headers: { 'Idempotency-Key': randomUUID() } })).body.booking;
+    await api('POST', `/api/bus/bookings/${b.id}/confirm`, {
+      as: ann,
+      body: { passengers: [{ seat: '1A', name: 'Ann One', age: 30, gender: 'female' }, { seat: '1B', name: 'Ann Two', age: 31, gender: 'female' }] },
+    });
+    const rzp = (await api('POST', `/api/bus/bookings/${b.id}/pay/razorpay`, { as: ann })).body;
+    assert.equal(rzp.amountPaise, 90_000);
+    assert.equal((await api('POST', `/api/bus/bookings/${b.id}/pay/razorpay`, { as: ann })).body.razorpayOrderId, rzp.razorpayOrderId, 'created once');
+    assert.equal((await api('POST', `/api/bus/bookings/${b.id}/pay/fake`, { as: ann, body: { outcome: 'success' } })).body.error.code, 'FAKE_PAYMENTS_OFF');
+    const forged = await api('POST', `/api/bus/bookings/${b.id}/pay/razorpay/verify`, { as: ann, body: razorpay.pay(rzp.razorpayOrderId, { secret: 'not-the-secret' }) });
+    assert.equal(forged.body.error.code, 'PAYMENT_SIGNATURE_INVALID');
+    assert.equal((await api('POST', `/api/bus/bookings/${b.id}/pay/razorpay/verify`, { as: ann, body: razorpay.pay(rzp.razorpayOrderId) })).body.outcome, 'paid');
+    const shown = (await api('GET', `/api/bus/bookings/${b.id}`, { as: ann })).body.booking;
+    assert.deepEqual([shown.status, shown.payment.provider], ['confirmed', 'razorpay']);
+  } finally {
+    await pool.query('DELETE FROM bus_trips WHERE id = $1', [trip.id]);
+  }
+});
+
+test("a TRAIN booking confirmed by Razorpay's webhook alone (the tab was closed): it gets its PNR; the same delivery again → duplicate", async () => {
+  const trip = await trainService.createTrip(
+    { trainNumber: '12951', trainName: `${RUN} Rajdhani`, from: `Mumbai ${RUN}`, to: `Delhi ${RUN}`, departsAt: later(3).toISOString(), arrivesAt: later(3.5).toISOString(), classes: [{ code: '3A', farePaise: 150_000, coaches: 1, berthsPerCoach: 2 }] },
+    null,
+  );
+  try {
+    const [ann] = await users(1);
+    const b = (await api('POST', `/api/train/trips/${trip.id}/holds`, { as: ann, body: { classCode: '3A', travellers: 1 }, headers: { 'Idempotency-Key': randomUUID() } })).body.booking;
+    await api('POST', `/api/train/bookings/${b.id}/confirm`, { as: ann, body: { passengers: [{ name: 'Ann Rider', age: 30, gender: 'female' }] } });
+    const rzp = (await api('POST', `/api/train/bookings/${b.id}/pay/razorpay`, { as: ann })).body;
+    const delivery = razorpay.webhook('payment.captured', rzp.razorpayOrderId);
+    assert.equal((await sendWebhook(delivery)).body.outcome, 'paid');
+    assert.equal((await sendWebhook(delivery)).body.outcome, 'duplicate');
+    const shown = (await api('GET', `/api/train/bookings/${b.id}`, { as: ann })).body.booking;
+    assert.equal(shown.status, 'confirmed');
+    assert.match(shown.pnr, /^\d{10}$/);
+  } finally {
+    await pool.query('DELETE FROM train_trips WHERE id = $1', [trip.id]);
+  }
+});

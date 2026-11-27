@@ -128,6 +128,8 @@ export async function insertBooking(client, { tripId, userId, classCode, berths,
 const BOOKING_SELECT = `
   SELECT b.*, t.train_number, t.train_name, t.origin, t.destination, t.departs_at, t.arrives_at,
          (t.cancelled_at IS NOT NULL) AS trip_cancelled,
+         (SELECT json_build_object('status', rf.status, 'amountPaise', rf.amount_paise, 'reason', rf.reason, 'refundedAt', rf.refunded_at)
+            FROM refunds AS rf WHERE rf.booking_kind = 'train' AND rf.booking_id = b.id ORDER BY rf.id DESC LIMIT 1) AS refund,
          json_agg(json_build_object('berth', x.berth_label, 'position', x.position, 'name', x.passenger_name,
                                     'age', x.passenger_age, 'gender', x.passenger_gender) ORDER BY x.position) AS berths
     FROM train_bookings AS b
@@ -145,6 +147,11 @@ function toBooking(r) {
     amountPaise: r.amount_paise,
     heldUntil: r.held_until,
     contactPhone: r.contact_phone,
+    passengersAt: r.passengers_at,
+    paymentProvider: r.payment_provider,
+    paymentId: r.payment_id,
+    paidAt: r.paid_at,
+    refund: r.refund ?? null,
     confirmedAt: r.confirmed_at,
     cancelledAt: r.cancelled_at,
     createdAt: r.created_at,
@@ -179,7 +186,9 @@ export async function listBookings(client, userId) {
   return rows.map(toBooking);
 }
 
-export async function confirmBooking(client, { id, passengers, contactPhone, pnr }) {
+// Saves the travellers; with a `pnr` (a free trip) also confirms. A paid trip is confirmed by its
+// payment (modules/booking-payments), which gives the PNR.
+export async function confirmBooking(client, { id, passengers, contactPhone, pnr = null }) {
   await client.query(
     `UPDATE train_booking_berths AS x SET passenger_name = p.name, passenger_age = p.age, passenger_gender = p.gender
        FROM json_to_recordset($2::json) AS p(position int, name text, age int, gender text)
@@ -187,7 +196,9 @@ export async function confirmBooking(client, { id, passengers, contactPhone, pnr
     [id, JSON.stringify(passengers.map((p, i) => ({ ...p, position: i + 1 })))],
   );
   await client.query(
-    `UPDATE train_bookings SET status = 'confirmed', pnr = $3, contact_phone = $2, confirmed_at = now(), updated_at = now() WHERE id = $1`,
+    pnr
+      ? `UPDATE train_bookings SET status = 'confirmed', pnr = $3, contact_phone = $2, passengers_at = now(), confirmed_at = now(), updated_at = now() WHERE id = $1`
+      : `UPDATE train_bookings SET contact_phone = $2, passengers_at = now(), updated_at = now() WHERE id = $1 AND $3::text IS NULL`,
     [id, contactPhone ?? null, pnr],
   );
 }

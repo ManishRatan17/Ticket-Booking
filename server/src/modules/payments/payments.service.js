@@ -10,6 +10,7 @@ import * as ordersRepository from '../orders/orders.repository.js';
 import { startPayment } from './fake-provider.js';
 import * as razorpay from './razorpay.js';
 import { recordRefund, requestRefund } from './refunds.js';
+import { handleRazorpayBookingPayment } from '../booking-payments/booking-payments.js';
 import { env } from '../../config/env.js';
 import { sendMail } from '../../lib/mailer.js';
 import { formatRupees } from '../../lib/money.js';
@@ -102,7 +103,16 @@ export async function handleRazorpayWebhook({ rawBody, signature, eventId }) {
   if (!type || !payment?.id || !payment?.order_id) return { outcome: 'ignored' };
 
   const orderId = await ordersRepository.findOrderIdByProviderOrderId(pool, payment.order_id);
-  if (!orderId) return { outcome: 'unknown_order' };
+  if (!orderId) {
+    // Not an event order: maybe a bus / train booking (modules/booking-payments).
+    const booking = await handleRazorpayBookingPayment({
+      providerOrderId: payment.order_id,
+      paymentId: payment.id,
+      amountPaise: Number(payment.amount),
+      eventId: eventId || `rzp_evt_${payment.id}_${event.event}`,
+    });
+    return booking ?? { outcome: 'unknown_order' };
+  }
   return handlePaymentEvent(
     {
       // Razorpay's event id makes repeats of the SAME delivery harmless; without it, one per payment + kind.

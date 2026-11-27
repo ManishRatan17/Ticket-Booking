@@ -192,3 +192,33 @@ after the commit: forget the cached event · drop the waiting room · release th
 Either the payment finished first (paid → then cancelled and refunded by the cancel), or the cancel did (the payment is refunded). Either way: **one refund per payment, no tickets for a cancelled event.**
 
 *Tested in [cancel-event.test.js](../server/test/cancel-event.test.js): 2 paid + 1 pending order + 1 hold → paid ones cancelled and refunded, emailed (with the reason and amount), the pending one cancelled with no refund, new holds and orders from an old hold → 409, the shop and admin show it; twice → 409, unknown → 404, short reason → 400, no edits, admins only, the audit entry; a payment for an order that slipped in → refunded, no tickets; **8 payments racing the cancel, 3 rounds** → nothing stays paid, exactly one refund each, no deadlock; the waiting room is emptied and closed. Mutations: holds not checking cancellation → the first test fails; the payment ignoring a cancelled event → the slipped-in test fails; the cancel locking the event first → the race test fails with "deadlock detected", 3 of 3 runs.*
+
+## Paying for bus and train bookings
+
+Bus ([23](23-bus-booking.md)) and train ([24](24-train-booking.md)) bookings use **one shared payment flow**, [modules/booking-payments/](../server/src/modules/booking-payments/) (migration [018](../server/migrations/018_booking_payments.sql)). Each module plugs in with a small adapter ([bus.payments.js](../server/src/modules/bus/bus.payments.js), [train.payments.js](../server/src/modules/train/train.payments.js): its tables, the receipt, and for trains the PNR); the shared module never imports them, so the two stay isolated. The event orders' payments above are unchanged.
+
+```
+hold (10 min) ──► POST /api/{bus|train}/bookings/:id/confirm  { passengers }   (saved; still 'held')
+   ──► POST /api/{bus|train}/bookings/:id/pay/fake {outcome}  → the fake provider's signed webhook
+                                                               POST /api/webhooks/booking-payments/{bus|train}
+       or POST …/pay/razorpay → checkout → POST …/pay/razorpay/verify  (+ Razorpay's own webhook)
+   ──► 'confirmed' (a train gets its PNR now) + a receipt email
+```
+
+A **free** trip (fare 0) is confirmed by the passenger details alone; nothing to pay.
+
+| Rule | How |
+|---|---|
+| Only a payment confirms a booking with a fare | the signed webhook, or Razorpay's verified signature; never the browser's word |
+| Each delivery is handled once | its id goes into `processed_webhooks` (atomic insert); a repeat → `duplicate` |
+| No race between payments, holds and cancels | the payment transaction locks the **trip, then the booking**, the same order as holds and cancels. Measured: without these locks, 10 deliveries + a second payment at once were not handled correctly (the race test fails) |
+| Money that buys nothing goes back, once | a refund recorded **inside** the payment transaction (`UNIQUE (payment_id)`), processed by the refund job: a second payment for a paid booking, a payment for a cancelled one (`booking_not_payable`), a wrong amount (`amount_mismatch`: the booking stays payable) |
+| A payment after the hold ran out | other run-out holds give their seats back first; if this booking's seats are still free → **confirmed**; if someone else holds them → `expired` + refunded (`seats_unavailable`) |
+| Cancelling a paid booking refunds it | `booking_cancelled`, recorded in the cancel's transaction; the booking shows `refund`, the person gets an email |
+| A failed attempt changes nothing | the person can pay again while the hold lasts (as with Razorpay's `payment.failed`) |
+
+Refunds can now belong to an event order **or** a booking: `refunds.order_id` became optional, with `booking_kind` + `booking_id` and a CHECK that exactly one is set. The admin Refunds list and the refund email name the item ("Bus Pune → Goa", "Train 12123 Mumbai → Pune").
+
+**Endpoints** (both kinds; signed in, customers only, not restricted, 10/min): `POST /api/{bus|train}/bookings/:id/pay/fake` `{ outcome: "success" | "failure" }` → `202 { paymentId }` · `POST …/pay/razorpay` → `200 { keyId, razorpayOrderId, amountPaise, currency, description }` (one Razorpay order per booking) · `POST …/pay/razorpay/verify` → `200 { outcome }`. Errors: `409 PASSENGERS_REQUIRED`, `409 BOOKING_ALREADY_PAID`, `409 BOOKING_NOT_PAYABLE`, `409 NOTHING_TO_PAY`, `409 BUS_HOLD_EXPIRED` / `TRAIN_HOLD_EXPIRED`, `404 FAKE_PAYMENTS_OFF` / `RAZORPAY_OFF`, `400 PAYMENT_SIGNATURE_INVALID`, `404 BUS_BOOKING_NOT_FOUND` / `TRAIN_BOOKING_NOT_FOUND`. A booking now carries `passengersGiven`, `payment: null | { required, paid, provider, paidAt }` and `refund`.
+
+*Tested in [booking-payments.test.js](../server/test/booking-payments.test.js) (7) and [razorpay.test.js](../server/test/razorpay.test.js) (+2: a bus booking paid via the page's signed answer, a forged one refused; a train booking confirmed by Razorpay's webhook alone with its PNR, the same delivery again → duplicate). Mutations: repeats not ignored → the duplicate test fails; no locks → the race test fails; cancel without refund → the cancel test fails.*

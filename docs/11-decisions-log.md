@@ -235,6 +235,16 @@ Every significant choice, the alternatives considered, and why. Newest at the bo
 | The payment re-checks `cancelled_at` under the event lock | trust that the cancel saw every order | an order created in the instant of the cancel would otherwise become tickets for a cancelled event |
 | A new order status `cancelled` | reuse `failed` | "the event was cancelled" isn't a failed payment; My orders says which |
 
+## Paying for bus and train bookings (step 4)
+
+| Decision | Rejected | Why |
+|---|---|---|
+| One shared module (booking-payments) with an adapter per kind; modules register themselves | payment code in each module; or reuse the event orders' payment code | the rules are written and tested once; bus and train stay isolated; the tested event payments are untouched |
+| Passenger details first, then pay; free trips confirm at once | pay first | the receipt and the PNR need the travellers; paying for an empty booking makes no sense |
+| A payment after the hold ran out is confirmed if its seats are still free | always refund late payments | the person paid; refund only when we really can't deliver |
+| `refunds` gets `booking_kind` + `booking_id` with a CHECK (exactly one target) | a second refunds table | one refund job, one admin list, one email for every refund |
+| The PNR is given on payment | on passenger details | a PNR means a confirmed ticket |
+
 ## Design system (2026-11-28)
 
 | Decision | Rejected | Why |

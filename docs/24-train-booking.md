@@ -74,7 +74,9 @@ A booking: `{ id, status, pnr, classCode, trip: { id, trainNumber, trainName, fr
 ## Not done yet (honest list)
 
 - **A real train provider:** needs a licensed partner and its API contract (see above).
-- **Payment** for train bookings (the next step, for bus and train together).
 - Admins can't yet edit or cancel a train trip; no website pages for train booking yet (backend only, as asked).
 
 *Tested in [train.test.js](../server/test/train.test.js) (10 tests). Mutations: no trip lock → both rush tests fail (only 3 of 10 berths sold; no double booking); no lock **and** no unique berth index → both fail; the external provider answering `[]` instead of 503 → the provider test fails.*
+
+
+**Payment (step 4):** a train booking with a fare is confirmed by **paying**, not by the passenger details: see [12 · Paying for bus and train bookings](12-orders-and-payments.md#paying-for-bus-and-train-bookings). Cancelling a paid booking refunds it. The PNR is given when the payment arrives.

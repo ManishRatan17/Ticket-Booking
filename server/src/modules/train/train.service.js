@@ -26,6 +26,10 @@ export function toPublicBooking(b) {
     amountPaise: b.amountPaise,
     heldUntil: b.status === 'held' ? b.heldUntil : null,
     contactPhone: b.contactPhone,
+    passengersGiven: Boolean(b.passengersAt),
+    // A trip with a fare is confirmed by paying (POST /api/train/bookings/:id/pay/…), which gives the PNR.
+    payment: b.amountPaise > 0 ? { required: true, paid: Boolean(b.paidAt), provider: b.paymentProvider, paidAt: b.paidAt } : null,
+    refund: b.refund ?? null,
     confirmedAt: b.confirmedAt,
     cancelledAt: b.cancelledAt,
     createdAt: b.createdAt,

@@ -5,7 +5,7 @@ docker compose up -d     # the server tests use the real PostgreSQL and Redis
 npm test                 # server (node:test) then client (Vitest)
 ```
 
-Today: **408 server tests + 50 client tests**, all passing, none skipped.
+Today: **417 server tests + 50 client tests**, all passing, none skipped.
 
 ## Their own database, and CI
 
@@ -94,6 +94,7 @@ Kept outside `test/` because Node runs every file inside `test/` as a test.
 | `refunds.test.js` | money that bought no tickets goes back: recorded with the payment, refunded, emailed, shown in the order; one refund per payment; a wrong amount → the paid amount back; admin list and Retry |
 | `audit.test.js` | the admin audit log: a role change (which admin, their email, whom, the role), creating + editing an event (the new event's id as the target), failed actions and reads NOT recorded, a set-role change recorded as "command line", **the database refuses UPDATE and DELETE**, admins read it (newest first, filter), normal users → 403 |
 | `cancel-event.test.js` | cancelling an event: paid orders cancelled + refunded + emailed, unpaid ones ended, holds / orders / the queue → 409, the shop and admin show it; twice, unknown, short reason, no edits, admins only, audited; a payment for an order that slipped in → refunded; **8 payments racing the cancel (3 rounds)** → one refund each, nothing paid, no deadlock; the waiting room emptied |
+| `booking-payments.test.js` | paying for bus and train bookings (fake provider): pay → the signed webhook confirms → receipt; passengers required; not yours → 404; free trips need no payment; a failed attempt keeps the hold; the same delivery twice → duplicate; a second payment → refunded; a wrong amount → refunded, still payable; **late payment**: seats free → confirmed, seats taken → expired + refunded; cancel a paid booking → refunded + email (bus and train); a train gets its PNR on payment; bad signature / unknown kind / unknown booking; **10 deliveries + a second payment at once → confirmed once, exactly one refund** |
 | `train.test.js` | train booking: admins create trips with classes (bad input, audited); search by cities, date and class; berths allocated in order → confirm → a 10-digit PNR (twice: same PNR); not enough berths → how many left; class not offered; one hold per trip; key required; admins and guests refused; 10 identical retries → one booking; **30 people, 10 berths → exactly 10, all different**; **20 people, 2–3 each from 20 → no berth twice**; expiry; cancel; **the external provider → 503 / 501, never invented trains** |
 | `bus.test.js` | bus booking: admins create trips (seat map from rows × columns, bad input, audited); search by cities in any case and an Indian travel date; the seat map never shows who; hold → confirm with passengers → history; taken / unknown / repeated / too many seats; one hold per trip; key required; admins and guests refused; **10 identical retries at once → one booking**; **25 people, one seat → exactly one wins**; **30 people, overlapping pairs → no seat twice**; an expired hold frees its seats and can't be confirmed; cancel frees seats, twice → 409, after departure → 409 |
 | `http-client.test.js` | the shared client for outside services against a local HTTP server: 2xx/4xx returned (a 404 never retried), a slow service → 504 at the timeout (never hangs), a GET failing with 5xx retried until it works, a POST never retried (it may have booked) unless marked idempotent, 429 → 503, nothing listening → 502, HTML instead of JSON → 502 |
@@ -170,6 +171,9 @@ A test only proves something once it has been seen to **fail for the right reaso
 | train: no trip lock | both rush tests: only 3 of 10 berths sold (everyone picked the same "first free berth"; the index refused the rest). No double booking |
 | train: no lock AND the unique berth index dropped | both rush tests |
 | train: the external provider answering `[]` instead of 503 | the provider test |
+| booking payments: repeated deliveries not ignored | the duplicate test |
+| booking payments: no trip / booking locks in the payment transaction | the payment race test |
+| booking payments: cancelling a paid booking doesn't refund | the cancel test |
 | holds not checking whether the event was cancelled | the cancel test (a hold → 200) |
 | the payment ignoring a cancelled event | the slipped-in-order test (tickets for a cancelled event) |
 | the cancel locking the event row first (the opposite order to payments) | the race test: "deadlock detected", 3 of 3 runs |

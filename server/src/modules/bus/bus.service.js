@@ -11,6 +11,7 @@ import { pool, withTransaction } from '../../config/db.js';
 import { AppError } from '../../lib/errors.js';
 import { isUniqueViolation } from '../../lib/db-errors.js';
 import * as repo from './bus.repository.js';
+import { refundOnCancel, requestRefund } from '../booking-payments/booking-payments.js';
 
 export const HOLD_MINUTES = 10;
 const TIME_ZONE = 'Asia/Kolkata'; // "travel date" = a calendar day in India
@@ -34,6 +35,10 @@ export function toPublicBooking(b) {
     amountPaise: b.amountPaise,
     heldUntil: b.status === 'held' ? b.heldUntil : null,
     contactPhone: b.contactPhone,
+    passengersGiven: Boolean(b.passengersAt),
+    // A trip with a fare is confirmed by paying (POST /api/bus/bookings/:id/pay/…); free trips need no payment.
+    payment: b.amountPaise > 0 ? { required: true, paid: Boolean(b.paidAt), provider: b.paymentProvider, paidAt: b.paidAt } : null,
+    refund: b.refund,
     confirmedAt: b.confirmedAt,
     cancelledAt: b.cancelledAt,
     createdAt: b.createdAt,
@@ -157,21 +162,25 @@ export async function confirmBooking({ bookingId, userId, passengers, contactPho
     if (!sameSeats(held, passengers.map((p) => p.seat))) {
       throw new AppError(400, 'PASSENGERS_MISMATCH', `Give one passenger for each held seat: ${held.join(', ')}`, { seats: held });
     }
-    await repo.confirmBooking(client, { id: bookingId, passengers, contactPhone });
+    // A free trip is confirmed now; otherwise the passengers are saved and the booking waits for payment.
+    await repo.confirmBooking(client, { id: bookingId, passengers, contactPhone, confirm: booking.amountPaise === 0 });
     return repo.findBooking(client, bookingId, userId);
   });
 }
 
 export async function cancelBooking({ bookingId, userId }) {
-  return withTransaction(async (client) => {
+  const { booking, refundId } = await withTransaction(async (client) => {
     const { trip, booking } = await lockOwnBooking(client, bookingId, userId);
     if (booking.status !== 'held' && booking.status !== 'confirmed') {
       throw new AppError(409, 'BUS_BOOKING_NOT_ACTIVE', `This booking is already ${booking.status}`, { status: booking.status });
     }
     if (new Date(trip.departsAt) <= new Date()) throw new AppError(409, 'BUS_TRIP_DEPARTED', 'This bus has already left');
+    const refundId = await refundOnCancel(client, 'bus', booking); // paid → the money goes back (recorded here)
     await repo.cancelBooking(client, bookingId);
-    return repo.findBooking(client, bookingId, userId);
+    return { booking: await repo.findBooking(client, bookingId, userId), refundId };
   });
+  if (refundId) await requestRefund(refundId);
+  return refundId ? repo.findBooking(pool, bookingId, userId) : booking;
 }
 
 export async function getBooking({ bookingId, userId }) {

@@ -6,11 +6,12 @@
 //
 // Concurrency: every change to a trip's bookings locks the TRIP row first, so allocations on one
 // trip take turns; and the database refuses a berth in two active bookings (unique index, migration 017).
-import { randomInt } from 'node:crypto';
 import { pool, withTransaction } from '../../../config/db.js';
 import { AppError } from '../../../lib/errors.js';
 import { isUniqueViolation } from '../../../lib/db-errors.js';
 import * as repo from '../train.repository.js';
+import { newPnr } from '../train.payments.js';
+import { refundOnCancel, requestRefund } from '../../booking-payments/booking-payments.js';
 
 export const name = 'local';
 export const HOLD_MINUTES = 10;
@@ -93,8 +94,6 @@ async function lockOwnBooking(client, bookingId, userId) {
   return { trip, booking };
 }
 
-const newPnr = () => String(randomInt(1_000_000_000, 10_000_000_000)); // 10 digits
-
 export async function confirmBooking({ bookingId, userId, passengers, contactPhone }) {
   // A PNR is random; if one ever repeats (1 in 9 billion), the unique index refuses it: try again.
   for (let attempt = 1; ; attempt++) {
@@ -114,7 +113,9 @@ export async function confirmBooking({ bookingId, userId, passengers, contactPho
             travellers: booking.berths.length,
           });
         }
-        await repo.confirmBooking(client, { id: bookingId, passengers, contactPhone, pnr: newPnr() });
+        // A free trip is confirmed now (with its PNR); otherwise the travellers are saved and the
+        // booking waits for payment, which gives the PNR (train.payments.js).
+        await repo.confirmBooking(client, { id: bookingId, passengers, contactPhone, pnr: booking.amountPaise === 0 ? newPnr() : null });
         return repo.findBooking(client, bookingId, userId);
       });
     } catch (err) {
@@ -125,15 +126,18 @@ export async function confirmBooking({ bookingId, userId, passengers, contactPho
 }
 
 export async function cancelBooking({ bookingId, userId }) {
-  return withTransaction(async (client) => {
+  const { booking, refundId } = await withTransaction(async (client) => {
     const { trip, booking } = await lockOwnBooking(client, bookingId, userId);
     if (booking.status !== 'held' && booking.status !== 'confirmed') {
       throw new AppError(409, 'TRAIN_BOOKING_NOT_ACTIVE', `This booking is already ${booking.status}`, { status: booking.status });
     }
     if (new Date(trip.departsAt) <= new Date()) throw new AppError(409, 'TRAIN_TRIP_DEPARTED', 'This train has already left');
+    const refundId = await refundOnCancel(client, 'train', booking); // paid → the money goes back (recorded here)
     await repo.cancelBooking(client, bookingId);
-    return repo.findBooking(client, bookingId, userId);
+    return { booking: await repo.findBooking(client, bookingId, userId), refundId };
   });
+  if (refundId) await requestRefund(refundId);
+  return refundId ? repo.findBooking(pool, bookingId, userId) : booking;
 }
 
 export async function getBooking({ bookingId, userId }) {

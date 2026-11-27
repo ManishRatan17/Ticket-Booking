@@ -223,6 +223,10 @@ Orders carry `refund`: `null`, or `{ "status": "pending" | "refunded", "amountPa
 ### `GET /admin/refunds?status=pending|refunded` → `200 { "refunds": [ { "id", "orderId", "userEmail", "eventName", "amountPaise", "reason", "status", "provider", "paymentId", "providerRefundId", "error", "attempts", "createdAt", "refundedAt" } ] }` (pending first)
 ### `POST /admin/refunds/:id/retry` → `202 { "retried": true }` · `404 REFUND_NOT_FOUND` · `409 ALREADY_REFUNDED`
 
+## Paying for bus and train bookings
+
+`POST /api/{bus|train}/bookings/:id/pay/fake`, `…/pay/razorpay`, `…/pay/razorpay/verify`, the webhook `POST /api/webhooks/booking-payments/{bus|train}`: see [12 · Paying for bus and train bookings](12-orders-and-payments.md#paying-for-bus-and-train-bookings). `GET /admin/refunds` items now also carry `bookingKind`, `bookingId` (`orderId` is null for a booking's refund).
+
 ## Train booking — `/api/train`
 
 Search with classes, server-allocated berths, PNR, cancel, history, admin trips (`/api/admin/train/trips`), and the provider answers (`503 TRAIN_PROVIDER_NOT_CONFIGURED`): every endpoint is in [24 · Train booking](24-train-booking.md#endpoints).

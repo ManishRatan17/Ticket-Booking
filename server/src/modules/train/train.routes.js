@@ -9,6 +9,8 @@ import { requireIdempotencyKey } from '../../middleware/idempotencyKey.js';
 import { rateLimit } from '../../lib/rateLimiter.js';
 import { confirmBodySchema, createTripSchema, holdBodySchema, idParamsSchema, searchQuerySchema } from './train.schemas.js';
 import * as controller from './train.controller.js';
+import { bookingPaymentRoutes } from '../booking-payments/booking-payments.routes.js';
+import './train.payments.js'; // registers the train with booking payments
 
 const MINUTE = 60;
 const searchPerIp = rateLimit({ name: 'train-search-ip', limit: 120, windowSeconds: MINUTE, key: (req) => req.ip });
@@ -43,6 +45,8 @@ trainRouter.post(
 );
 trainRouter.post('/bookings/:id/cancel', authenticate, validate({ params: idParamsSchema }), controller.cancelBooking);
 trainRouter.get('/bookings', authenticate, controller.listBookings);
+// Paying: POST /bookings/:id/pay/fake | /pay/razorpay | /pay/razorpay/verify (modules/booking-payments)
+trainRouter.use('/bookings', bookingPaymentRoutes('train'));
 trainRouter.get('/bookings/:id', authenticate, validate({ params: idParamsSchema }), controller.getBooking);
 
 export const trainAdminRouter = Router();

@@ -104,6 +104,8 @@ export async function insertBooking(client, { tripId, userId, seats, amountPaise
 const BOOKING_SELECT = `
   SELECT b.*, t.operator, t.bus_number, t.origin, t.destination, t.departs_at, t.arrives_at,
          (t.cancelled_at IS NOT NULL) AS trip_cancelled,
+         (SELECT json_build_object('status', rf.status, 'amountPaise', rf.amount_paise, 'reason', rf.reason, 'refundedAt', rf.refunded_at)
+            FROM refunds AS rf WHERE rf.booking_kind = 'bus' AND rf.booking_id = b.id ORDER BY rf.id DESC LIMIT 1) AS refund,
          json_agg(json_build_object('label', s.seat_label, 'name', s.passenger_name, 'age', s.passenger_age,
                                     'gender', s.passenger_gender) ORDER BY s.seat_label) AS seats
     FROM bus_bookings AS b
@@ -120,6 +122,11 @@ function toBooking(r) {
     idempotencyKey: r.idempotency_key,
     heldUntil: r.held_until,
     contactPhone: r.contact_phone,
+    passengersAt: r.passengers_at,
+    paymentProvider: r.payment_provider,
+    paymentId: r.payment_id,
+    paidAt: r.paid_at,
+    refund: r.refund ?? null,
     confirmedAt: r.confirmed_at,
     cancelledAt: r.cancelled_at,
     createdAt: r.created_at,
@@ -154,7 +161,9 @@ export async function listBookings(client, userId) {
   return rows.map(toBooking);
 }
 
-export async function confirmBooking(client, { id, passengers, contactPhone }) {
+// Saves the passengers; confirms too when `confirm` (a free trip). A paid trip is confirmed by its
+// payment (modules/booking-payments).
+export async function confirmBooking(client, { id, passengers, contactPhone, confirm = true }) {
   await client.query(
     `UPDATE bus_booking_seats AS s SET passenger_name = p.name, passenger_age = p.age, passenger_gender = p.gender
        FROM json_to_recordset($2::json) AS p(seat text, name text, age int, gender text)
@@ -162,7 +171,9 @@ export async function confirmBooking(client, { id, passengers, contactPhone }) {
     [id, JSON.stringify(passengers)],
   );
   await client.query(
-    `UPDATE bus_bookings SET status = 'confirmed', contact_phone = $2, confirmed_at = now(), updated_at = now() WHERE id = $1`,
+    confirm
+      ? `UPDATE bus_bookings SET status = 'confirmed', contact_phone = $2, passengers_at = now(), confirmed_at = now(), updated_at = now() WHERE id = $1`
+      : `UPDATE bus_bookings SET contact_phone = $2, passengers_at = now(), updated_at = now() WHERE id = $1`,
     [id, contactPhone ?? null],
   );
 }

@@ -116,7 +116,18 @@ test('search: from/to in any letter case, by travel date (India), with seats lef
   assert.equal((await api('GET', '/api/bus/trips/999999999')).body.error.code, 'BUS_TRIP_NOT_FOUND');
 });
 
-test('hold → confirm with passengers → in my history; the price comes from the trip, not the request', async () => {
+// Pay with the fake provider and wait for its signed webhook to confirm the booking.
+async function payAndWait(as, bookingId, outcome = 'success') {
+  assert.equal((await api('POST', `/api/bus/bookings/${bookingId}/pay/fake`, { as, body: { outcome } })).status, 202);
+  for (let i = 0; i < 100; i++) {
+    const b = (await api('GET', `/api/bus/bookings/${bookingId}`, { as })).body.booking;
+    if (b.status !== 'held') return b;
+    await new Promise((r) => setTimeout(r, 20));
+  }
+  return (await api('GET', `/api/bus/bookings/${bookingId}`, { as })).body.booking;
+}
+
+test('hold → passengers → PAY → confirmed → in my history; the price comes from the trip, not the request', async () => {
   const t = await trip({ farePaise: 60_000 });
   const [ann] = await users(1);
   const held = await hold(ann, t.id, ['2C', '2d']);
@@ -131,9 +142,11 @@ test('hold → confirm with passengers → in my history; the price comes from t
 
   const ok = await api('POST', `/api/bus/bookings/${b.id}/confirm`, { as: ann, body: { passengers: passengers(['2D', '2C']), contactPhone: '+91 98765 43210' } });
   assert.equal(ok.status, 200, JSON.stringify(ok.body));
-  assert.equal(ok.body.booking.status, 'confirmed');
-  assert.equal(ok.body.booking.heldUntil, null);
-  assert.deepEqual(ok.body.booking.seats.find((s) => s.label === '2D').passenger, { name: 'Passenger 1', age: 30, gender: 'female' });
+  // A trip with a fare: the details are saved, and the booking waits for payment.
+  assert.deepEqual([ok.body.booking.status, ok.body.booking.passengersGiven, ok.body.booking.payment.paid], ['held', true, false]);
+  const paid = await payAndWait(ann, b.id);
+  assert.deepEqual([paid.status, paid.payment.paid, paid.payment.provider, paid.heldUntil], ['confirmed', true, 'fake', null]);
+  assert.deepEqual(paid.seats.find((s) => s.label === '2D').passenger, { name: 'Passenger 1', age: 30, gender: 'female' });
   const again = await api('POST', `/api/bus/bookings/${b.id}/confirm`, { as: ann, body: { passengers: passengers(['2C', '2D']) } });
   assert.deepEqual([again.status, again.body.booking.status], [200, 'confirmed'], 'confirming twice is harmless');
 
