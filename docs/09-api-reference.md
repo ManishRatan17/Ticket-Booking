@@ -223,6 +223,10 @@ Orders carry `refund`: `null`, or `{ "status": "pending" | "refunded", "amountPa
 ### `GET /admin/refunds?status=pending|refunded` → `200 { "refunds": [ { "id", "orderId", "userEmail", "eventName", "amountPaise", "reason", "status", "provider", "paymentId", "providerRefundId", "error", "attempts", "createdAt", "refundedAt" } ] }` (pending first)
 ### `POST /admin/refunds/:id/retry` → `202 { "retried": true }` · `404 REFUND_NOT_FOUND` · `409 ALREADY_REFUNDED`
 
+## Train booking — `/api/train`
+
+Search with classes, server-allocated berths, PNR, cancel, history, admin trips (`/api/admin/train/trips`), and the provider answers (`503 TRAIN_PROVIDER_NOT_CONFIGURED`): every endpoint is in [24 · Train booking](24-train-booking.md#endpoints).
+
 ## Bus booking — `/api/bus`
 
 Search, seat map, holds, confirm, cancel, history, and the admin trip endpoints (`/api/admin/bus/trips`): every endpoint with its answers is in [23 · Bus booking](23-bus-booking.md#endpoints).

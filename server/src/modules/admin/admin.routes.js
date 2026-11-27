@@ -9,6 +9,7 @@ import { createEventSchema, updateEventSchema } from '../events/events.schemas.j
 import * as adminEvents from './admin.events.js';
 import { cancelEvent } from '../events/events.cancel.js';
 import { busAdminRouter } from '../bus/bus.routes.js';
+import { trainAdminRouter } from '../train/train.routes.js';
 import * as refunds from '../payments/refunds.js';
 import * as eventsController from '../events/events.controller.js';
 import { z } from 'zod';
@@ -146,5 +147,6 @@ router.get(
 
 // Bus trips (modules/bus/): same admin guard and audit log as everything here.
 router.use('/bus', busAdminRouter);
+router.use('/train', trainAdminRouter);
 
 export default router;

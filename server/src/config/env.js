@@ -78,6 +78,26 @@ function razorpaySettings() {
   };
 }
 
+// Train booking (modules/train). Where trains come from:
+//   local    (default) the platform's own trains, added by admins
+//   external a licensed train-booking partner. There is NO public booking API for Indian Railways
+//            (IRCTC sells e-tickets itself or through licensed agents), so this needs a partner's URL,
+//            key and API contract; until then every train request answers 503, never invented data.
+function trainSettings() {
+  const provider = process.env.TRAIN_PROVIDER || 'local';
+  if (!['local', 'external'].includes(provider)) {
+    throw new Error(`TRAIN_PROVIDER must be "local" or "external", not "${provider}" (see server/.env.example)`);
+  }
+  return {
+    provider,
+    external: {
+      url: process.env.TRAIN_PROVIDER_URL || '',
+      apiKey: process.env.TRAIN_PROVIDER_API_KEY || '',
+      timeoutMs: Math.max(1000, Number(process.env.TRAIN_PROVIDER_TIMEOUT_MS ?? 8000)),
+    },
+  };
+}
+
 // Express "trust proxy": which proxies may tell us the client's real IP (X-Forwarded-For).
 //   unset/"false" → trust nobody: req.ip is whoever connected to us (safe default)
 //   "1"           → trust ONE proxy in front of us (typical on Railway/Render)
@@ -166,6 +186,8 @@ export const env = {
     // is switched OFF; without them (development, tests, the load test) the fake provider is used.
     razorpay: razorpaySettings(),
   },
+  // Train booking: where trains come from (local inventory, or a licensed partner).
+  train: trainSettings(),
   // Email (Phase 7). Without a Resend key, emails are printed in the console (development).
   mail: {
     resendApiKey: process.env.RESEND_API_KEY || null,

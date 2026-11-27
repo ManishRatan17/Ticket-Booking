@@ -20,6 +20,7 @@ const ACTIONS = {
   'POST /restrictions': ['restriction.create', 'restriction'],
   'POST /restrictions/:id/lift': ['restriction.lift', 'restriction'],
   'POST /bus/trips': ['bus.trip.create', 'bus_trip'],
+  'POST /train/trips': ['train.trip.create', 'train_trip'],
 };
 
 // Long texts (support messages) are shortened; the full text stays where it lives.

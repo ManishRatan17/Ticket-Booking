@@ -34,6 +34,7 @@ A ticketing platform built to stay **correct** (never sell a ticket twice) and *
 | 21 | [Deployment](21-deployment.md) | One Docker image (API + website), production settings, real email, step by step on Railway |
 | 22 | [Demo video script](22-demo-script.md) | A 2-minute walkthrough: what to show and what to say |
 | 23 | [Bus booking](23-bus-booking.md) | Its own module: search, seat map, 10-minute holds, passengers, cancel, history; no seat booked twice |
+| 24 | [Train booking](24-train-booking.md) | Its own module: classes and server-allocated berths, PNR, cancel, history; providers (local inventory / a licensed partner → 503 until configured) |
 
 ---
 
@@ -61,7 +62,7 @@ Roadmap from the original blueprint. ✅ done · 🟡 partly done · ⬜ not sta
 
 **Load test (laptop, one API process):** 10,000 people for 300 tickets → **exactly 300 sold, 0 duplicates, 0 failed requests**. Through the waiting room: median **3 ms**, p95 **48 ms**. With no waiting room at all, 500 clicks a second: median 6 ms, p95 327 ms. Details: [19](19-load-testing.md).
 
-**Numbers today:** 398 server tests + 50 frontend tests, all passing. 300 signed-in users racing for 100 tickets over real HTTP → exactly 100 holds.
+**Numbers today:** 408 server tests + 50 frontend tests, all passing. 300 signed-in users racing for 100 tickets over real HTTP → exactly 100 holds.
 
 ---
 

@@ -235,6 +235,16 @@ Every significant choice, the alternatives considered, and why. Newest at the bo
 | The payment re-checks `cancelled_at` under the event lock | trust that the cancel saw every order | an order created in the instant of the cancel would otherwise become tickets for a cancelled event |
 | A new order status `cancelled` | reuse `failed` | "the event was cancelled" isn't a failed payment; My orders says which |
 
+## Train booking
+
+| Decision | Rejected | Why |
+|---|---|---|
+| Its own module and tables (migration 017), separate from bus | one "transport" module | trains have classes, coaches, berths allocated by the operator and PNRs; separate, a change to one can't break the other |
+| A provider interface: local inventory by default, an external partner behind `TRAIN_PROVIDER=external` | call an Indian Railways API | there is no public booking API (IRCTC sells itself or via licensed agents); the external provider answers 503 until a partner exists, never invented data |
+| The server allocates berths (first free in class order) | the customer picks berths | how train booking works; and a simple, fair rule |
+| Trip-row lock while allocating | rely on the unique index | measured: without the lock, everyone computes the same first free berth and only 3 of 10 sold; the index alone keeps it safe but not full |
+| Random 10-digit PNR, UNIQUE, retried on a clash | a sequence | not guessable from another booking |
+
 ## Bus booking
 
 | Decision | Rejected | Why |
