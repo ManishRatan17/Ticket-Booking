@@ -132,7 +132,7 @@ export function AdminRestrictionsPage() {
         <ul>
           {list.map((r) => (
             <li key={r.id}>
-              {r.automatic && !r.acknowledgedAt && <span className="badge">new</span>} <strong>{r.userEmail}</strong> — {r.kind}
+              {r.automatic && !r.acknowledgedAt && <span className="badge badge-alert">new</span>} <strong>{r.userEmail}</strong> — {r.kind}
               {r.endsAt ? ` until ${new Date(r.endsAt).toLocaleDateString()}` : ' (permanent)'} · {r.automatic ? 'automatic' : 'by an admin'} ·{' '}
               {timeAgo(r.startsAt)}
               {r.liftedAt && <> · lifted{r.overturned && ' (overturned)'}</>}

@@ -84,6 +84,22 @@ A laptop 3 minutes fast or 10 minutes slow still shows 5:00 for a new hold (unit
 10. **Restricted accounts**: [RestrictionBanner](../client/src/components/RestrictionBanner.jsx) on every page ("Unusual, automated activity was detected … booking paused until … appeal"), from `user.restriction` (login and `/me`). A refused booking with `ACCOUNT_RESTRICTED` reloads "who am I" so the banner appears at once. Help offers "Appeal" while restricted. Details: [18-bot-strikes.md](18-bot-strikes.md).
 11. **Admins**: the nav shows only admin pages (Manage events · Support inbox · Restrictions with a "2 new" badge · Users · System); the event page tells an admin they can't buy; `/support` sends admins to the inbox. Details: [20-admin-side.md](20-admin-side.md).
 
+## Design system: one visual identity
+
+One premium platform with four categories, not four websites. **All colours live in one file,** [styles/tokens.css](../client/src/styles/tokens.css) (loaded first, by `index.css`); no other CSS or JSX file contains a raw colour (checked: 0).
+
+| Tokens | What |
+|---|---|
+| Palette | brand indigo → violet, neutrals (slate), success / warning / danger, gold |
+| Roles | `--page`, `--surface`, `--text`, `--muted`, `--border`, `--primary`, `--link`, `--focus-ring`, `--brand-gradient`, `--brand-line` (pages use these, not the palette) |
+| Type, space, shape, depth, motion | `--font-sans`, `--text-xs … --text-display`, `--space-1 … 7`, `--radius-sm … pill`, `--shadow-sm / md / lg`, `--ease-out`, `--duration-fast / base / slow` |
+| Category accents | `--accent-train / bus / movie / flight` (+ `-soft`): only a recognition aid (card icon tile, top bar, badge) |
+| **The scene** | `--scene-*`: one environment and one livery for every animation |
+
+**The shared scene.** [SceneBackdrop](../client/src/components/transitions/SceneBackdrop.jsx) draws the same twilight sky in the brand's colours, stars, a glow on the horizon, two ranges of hills and the ground (`--scene-horizon` high), for **all four animations and both Coming soon pages**. Each category only adds its moving objects: the train and its rails, the bus on its road, the curtains and open-air screen, the clouds and plane. Every vehicle wears one livery (white body, brand stripe, dark glass). The SVG drawings use tokens directly (`fill="var(--scene-object)"`: browsers resolve CSS variables in SVG presentation attributes; checked in Chrome).
+
+Shared building blocks (CSS classes in `App.css`, built only from tokens): `.button` (+ `-secondary`, `-small`, `-danger`), `.card`, `.panel`, `.badge` (+ `.badge-alert` for counts that need attention: fixes a clash where the account page's "This device" badge showed in alert red), `.alert-*`, `.field`, `.stat`, tables; plus the React components `SceneBackdrop`, `CategoryTransition`, `ComingSoon`, `Alert`, `FormField`. **A new page uses these and the tokens; never a raw colour.**
+
 ## Landing page and category transitions
 
 The home page shows four booking categories (Train, Bus, Movie, Flight, [lib/categories.js](../client/src/lib/categories.js)). A click opens that category's **own full-screen animation** while its data loads, then its page `/book/:category` ([CategoryPage.jsx](../client/src/pages/CategoryPage.jsx)).

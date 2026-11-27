@@ -1,6 +1,7 @@
 // Full-screen cinema scene: the curtains start closed and open smoothly, revealing the glowing screen
 // with a seat-booking view on it (seats being picked one by one) and the projector's beam.
 // Decoration only: no booking happens here.
+import { SceneBackdrop } from './SceneBackdrop.jsx'
 import './MovieTransition.css'
 
 const ROWS = 5
@@ -12,7 +13,7 @@ const PICKED = [23, 24, 25]
 export function MovieTransition() {
   const seats = Array.from({ length: ROWS * SEATS_PER_ROW }, (_, i) => i)
   return (
-    <div className="movie-scene" aria-hidden="true">
+    <SceneBackdrop className="movie-scene">
       <div className="movie-scene__screen">
         <div className="movie-scene__booking">
           <div className="movie-scene__screen-label">SCREEN</div>
@@ -31,6 +32,6 @@ export function MovieTransition() {
       <div className="movie-scene__curtain movie-scene__curtain--left" />
       <div className="movie-scene__curtain movie-scene__curtain--right" />
       <div className="movie-scene__valance" />
-    </div>
+    </SceneBackdrop>
   )
 }

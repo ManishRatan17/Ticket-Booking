@@ -1,5 +1,5 @@
-/* Full-screen "Coming soon" (ComingSoon.jsx): a themed scene above, the message card below.
-   Same language as the transitions: the movie scene's theatre, the flight scene's sky. */
+/* Full-screen "Coming soon" (ComingSoon.jsx): the shared scene (SceneBackdrop) behind, a construction
+   illustration above, the message card below. */
 .coming-soon {
   position: fixed;
   inset: 0;
@@ -12,14 +12,6 @@
   padding: 1rem 1rem max(1.5rem, 5vh);
   overflow: hidden;
   animation: cs-in 0.45s ease-out both;
-}
-
-.coming-soon--movie {
-  background: radial-gradient(ellipse at 50% 30%, #3f0d1d 0%, #12060a 70%);
-}
-
-.coming-soon--flight {
-  background: linear-gradient(180deg, #0369a1 0%, #0ea5e9 45%, #bae6fd 100%);
 }
 
 .coming-soon__scene {
@@ -38,8 +30,8 @@
   text-align: center;
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 20px;
-  box-shadow: 0 24px 60px -18px rgba(15, 23, 42, 0.55);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-lg);
 }
 
 .coming-soon__card h1 {
@@ -70,7 +62,7 @@
   margin: 0 auto 1.25rem;
   overflow: hidden;
   border-radius: 999px;
-  background: #e5e7eb;
+  background: var(--surface-muted);
 }
 
 .coming-soon__progress span {
@@ -78,7 +70,7 @@
   width: 68%;
   height: 100%;
   border-radius: inherit;
-  background: linear-gradient(-45deg, #facc15 25%, #1f2937 25% 50%, #facc15 50% 75%, #1f2937 75%) 0 0 / 20px 20px;
+  background: linear-gradient(-45deg, var(--scene-hazard) 25%, var(--scene-hazard-dark) 25% 50%, var(--scene-hazard) 50% 75%, var(--scene-hazard-dark) 75%) 0 0 / 20px 20px;
   animation: cs-stripes 0.7s linear infinite;
 }
 
@@ -88,7 +80,7 @@
   bottom: 0;
   width: 26vw;
   height: 100%;
-  background: linear-gradient(to top, rgba(254, 249, 195, 0.32), rgba(254, 249, 195, 0));
+  background: linear-gradient(to top, color-mix(in srgb, var(--scene-light) 32%, transparent), color-mix(in srgb, var(--scene-light) 0%, transparent));
   clip-path: polygon(45% 100%, 55% 100%, 100% 0, 0 0);
   transform-origin: bottom center;
 }
@@ -107,7 +99,7 @@
   position: relative;
   width: clamp(150px, 26vw, 260px);
   height: auto;
-  filter: drop-shadow(0 16px 20px rgba(0, 0, 0, 0.5));
+  filter: drop-shadow(0 16px 20px color-mix(in srgb, var(--scene-outline) 50%, transparent));
 }
 
 .cs-movie__stick {
@@ -123,13 +115,13 @@
   bottom: 6%;
   height: clamp(46px, 7vw, 64px);
   background:
-    linear-gradient(90deg, #f8fafc 0 12px, transparent 12px) 0 5px / 24px 7px repeat-x,
-    linear-gradient(90deg, #f8fafc 0 12px, transparent 12px) 0 calc(100% - 5px) / 24px 7px repeat-x,
-    linear-gradient(90deg, transparent 0 112px, #0b0b0f 112px) 0 0 / 120px 100% repeat-x,
-    linear-gradient(-45deg, #facc15 25%, #111827 25% 50%, #facc15 50% 75%, #111827 75%) 0 50% / 40px 40px repeat-x,
-    #0b0b0f;
+    linear-gradient(90deg, var(--scene-object) 0 12px, transparent 12px) 0 5px / 24px 7px repeat-x,
+    linear-gradient(90deg, var(--scene-object) 0 12px, transparent 12px) 0 calc(100% - 5px) / 24px 7px repeat-x,
+    linear-gradient(90deg, transparent 0 112px, var(--scene-outline) 112px) 0 0 / 120px 100% repeat-x,
+    linear-gradient(-45deg, var(--scene-hazard) 25%, var(--scene-hazard-dark) 25% 50%, var(--scene-hazard) 50% 75%, var(--scene-hazard-dark) 75%) 0 50% / 40px 40px repeat-x,
+    var(--scene-outline);
   background-clip: border-box;
-  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 10px 24px color-mix(in srgb, var(--scene-outline) 50%, transparent);
   transform: rotate(-3deg);
   animation: cs-film 1.6s linear infinite;
 }
@@ -140,10 +132,10 @@
   width: clamp(110px, 18vw, 220px);
   aspect-ratio: 2.4;
   background:
-    radial-gradient(ellipse 28% 42% at 30% 56%, #fff 96%, transparent 100%),
-    radial-gradient(ellipse 27% 50% at 58% 50%, #fff 96%, transparent 100%),
-    radial-gradient(ellipse 45% 28% at 50% 72%, #fff 96%, transparent 100%);
-  opacity: 0.9;
+    radial-gradient(ellipse 28% 42% at 30% 56%, var(--scene-cloud) 96%, transparent 100%),
+    radial-gradient(ellipse 27% 50% at 58% 50%, var(--scene-cloud) 96%, transparent 100%),
+    radial-gradient(ellipse 45% 28% at 50% 72%, var(--scene-cloud) 96%, transparent 100%);
+  opacity: 1;
 }
 
 .cs-cloud--one {
@@ -161,7 +153,7 @@
   position: relative;
   width: min(92vw, 560px);
   height: auto;
-  filter: drop-shadow(0 14px 16px rgba(3, 105, 161, 0.35));
+  filter: drop-shadow(0 14px 16px color-mix(in srgb, var(--brand-950) 35%, transparent));
 }
 
 .cs-flight__fin,

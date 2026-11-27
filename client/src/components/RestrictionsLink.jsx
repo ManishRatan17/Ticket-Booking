@@ -23,7 +23,7 @@ export function RestrictionsLink() {
 
   return (
     <NavLink to="/admin/restrictions" title={count ? `${count} new bot strike${count > 1 ? 's' : ''}` : undefined}>
-      Restrictions{count > 0 && <span className="badge">{count} new</span>}
+      Restrictions{count > 0 && <span className="badge badge-alert">{count} new</span>}
     </NavLink>
   )
 }

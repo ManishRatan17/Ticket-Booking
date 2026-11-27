@@ -26,6 +26,9 @@ every step, in the same commit.** Details live in `docs/` — read only the doc 
   Movie + Flight = full-screen ComingSoon (`available: false` in lib/categories.js). TrainLoader was removed.
   Committed. Browser checks: a CDP script driving headless Chrome (in the session scratchpad).
   The user designs the rest of the UI; only build the UI they ask for.
+- **Design system (2026-11-28):** ALL colours/spacing/radii/shadows/motion are tokens in client/src/styles/tokens.css
+  (no raw colour anywhere else: keep it that way). Animations + Coming soon share SceneBackdrop (one scene, one livery).
+  New pages: reuse .button/.card/.panel/.badge/.alert/.field and the tokens. See docs/08 "Design system".
 - `project.txt` (repo root) is the user's own notes file: never commit or edit it.
 
 ## How the user wants to work (always)

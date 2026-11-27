@@ -1,23 +1,24 @@
-/* ---------- colours (one place to change them) ---------- */
-:root {
-  --text: #1f2937;
-  --muted: #6b7280;
-  --border: #d1d5db;
-  --surface: #ffffff;
-  --page: #f9fafb;
-  --primary: #2563eb;
-  --primary-hover: #1d4ed8;
-  --ok: #15803d;
-  --error: #b91c1c;
-  --error-bg: #fef2f2;
-  --info-bg: #eff6ff;
-  --success-bg: #f0fdf4;
-}
-
+/* The whole site's look comes from styles/tokens.css (colours, type, spacing, radii, shadows, motion).
+   No raw colours in this file: use a token. */
 body {
   background: var(--page);
   color: var(--text);
-  font-family: system-ui, sans-serif;
+  font-family: var(--font-sans);
+  line-height: var(--leading);
+}
+h1,
+h2,
+h3 {
+  line-height: var(--leading-tight);
+  letter-spacing: -0.01em;
+}
+a {
+  color: var(--link);
+}
+:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+  border-radius: var(--radius-sm);
 }
 
 /* ---------- layout ---------- */
@@ -38,9 +39,12 @@ body {
 }
 
 .brand {
-  font-weight: 700;
-  color: var(--text);
+  font-weight: 800;
   text-decoration: none;
+  background: var(--brand-line);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
 }
 
 .navbar a.active {
@@ -59,9 +63,9 @@ body {
   padding: 1.5rem;
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
 }
-
 .muted {
   color: var(--muted);
 }
@@ -77,12 +81,27 @@ body {
   font-weight: 600;
 }
 
+.field input,
+.field select,
+textarea,
+select {
+  padding: 0.55rem 0.7rem;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  transition: border-color var(--duration-fast), box-shadow var(--duration-fast);
+}
 .field input {
   width: 100%;
-  padding: 0.55rem 0.7rem;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  font: inherit;
+}
+.field input:focus,
+textarea:focus,
+select:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: var(--focus-ring);
 }
 
 .field input[aria-invalid='true'] {
@@ -107,18 +126,22 @@ body {
   width: 100%;
   padding: 0.6rem 1.2rem;
   border: 1px solid var(--primary);
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   background: var(--primary);
-  color: #fff;
+  color: var(--on-primary);
   font: inherit;
   font-weight: 600;
   text-align: center;
   text-decoration: none;
   cursor: pointer;
+  transition: background var(--duration-fast), border-color var(--duration-fast), transform var(--duration-fast);
 }
-
 .button:hover {
   background: var(--primary-hover);
+  border-color: var(--primary-hover);
+}
+.button:active:not(:disabled) {
+  transform: translateY(1px);
 }
 
 .button:disabled {
@@ -133,7 +156,8 @@ body {
 }
 
 .button-secondary:hover {
-  background: var(--page);
+  background: var(--surface-muted);
+  border-color: var(--border-strong);
 }
 
 .button-link {
@@ -164,16 +188,18 @@ body {
 }
 
 .button-danger:hover {
-  background: #991b1b;
+  background: var(--danger-hover);
+  border-color: var(--danger-hover);
 }
 
 /* ---------- account page ---------- */
 .panel {
-  padding: 1rem;
-  margin-bottom: 1rem;
+  padding: var(--space-4);
+  margin-bottom: var(--space-4);
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
 }
 
 .details {
@@ -207,14 +233,20 @@ body {
   margin: 0.25rem 0 0;
 }
 
+/* One badge for the whole site; .badge-alert for counts that need attention (new restrictions). */
 .badge {
-  margin-left: 0.5rem;
-  padding: 0.1rem 0.5rem;
-  border-radius: 999px;
-  background: var(--success-bg);
-  color: var(--ok);
-  font-size: 0.8rem;
-  font-weight: 600;
+  display: inline-block;
+  margin-left: var(--space-2);
+  padding: 0.05rem 0.55rem;
+  border-radius: var(--radius-pill);
+  background: var(--brand-100);
+  color: var(--brand-700);
+  font-size: var(--text-xs);
+  font-weight: 700;
+}
+.badge-alert {
+  background: var(--danger);
+  color: var(--on-primary);
 }
 
 /* ---------- admin table ---------- */
@@ -249,9 +281,9 @@ body {
 
 /* ---------- messages ---------- */
 .alert {
-  margin-bottom: 1rem;
-  padding: 0.75rem 1rem;
-  border-radius: 6px;
+  margin-bottom: var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-md);
 }
 
 .alert-error {
@@ -261,6 +293,7 @@ body {
 
 .alert-info {
   background: var(--info-bg);
+  color: var(--brand-800);
 }
 
 .alert-success {
@@ -297,19 +330,19 @@ body {
 .chance {
   font-weight: 600;
   padding: 0.05rem 0.4rem;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
 }
 .chance-good {
-  background: #e3f6e8;
-  color: #1d6b34;
+  background: var(--success-bg);
+  color: var(--success);
 }
 .chance-maybe {
-  background: #fff4d6;
-  color: #7a5a00;
+  background: var(--warning-bg);
+  color: var(--warning);
 }
 .chance-unlikely {
-  background: #fde8e8;
-  color: #9b1c1c;
+  background: var(--danger-bg);
+  color: var(--danger);
 }
 
 /* Support inbox: a simple conversation */
@@ -318,12 +351,12 @@ body {
   padding: 0;
 }
 .thread li {
-  border-left: 3px solid #ccc;
+  border-left: 3px solid var(--border-strong);
   padding: 0.25rem 0.75rem;
   margin: 0.5rem 0;
 }
 .thread li.from-admin {
-  border-left-color: #2b6cb0;
+  border-left-color: var(--primary);
 }
 .thread li p {
   margin: 0.2rem 0;
@@ -345,16 +378,6 @@ textarea {
 }
 
 /* Admin console */
-.badge {
-  display: inline-block;
-  margin-left: 0.35rem;
-  padding: 0 0.4rem;
-  border-radius: 999px;
-  background: #c53030;
-  color: #fff;
-  font-size: 0.75rem;
-  font-weight: 600;
-}
 .table-wrap {
   overflow-x: auto;
 }
@@ -365,14 +388,15 @@ textarea {
 }
 .admin-table th,
 .admin-table td {
-  border-bottom: 1px solid #ddd;
+  border-bottom: 1px solid var(--border);
   padding: 0.4rem 0.5rem;
   text-align: left;
   vertical-align: top;
 }
-.status-on_sale { color: #1d6b34; font-weight: 600; }
-.status-sold_out { color: #9b1c1c; font-weight: 600; }
-.status-all_held { color: #7a5a00; font-weight: 600; }
+.status-on_sale { color: var(--success); font-weight: 600; }
+.status-sold_out,
+.status-cancelled { color: var(--danger); font-weight: 600; }
+.status-all_held { color: var(--warning); font-weight: 600; }
 .stat-row {
   display: flex;
   flex-wrap: wrap;
@@ -380,39 +404,45 @@ textarea {
   margin: 0.75rem 0;
 }
 .stat {
-  border: 1px solid #ddd;
-  border-radius: 6px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
   padding: 0.5rem 0.75rem;
   min-width: 8rem;
 }
 .stat strong { display: block; font-size: 1.2rem; }
-.stat span { font-size: 0.8rem; color: #666; }
+.stat span { font-size: var(--text-xs); color: var(--muted); }
 .light { font-weight: 600; }
-.light-ok { color: #1d6b34; }
-.light-bad { color: #c53030; }
+.light-ok { color: var(--success); }
+.light-bad { color: var(--danger); }
 
 /* ---------- landing page: hero + booking categories ---------- */
 /* Each category's accent colours, used by its card and its page. */
-.category--train { --accent: #2563eb; --accent-soft: #dbeafe; --accent-shadow: rgba(37, 99, 235, 0.45); --accent-bar: linear-gradient(90deg, #38bdf8, #2563eb); }
-.category--bus { --accent: #d97706; --accent-soft: #fef3c7; --accent-shadow: rgba(217, 119, 6, 0.45); --accent-bar: linear-gradient(90deg, #fbbf24, #d97706); }
-.category--movie { --accent: #e11d48; --accent-soft: #ffe4e6; --accent-shadow: rgba(225, 29, 72, 0.4); --accent-bar: linear-gradient(90deg, #fb7185, #be123c); }
-.category--flight { --accent: #0284c7; --accent-soft: #e0f2fe; --accent-shadow: rgba(2, 132, 199, 0.45); --accent-bar: linear-gradient(90deg, #7dd3fc, #0284c7); }
+/* (a small recognition aid only; everything else is the one platform look) */
+.category--train { --accent: var(--accent-train); --accent-soft: var(--accent-train-soft); }
+.category--bus { --accent: var(--accent-bus); --accent-soft: var(--accent-bus-soft); }
+.category--movie { --accent: var(--accent-movie); --accent-soft: var(--accent-movie-soft); }
+.category--flight { --accent: var(--accent-flight); --accent-soft: var(--accent-flight-soft); }
+[class*='category--'] {
+  --accent-shadow: color-mix(in srgb, var(--accent) 45%, transparent);
+  --accent-bar: linear-gradient(90deg, color-mix(in srgb, var(--accent) 55%, var(--gray-0)), var(--accent));
+}
 
 .landing-hero {
   position: relative;
   overflow: hidden;
   padding: clamp(1.5rem, 5vw, 2.75rem) clamp(1.25rem, 4vw, 2.25rem);
-  border-radius: 24px;
-  color: #fff;
+  border-radius: var(--radius-xl);
+  color: var(--on-primary);
   background:
-    radial-gradient(circle at 12% 18%, rgba(255, 255, 255, 0.2), transparent 42%),
-    radial-gradient(circle at 92% 110%, rgba(244, 114, 182, 0.45), transparent 45%),
-    linear-gradient(135deg, #1e3a8a 0%, #4f46e5 55%, #9333ea 100%);
-  box-shadow: 0 24px 60px -20px rgba(49, 46, 129, 0.55);
+    radial-gradient(circle at 12% 18%, color-mix(in srgb, var(--gray-0) 20%, transparent), transparent 42%),
+    radial-gradient(circle at 92% 110%, color-mix(in srgb, var(--orchid-300) 45%, transparent), transparent 45%),
+    var(--brand-gradient);
+  box-shadow: var(--shadow-lg);
 }
 .landing-hero h1 {
   margin: 0 0 0.5rem;
-  font-size: clamp(1.9rem, 5.5vw, 2.8rem);
+  font-size: var(--text-display);
   line-height: 1.1;
   letter-spacing: -0.02em;
 }
@@ -422,7 +452,7 @@ textarea {
   opacity: 0.92;
 }
 .landing-hero a {
-  color: #fff;
+  color: var(--on-primary);
   font-weight: 600;
 }
 .landing-eyebrow {
@@ -464,10 +494,10 @@ textarea {
   text-align: left;
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 18px;
-  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
   cursor: pointer;
-  transition: transform 0.22s ease, box-shadow 0.22s ease, border-color 0.22s ease;
+  transition: transform var(--duration-base) ease, box-shadow var(--duration-base) ease, border-color var(--duration-base) ease;
 }
 .category-card::before {
   content: '';
@@ -495,7 +525,7 @@ textarea {
   flex: none;
   width: 3.25rem;
   height: 3.25rem;
-  border-radius: 14px;
+  border-radius: var(--radius-md);
   font-size: 1.75rem;
   background: var(--accent-soft);
   transition: transform 0.25s ease;

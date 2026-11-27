@@ -1,34 +1,9 @@
-/* Bus: sunset, a city skyline, the road rising into view, the bus driving in with dust and smoke. */
+/* Bus: in the shared scene (SceneBackdrop), the road rises into view and the bus drives in with dust
+   and smoke, lane markings streaming past. */
 .bus-scene {
   position: absolute;
   inset: 0;
   overflow: hidden;
-  background: linear-gradient(180deg, #0c4a6e 0%, #0369a1 32%, #fb923c 66%, #fde68a 76%);
-}
-
-.bus-scene__sun {
-  position: absolute;
-  right: 16%;
-  top: 22%;
-  width: clamp(70px, 11vw, 130px);
-  aspect-ratio: 1;
-  border-radius: 50%;
-  background: radial-gradient(circle, #fff7ed 0%, #fed7aa 55%, rgba(254, 215, 170, 0) 72%);
-}
-
-/* Buildings in three repeating layers; they scroll at different speeds (parallax) and loop seamlessly. */
-.bus-scene__city {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 30%;
-  height: 26%;
-  background:
-    linear-gradient(90deg, #1e293b 0 54px, transparent 54px) 0 100% / 130px 62% repeat-x,
-    linear-gradient(90deg, transparent 0 70px, #334155 70px 112px, transparent 112px) 0 100% / 170px 92% repeat-x,
-    linear-gradient(90deg, transparent 0 20px, #475569 20px 80px, transparent 80px) 0 100% / 230px 45% repeat-x;
-  opacity: 0.85;
-  animation: bus-scene-city 4s linear infinite;
 }
 
 .bus-scene__road {
@@ -36,8 +11,8 @@
   left: 0;
   right: 0;
   bottom: 0;
-  height: 30%;
-  background: linear-gradient(180deg, #64748b 0 5px, #1f2937 5px, #111827);
+  height: var(--scene-horizon);
+  background: linear-gradient(180deg, var(--scene-metal) 0 5px, var(--scene-tyre) 5px, var(--scene-outline));
   transform-origin: bottom;
   animation: bus-scene-road 0.55s cubic-bezier(0.2, 0.7, 0.2, 1) both;
 }
@@ -48,7 +23,7 @@
   right: 0;
   top: 42%;
   height: 6px;
-  background: repeating-linear-gradient(90deg, #fde68a 0 48px, transparent 48px 96px);
+  background: repeating-linear-gradient(90deg, var(--scene-warm-soft) 0 48px, transparent 48px 96px);
   animation: bus-scene-lane 0.45s linear infinite;
 }
 
@@ -66,7 +41,7 @@
   display: block;
   width: 100%;
   height: auto;
-  filter: drop-shadow(0 10px 8px rgba(0, 0, 0, 0.35));
+  filter: drop-shadow(0 10px 8px color-mix(in srgb, var(--scene-outline) 35%, transparent));
 }
 
 .bus-scene__body {
@@ -109,22 +84,13 @@
 }
 
 .bus-scene__dust span {
-  background: radial-gradient(circle, rgba(222, 200, 170, 0.9), rgba(222, 200, 170, 0) 70%);
+  background: radial-gradient(circle, color-mix(in srgb, var(--scene-object-shade) 90%, transparent), color-mix(in srgb, var(--scene-object-shade) 0%, transparent) 70%);
 }
 
 .bus-scene__smoke span {
   width: clamp(12px, 2vw, 20px);
-  background: radial-gradient(circle, rgba(148, 163, 184, 0.8), rgba(148, 163, 184, 0) 70%);
+  background: radial-gradient(circle, color-mix(in srgb, var(--scene-line) 80%, transparent), color-mix(in srgb, var(--scene-line) 0%, transparent) 70%);
   animation-duration: 1.3s;
-}
-
-@keyframes bus-scene-city {
-  to {
-    background-position:
-      -130px 100%,
-      -170px 100%,
-      -230px 100%;
-  }
 }
 
 @keyframes bus-scene-road {
@@ -175,7 +141,6 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .bus-scene__city,
   .bus-scene__road,
   .bus-scene__lane,
   .bus-scene__vehicle,

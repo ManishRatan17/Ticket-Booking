@@ -235,6 +235,16 @@ Every significant choice, the alternatives considered, and why. Newest at the bo
 | The payment re-checks `cancelled_at` under the event lock | trust that the cancel saw every order | an order created in the instant of the cancel would otherwise become tickets for a cancelled event |
 | A new order status `cancelled` | reuse `failed` | "the event was cancelled" isn't a failed payment; My orders says which |
 
+## Design system (2026-11-28)
+
+| Decision | Rejected | Why |
+|---|---|---|
+| Design tokens in one CSS file (custom properties), every colour a token | a UI library (Tailwind, a component kit) | no new dependency, no rewrite of every page; one file to rebrand the site |
+| One shared animation scene (SceneBackdrop) + one vehicle livery | a themed background per category | the user's brief: one platform, four categories; only the moving objects differ |
+| Tokens straight in SVG attributes (`fill="var(--…)"`) | redraw with CSS classes | browsers resolve them (checked in Chrome): the drawings stay as they were |
+| Category accent colours kept, but only on the icon tile, top bar and badge | one colour for everything | a quick recognition aid; the rest of the look is identical |
+| Building blocks as CSS classes; React components only where they remove repetition | a component for every button and card | lightweight; the existing pages already use these classes |
+
 ## Train booking
 
 | Decision | Rejected | Why |

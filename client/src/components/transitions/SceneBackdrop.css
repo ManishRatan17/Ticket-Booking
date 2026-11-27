@@ -1,0 +1,104 @@
+/* The shared scene (SceneBackdrop.jsx). Everything inside a category's scene is positioned against
+   --scene-horizon: the ground's height, the same in every scene. */
+.scene {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  background: var(--scene-sky);
+}
+
+.scene__stars {
+  position: absolute;
+  inset: 0 0 45% 0;
+  background:
+    radial-gradient(1.6px 1.6px at 8% 14%, var(--scene-star) 98%, transparent),
+    radial-gradient(1.2px 1.2px at 21% 32%, var(--scene-star) 98%, transparent),
+    radial-gradient(1.8px 1.8px at 34% 9%, var(--scene-star) 98%, transparent),
+    radial-gradient(1.2px 1.2px at 47% 26%, var(--scene-star) 98%, transparent),
+    radial-gradient(1.6px 1.6px at 62% 12%, var(--scene-star) 98%, transparent),
+    radial-gradient(1.2px 1.2px at 74% 30%, var(--scene-star) 98%, transparent),
+    radial-gradient(1.8px 1.8px at 86% 8%, var(--scene-star) 98%, transparent),
+    radial-gradient(1.2px 1.2px at 93% 24%, var(--scene-star) 98%, transparent);
+  animation: scene-twinkle 3.5s ease-in-out infinite alternate;
+}
+
+.scene__glow {
+  position: absolute;
+  left: 50%;
+  bottom: var(--scene-horizon);
+  width: clamp(200px, 32vw, 380px);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: var(--scene-glow);
+  translate: -50% 45%;
+  opacity: 0.85;
+  animation: scene-glow-rise 2.5s var(--ease-out) both;
+}
+
+.scene__hills {
+  position: absolute;
+  left: -10%;
+  right: -10%;
+  bottom: var(--scene-horizon);
+}
+
+.scene__hills--far {
+  height: 26%;
+  opacity: 0.55;
+  background:
+    radial-gradient(ellipse 18% 90% at 14% 100%, var(--scene-hills-far) 97%, transparent 100%),
+    radial-gradient(ellipse 26% 100% at 46% 100%, var(--scene-hills-far) 97%, transparent 100%),
+    radial-gradient(ellipse 20% 80% at 82% 100%, var(--scene-hills-far) 97%, transparent 100%);
+  animation: scene-drift 16s ease-in-out infinite alternate;
+}
+
+.scene__hills--near {
+  height: 15%;
+  background:
+    radial-gradient(ellipse 28% 90% at 28% 100%, var(--scene-hills-near) 97%, transparent 100%),
+    radial-gradient(ellipse 32% 100% at 76% 100%, var(--scene-hills-near) 97%, transparent 100%);
+  animation: scene-drift 8s ease-in-out infinite alternate;
+}
+
+.scene__ground {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: var(--scene-horizon);
+  background: var(--scene-ground);
+}
+
+@keyframes scene-twinkle {
+  from {
+    opacity: 0.45;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes scene-glow-rise {
+  from {
+    opacity: 0;
+    translate: -50% 80%;
+  }
+  to {
+    opacity: 0.85;
+    translate: -50% 45%;
+  }
+}
+
+@keyframes scene-drift {
+  to {
+    transform: translateX(-6%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .scene__stars,
+  .scene__glow,
+  .scene__hills {
+    animation: none;
+  }
+}
