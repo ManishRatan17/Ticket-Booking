@@ -21,6 +21,7 @@ export const busRouter = Router();
 
 // Anyone can search and look at a seat map.
 busRouter.get('/trips', searchPerIp, validate({ query: searchQuerySchema }), controller.searchTrips);
+busRouter.get('/routes', searchPerIp, controller.listRoutes); // suggestions for the search form
 busRouter.get('/trips/:id', searchPerIp, validate({ params: idParamsSchema }), controller.getTrip);
 
 // Booking needs an account; admins don't book, restricted accounts can't.

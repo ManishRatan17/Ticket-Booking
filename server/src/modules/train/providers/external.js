@@ -27,6 +27,7 @@ function unavailable() {
 }
 
 export const searchTrips = async () => unavailable();
+export const listRoutes = async () => unavailable();
 export const getTrip = async () => unavailable();
 export const holdBerths = async () => unavailable();
 export const confirmBooking = async () => unavailable();

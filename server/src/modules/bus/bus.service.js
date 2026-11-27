@@ -73,6 +73,7 @@ export async function createTrip({ rows, seatColumns, ...trip }, adminId) {
 }
 
 export const listTripsForAdmin = () => repo.listUpcomingTrips(pool);
+export const listRoutes = () => repo.listRoutes(pool);
 
 // ---------- holding seats ----------
 

@@ -100,6 +100,21 @@ One premium platform with four categories, not four websites. **All colours live
 
 Shared building blocks (CSS classes in `App.css`, built only from tokens): `.button` (+ `-secondary`, `-small`, `-danger`), `.card`, `.panel`, `.badge` (+ `.badge-alert` for counts that need attention: fixes a clash where the account page's "This device" badge showed in alert red), `.alert-*`, `.field`, `.stat`, tables; plus the React components `SceneBackdrop`, `CategoryTransition`, `ComingSoon`, `Alert`, `FormField`. **A new page uses these and the tokens; never a raw colour.**
 
+## Bus and train booking pages
+
+| Page | What it does |
+|---|---|
+| `/book/bus`, `/book/train` | the search (from / to with suggestions from `GET /api/{bus|train}/routes`, a swap button, the travel date, a class for trains) and the trips found. The search lives in the URL (`?from=…&to=…&date=…&class=…`): back button and shared links work |
+| `/book/bus/trips/:id` | the **seat map**: rows with the aisle in the middle (`seatRows()`), free / yours / taken, up to 6 seats, the total, "Hold N seats for 10 minutes" |
+| train results | each class: fare, berths left, a travellers picker (1–6) and **Book** (the server allocates the berths) |
+| `/book/{bus|train}/bookings/:id` | one page for both: steps (Seats/Class → Passengers/Travellers → Payment → Confirmed), the hold countdown on the server's clock, the passenger form, the payment panel (the fake provider, or Razorpay when the server has it; the page asks the server until the payment is decided), then the ticket (PNR for trains) and **Cancel** (a paid booking is refunded) |
+| `/orders` "My bookings" | Bus, Train and Events sections |
+| `/admin/trips` | admins add bus trips and trains (classes with fare, coaches, berths per coach) and see what's coming up |
+
+Built from shared pieces ([components/booking/](../client/src/components/booking/): `TripSearch`, `TripSearchForm`, `BookingSteps`, `PassengerForm`, `PaymentPanel`, `BookingTicket`, `TripBookingsList`), one API client for both kinds ([api/bookings.js](../client/src/api/bookings.js): `bookingApi('bus' | 'train')`), pure helpers ([lib/booking.js](../client/src/lib/booking.js), tested), and only the design tokens (0 raw colours). Retried clicks are safe: each hold sends an Idempotency-Key kept until it succeeds.
+
+*Tested: [booking.test.js](../client/src/lib/booking.test.js) (seat-map layout, passenger checks, durations, "tomorrow in India"), and **end to end through the real pages** in headless Chrome against a separate API on the test database (:5099) and Vite (:5199), never the development data: the admin adds a bus trip and a train through the forms; a customer opens Bus through its transition, searches, picks 2 seats, gives passengers, pays, sees "You're booked!"; books a train (class, 2 travellers) and gets a PNR; sees both in My bookings; cancels the paid bus booking → refunded; the seat map fits a phone (14 checks). The end-to-end run found a real bug the unit tests couldn't: the bus confirm needs each passenger's seat, and the shared form didn't send it.*
+
 ## Landing page and category transitions
 
 The home page shows four booking categories (Train, Bus, Movie, Flight, [lib/categories.js](../client/src/lib/categories.js)). A click opens that category's **own full-screen animation** while its data loads, then its page `/book/:category` ([CategoryPage.jsx](../client/src/pages/CategoryPage.jsx)).

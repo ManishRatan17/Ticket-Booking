@@ -235,6 +235,16 @@ Every significant choice, the alternatives considered, and why. Newest at the bo
 | The payment re-checks `cancelled_at` under the event lock | trust that the cancel saw every order | an order created in the instant of the cancel would otherwise become tickets for a cancelled event |
 | A new order status `cancelled` | reuse `failed` | "the event was cancelled" isn't a failed payment; My orders says which |
 
+## Bus and train booking pages
+
+| Decision | Rejected | Why |
+|---|---|---|
+| One API client and one booking page for both kinds | a copy per kind | the backend shapes are the same; one place to fix |
+| The search in the URL | component state only | back button and shared links show the same results |
+| Route suggestions from a small public endpoint | free text only | people shouldn't have to guess exact city names |
+| One "My bookings" page with Bus / Train / Events | a page per kind | one place for everything a person booked |
+| End-to-end test on a separate API + test database | against the development server | real pages, real payments flow, no development data touched |
+
 ## Paying for bus and train bookings (step 4)
 
 | Decision | Rejected | Why |

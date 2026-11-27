@@ -182,3 +182,13 @@ export async function cancelBooking(client, id) {
   await client.query(`UPDATE bus_bookings SET status = 'cancelled', cancelled_at = now(), updated_at = now() WHERE id = $1`, [id]);
   await client.query('UPDATE bus_booking_seats SET active = false WHERE booking_id = $1', [id]);
 }
+
+// Upcoming routes (from → to, with how many trips and the next departure): the search form's suggestions.
+export async function listRoutes(client) {
+  const { rows } = await client.query(
+    `SELECT origin, destination, count(*)::int AS trips, min(departs_at) AS next_departure
+       FROM bus_trips WHERE departs_at > now() AND cancelled_at IS NULL
+      GROUP BY origin, destination ORDER BY min(departs_at) LIMIT 100`,
+  );
+  return rows.map((r) => ({ from: r.origin, to: r.destination, trips: r.trips, nextDeparture: r.next_departure }));
+}

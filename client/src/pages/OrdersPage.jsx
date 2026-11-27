@@ -6,6 +6,7 @@ import { Alert } from '../components/Alert.jsx'
 import { errorMessage } from '../lib/errorMessages.js'
 import { formatDate, formatMoney } from '../lib/format.js'
 import { REFUND_REASON_TEXT } from '../lib/refunds.js'
+import { TripBookingsList } from '../components/booking/TripBookingsList.jsx'
 
 const STATUS_TEXT = {
   pending: 'waiting for payment',
@@ -32,7 +33,12 @@ export function OrdersPage() {
 
   return (
     <section>
-      <h1>My orders</h1>
+      <h1>My bookings</h1>
+      <h2>🚌 Bus</h2>
+      <TripBookingsList kind="bus" />
+      <h2>🚆 Train</h2>
+      <TripBookingsList kind="train" />
+      <h2>🎟 Events</h2>
       <Alert>{error}</Alert>
       {orders === null && !error && <p className="muted">Loading…</p>}
       {orders?.length === 0 && (

@@ -251,3 +251,16 @@ test('EXTERNAL provider: not configured → 503 on every train request, configur
     env.train.external.apiKey = saved.apiKey;
   }
 });
+
+test('routes: upcoming from → to pairs for the search suggestions (503 with the external provider)', async () => {
+  const t = await trip();
+  const routes = (await api('GET', '/api/train/routes')).body.routes;
+  assert.equal(routes.find((r) => r.from === t.from && r.to === t.to)?.trips, 1);
+  const saved = env.train.provider;
+  try {
+    env.train.provider = 'external';
+    assert.equal((await api('GET', '/api/train/routes')).status, 503);
+  } finally {
+    env.train.provider = saved;
+  }
+});

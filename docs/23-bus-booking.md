@@ -40,6 +40,7 @@ held ──confirm──► confirmed ──cancel──► cancelled
 | Method and path | Who | Answers |
 |---|---|---|
 | `GET /api/bus/trips?from&to&date` | anyone | `200 { trips: [{ id, operator, busNumber, from, to, departsAt, arrivesAt, farePaise, totalSeats, seatsLeft, cancelledAt }] }` (not yet departed, not cancelled) · `400` (date not YYYY-MM-DD, from = to) |
+| `GET /api/bus/routes` | anyone | `200 { routes: [{ from, to, trips, nextDeparture }] }`: upcoming routes (the search form's suggestions), not departed, not cancelled |
 | `GET /api/bus/trips/:id` | anyone | `200 { trip: { …, seatsLeft, seats: [{ label, taken }] } }` · `404 BUS_TRIP_NOT_FOUND` |
 | `POST /api/bus/trips/:id/holds` | signed-in customer + `Idempotency-Key` | `201 { booking }` · `200` + `Idempotent-Replayed: true` (a retry) · `400 UNKNOWN_SEATS` / validation (1–6 seats like `7C`, no repeats) · `400 IDEMPOTENCY_KEY_REQUIRED` · `409 SEATS_TAKEN` (`details.seats`) · `409 BUS_HOLD_EXISTS` · `409 BUS_TRIP_DEPARTED` / `BUS_TRIP_CANCELLED` · `422 IDEMPOTENCY_KEY_REUSED` · `403 ADMINS_CANNOT_BUY` / `ACCOUNT_RESTRICTED` |
 | `POST /api/bus/bookings/:id/confirm` | the booking's owner | `200 { booking }` (confirming twice: the same answer) · `400 PASSENGERS_MISMATCH` (one passenger per held seat; `details.seats`) · `409 BUS_HOLD_EXPIRED` · `409 BUS_BOOKING_NOT_HELD` · `404 BUS_BOOKING_NOT_FOUND` |

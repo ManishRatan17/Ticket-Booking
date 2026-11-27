@@ -53,6 +53,17 @@ const MESSAGES = {
   ALREADY_CANCELLED: 'This event is already cancelled.',
   // Development: the website can't reach the API (stopped, or restarting after a file change)
   API_UNREACHABLE: 'The server is not answering right now (it may be restarting). Please try again in a few seconds.',
+  // Bus and train booking
+  BUS_HOLD_EXISTS: 'You already have seats on hold on this bus. Finish or release that booking first (My bookings).',
+  TRAIN_HOLD_EXISTS: 'You already have berths on hold on this train. Finish or release that booking first (My bookings).',
+  BUS_HOLD_EXPIRED: 'Your 10 minutes ran out and the seats were released. Please choose seats again.',
+  TRAIN_HOLD_EXPIRED: 'Your 10 minutes ran out and the berths were released. Please book again.',
+  BUS_TRIP_DEPARTED: 'This bus has already left.',
+  TRAIN_TRIP_DEPARTED: 'This train has already left.',
+  PASSENGERS_REQUIRED: 'Give the passenger details first, then pay.',
+  BOOKING_ALREADY_PAID: 'This booking is already paid and confirmed.',
+  TRAIN_PROVIDER_NOT_CONFIGURED: "Train booking isn't available on this server yet.",
+  TRAIN_PROVIDER_NOT_IMPLEMENTED: "Train booking isn't available on this server yet.",
   // Admin
   FORBIDDEN: 'You do not have permission to do this.',
   LAST_ADMIN: 'This is the only admin left. Make someone else an admin first.',

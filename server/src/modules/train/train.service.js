@@ -39,6 +39,7 @@ export function toPublicBooking(b) {
 // ---------- customers: everything goes through the provider ----------
 
 export const searchTrips = (query) => provider().searchTrips(query);
+export const listRoutes = () => provider().listRoutes();
 export const getTrip = (id) => provider().getTrip(id);
 export const holdBerths = (args) => provider().holdBerths(args);
 export const confirmBooking = (args) => provider().confirmBooking(args);

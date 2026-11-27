@@ -3,7 +3,7 @@
 Admins **run** the sale; they don't take part in it. This page covers what an admin sees and can do, and the rules behind it.
 
 ```
-Admin nav:  Manage events · Support inbox · Refunds · Restrictions (2 new) · Users · System · Audit log
+Admin nav:  Manage events · Trips · Support inbox · Refunds · Restrictions (2 new) · Users · System · Audit log
 Customer:   Events · My orders · Help
 ```
 
@@ -96,3 +96,7 @@ admin request (POST / PATCH)  ──► the admin route does its work ──► 
 Housekeeping never trims it (see [13](13-background-jobs.md)). Honest limit: the entry is written just after the response; a crash in that instant could lose one entry (it never records something that didn't happen).
 
 *Tested in [audit.test.js](../server/test/audit.test.js): role change, event create + edit, failed actions and reads not recorded, set-role recorded, the database refusing UPDATE/DELETE, reading and filtering, normal users → 403. Mutation: the middleware removed → 3 tests fail.*
+
+## Trips (bus and train)
+
+`/admin/trips`: two forms. **Add a bus trip** (operator, bus number, from, to, departs, arrives, fare, rows, seat columns such as `ABCD` = 2 + 2) and **Add a train** (number, name, from, to, times, and per class: fare, coaches, berths per coach; 3A and SL are ticked by default). Below, the upcoming buses (seats left) and trains (each class's berths left). Both forms go through the admin API, so they're audited (`bus.trip.create`, `train.trip.create`). With `TRAIN_PROVIDER=external`, adding trains is refused (`409 TRAIN_INVENTORY_EXTERNAL`).

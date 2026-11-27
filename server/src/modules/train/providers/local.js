@@ -19,6 +19,8 @@ const TIME_ZONE = 'Asia/Kolkata'; // "travel date" = a calendar day in India
 
 export const searchTrips = ({ from, to, date, classCode }) => repo.searchTrips(pool, { from, to, date, timeZone: TIME_ZONE, classCode });
 
+export const listRoutes = () => repo.listRoutes(pool);
+
 export async function getTrip(id) {
   const trip = await repo.findTrip(pool, id);
   if (!trip) throw new AppError(404, 'TRAIN_TRIP_NOT_FOUND', 'No train trip with this id');

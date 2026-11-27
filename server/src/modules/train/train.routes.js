@@ -21,6 +21,7 @@ export const trainRouter = Router();
 
 // Anyone can search and see a trip's classes and availability.
 trainRouter.get('/trips', searchPerIp, validate({ query: searchQuerySchema }), controller.searchTrips);
+trainRouter.get('/routes', searchPerIp, controller.listRoutes); // suggestions for the search form
 trainRouter.get('/trips/:id', searchPerIp, validate({ params: idParamsSchema }), controller.getTrip);
 
 // Booking needs an account; admins don't book, restricted accounts can't.

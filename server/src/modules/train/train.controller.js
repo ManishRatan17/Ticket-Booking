@@ -5,6 +5,10 @@ export async function searchTrips(req, res) {
   res.json({ trips: await train.searchTrips(req.validated.query) });
 }
 
+export async function listRoutes(req, res) {
+  res.json({ routes: await train.listRoutes() });
+}
+
 export async function getTrip(req, res) {
   res.json({ trip: await train.getTrip(req.validated.params.id) });
 }
@@ -18,7 +22,7 @@ export async function holdBerths(req, res) {
   });
   // 201 the first time; 200 + a header saying "this is the earlier answer" on a retry.
   if (!created) res.set('Idempotent-Replayed', 'true');
-  res.status(created ? 201 : 200).json({ booking: train.toPublicBooking(booking) });
+  res.status(created ? 201 : 200).json({ booking: train.toPublicBooking(booking), serverTime: new Date() });
 }
 
 export async function confirmBooking(req, res) {
@@ -36,7 +40,8 @@ export async function listBookings(req, res) {
 }
 
 export async function getBooking(req, res) {
-  res.json({ booking: train.toPublicBooking(await train.getBooking({ bookingId: req.validated.params.id, userId: req.user.id })) });
+  // serverTime: the page counts the hold down on the server's clock, not the visitor's.
+  res.json({ booking: train.toPublicBooking(await train.getBooking({ bookingId: req.validated.params.id, userId: req.user.id })), serverTime: new Date() });
 }
 
 // ---------- admins ----------

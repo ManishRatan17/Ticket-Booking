@@ -5,7 +5,7 @@ docker compose up -d     # the server tests use the real PostgreSQL and Redis
 npm test                 # server (node:test) then client (Vitest)
 ```
 
-Today: **417 server tests + 50 client tests**, all passing, none skipped.
+Today: **419 server tests + 54 client tests**, plus an end-to-end run through the real pages (14 checks, below), all passing, none skipped.
 
 ## Their own database, and CI
 
@@ -191,6 +191,8 @@ Thousands of users are tested separately, with k6 and SQL verification afterward
 ## Lessons from flaky and broken runs
 
 - **A test that failed once in a full run (orders, same-key race):** it passed 5/5 alone, so it would have been easy to call it "flaky". A stress script (60 rounds × 20 simultaneous calls) reproduced it every time: ~15 errors in 1,200, a real bug since Phase 2 (see [12](12-orders-and-payments.md#orders-and-idempotency-step-2a)). Lesson: a rare failure under load is usually a real race; make it frequent, then fix it.
+
+- **End to end through the real pages (bus and train booking):** headless Chrome drives the website on a separate API (:5099) + Vite (:5199) over the **test** database, like a person: forms filled, buttons clicked, the fake provider paying. It found a bug no unit test could: the shared passenger form didn't send each bus passenger's seat ("Request validation failed"). Its first run also left its admin user behind, and the next suite run showed **3 skipped** (the "last admin" tests): it now deletes its users, trips and refunds when it ends.
 
 - **A failing race test that left data behind (cancel an event):** while checking that the race test catches a deadlock, each failed run left users and paid orders in the test database. The test failed as soon as the cancel deadlocked, but its 8 payments were still running; the cleanup ran under them, and tickets written afterwards blocked the deletes. 9 runs later, the leftover admins made the 3 "last admin" tests **skip** and pushed another test's admin off a 100-user page (**fail**). Fix: `Promise.allSettled`, so the test waits for every payment before it fails. Lesson: a test must finish its own work before failing, or its cleanup races it.
 

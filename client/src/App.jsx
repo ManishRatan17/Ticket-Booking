@@ -18,6 +18,9 @@ import { AdminJobsPage } from './pages/AdminJobsPage.jsx'
 import { EventsPage } from './pages/EventsPage.jsx'
 import { EventPage } from './pages/EventPage.jsx'
 import { CategoryPage } from './pages/CategoryPage.jsx'
+import { BusSeatsPage } from './pages/BusSeatsPage.jsx'
+import { BookingPage } from './pages/BookingPage.jsx'
+import { AdminTripsPage } from './pages/AdminTripsPage.jsx'
 import { CheckoutPage } from './pages/CheckoutPage.jsx'
 import { OrdersPage } from './pages/OrdersPage.jsx'
 import { SupportPage } from './pages/SupportPage.jsx'
@@ -40,6 +43,7 @@ function App() {
             <Route path="events" element={<EventsPage />} />
             <Route path="events/:id" element={<EventPage />} />
             <Route path="book/:category" element={<CategoryPage />} />
+            <Route path="book/bus/trips/:id" element={<BusSeatsPage />} />
 
             {/* Only for signed-out visitors */}
             <Route element={<GuestOnly />}>
@@ -53,6 +57,7 @@ function App() {
               <Route path="account" element={<AccountPage />} />
               <Route path="checkout/:id" element={<CheckoutPage />} />
               <Route path="orders" element={<OrdersPage />} />
+              <Route path="book/:kind/bookings/:id" element={<BookingPage />} />
               <Route path="support" element={<SupportPage />} />
               <Route path="support/:id" element={<SupportRequestPage />} />
             </Route>
@@ -62,6 +67,7 @@ function App() {
               <Route path="admin/users" element={<AdminUsersPage />} />
               <Route path="admin/events" element={<AdminEventsPage />} />
               <Route path="admin/events/:id" element={<AdminEventPage />} />
+              <Route path="admin/trips" element={<AdminTripsPage />} />
               <Route path="admin/system" element={<AdminJobsPage />} />
               <Route path="admin/refunds" element={<AdminRefundsPage />} />
               <Route path="admin/audit" element={<AdminAuditPage />} />

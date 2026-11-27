@@ -29,6 +29,7 @@ function NavBar() {
             {user.role === 'admin' ? (
               <>
                 <NavLink to="/admin/events">Manage events</NavLink>
+                <NavLink to="/admin/trips">Trips</NavLink>
                 <NavLink to="/admin/support">Support inbox</NavLink>
                 <NavLink to="/admin/refunds">Refunds</NavLink>
                 <RestrictionsLink />
@@ -38,7 +39,7 @@ function NavBar() {
               </>
             ) : (
               <>
-                <NavLink to="/orders">My orders</NavLink>
+                <NavLink to="/orders">My bookings</NavLink>
                 <NavLink to="/support">Help</NavLink>
               </>
             )}

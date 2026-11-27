@@ -6,9 +6,9 @@ every step, in the same commit.** Details live in `docs/` — read only the doc 
 
 ## Where we are (updated 2026-11-26)
 
-- Last step: payments for bus + train (step 4). Next: the bus/train booking PAGES on the website (not built yet),
-  then deploy (needs the user's accounts).
-- Tests: **417 server + 50 client**, all passing, 0 skipped. Migrations up to **018** (dev DB migrated).
+- Last step: the bus + train booking PAGES (search, seat map, class, passengers, payment, ticket, My bookings,
+  admin Trips page). Next: deploy (needs the user's accounts: Railway, Cloudflare Turnstile, Resend).
+- Tests: **419 server + 54 client** + an end-to-end page run (14 checks; see docs/10), all passing, 0 skipped. Migrations up to **018** (dev DB migrated).
 - **Backend features are complete.** Done, in order: auth (+Google), holds (Redis Lua), orders +
   payments (fake + Razorpay test mode), background jobs (BullMQ), waiting room, protection (rate
   limits, cap, Turnstile, honeypot), lucky draw, support inbox, bot strikes, admin side, load test
@@ -78,6 +78,9 @@ The user usually runs the app in a window titled "TicketBooking - npm run dev". 
 - The API runs under `node --watch`: ANY server-file edit restarts it (a few seconds of 502 API_UNREACHABLE).
   `/api/health` → `services.worker` shows whether the background worker is running.
 - NEVER put backticks inside a bash `node -e "…"` string: bash runs them as commands. Use a script file.
+- End-to-end page tests: run a SEPARATE API on the test DB (PORT=5099, .env + .env.test) and Vite (:5199,
+  API_URL=http://localhost:5099), drive it with headless Chrome over CDP (Node's WebSocket); stop only those two
+  ports afterwards; delete the run's users/trips (a leftover admin makes the 'last admin' tests skip).
 - Lock order in payments: **order row, then event row**. Anything new that locks both must do the same (deadlock otherwise — measured).
 
 ## Map of the code

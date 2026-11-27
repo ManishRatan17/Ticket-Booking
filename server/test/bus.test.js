@@ -238,3 +238,13 @@ test('cancel: the seats go back; twice → 409; after departure → 409', async 
   assert.equal((await api('POST', `/api/bus/bookings/${c.id}/cancel`, { as: ann })).body.error.code, 'BUS_TRIP_DEPARTED');
   assert.equal((await hold(bob, gone.id, ['2A'])).body.error.code, 'BUS_TRIP_DEPARTED');
 });
+
+test('routes: upcoming from → to pairs for the search suggestions; departed trips are not offered', async () => {
+  const t = await trip();
+  let routes = (await api('GET', '/api/bus/routes')).body.routes;
+  const mine = routes.find((r) => r.from === t.from && r.to === t.to);
+  assert.deepEqual([mine.trips, Boolean(mine.nextDeparture)], [1, true]);
+  await pool.query("UPDATE bus_trips SET departs_at = now() - interval '2 hours', arrives_at = now() - interval '1 hour' WHERE id = $1", [t.id]);
+  routes = (await api('GET', '/api/bus/routes')).body.routes;
+  assert.ok(!routes.some((r) => r.from === t.from), 'gone once departed');
+});

@@ -18,7 +18,7 @@ Load-tested with [k6](https://k6.io) against the real system (Linux containers, 
 
 Never oversold in any run, including the first one, before the bottlenecks it found were fixed. The load test exposed a database bottleneck on the hot path (790 errors in the first run → **0**, throughput **×1.9**). Details, before/after numbers and honest limits: [docs/19-load-testing.md](docs/19-load-testing.md).
 
-**467 automated tests** (417 server tests against real PostgreSQL and Redis, 50 client tests with Vitest), with **mutation testing**: every important protection was deliberately broken to prove a test catches it. They run on every push (GitHub Actions, real PostgreSQL and Redis), against their own test database.
+**473 automated tests** (419 server tests against real PostgreSQL and Redis, 54 client tests with Vitest), with **mutation testing**: every important protection was deliberately broken to prove a test catches it. They run on every push (GitHub Actions, real PostgreSQL and Redis), against their own test database.
 
 ## How it works
 

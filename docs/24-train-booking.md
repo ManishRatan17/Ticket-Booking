@@ -52,6 +52,7 @@ Classes: `1A` (berths H1-…), `2A` (A…), `3A` (B…), `SL` (S…), `CC` (C…
 | Method and path | Who | Answers |
 |---|---|---|
 | `GET /api/train/trips?from&to&date&classCode?` | anyone | `200 { trips: [{ id, trainNumber, trainName, from, to, departsAt, arrivesAt, cancelledAt, classes: [{ code, farePaise, total, available }] }] }` · `400` · `503`/`501` (external) |
+| `GET /api/train/routes` | anyone | `200 { routes: [{ from, to, trips, nextDeparture }] }` (the search suggestions) · `503` (external provider) |
 | `GET /api/train/trips/:id` | anyone | `200 { trip }` · `404 TRAIN_TRIP_NOT_FOUND` |
 | `POST /api/train/trips/:id/holds` | signed-in customer + `Idempotency-Key` | `201 { booking }` · `200` + `Idempotent-Replayed` · `400 CLASS_NOT_OFFERED` (`details.classes`) / validation · `409 NOT_ENOUGH_BERTHS` (`details.available`) · `409 TRAIN_HOLD_EXISTS` · `409 TRAIN_TRIP_DEPARTED` / `TRAIN_TRIP_CANCELLED` · `422 IDEMPOTENCY_KEY_REUSED` · `400 IDEMPOTENCY_KEY_REQUIRED` · `403 ADMINS_CANNOT_BUY` / `ACCOUNT_RESTRICTED` |
 | `POST /api/train/bookings/:id/confirm` | the owner | `200 { booking }` with `pnr` (twice: the same PNR) · `400 PASSENGERS_MISMATCH` (`details.travellers`) · `409 TRAIN_HOLD_EXPIRED` · `409 TRAIN_BOOKING_NOT_HELD` · `404` |
