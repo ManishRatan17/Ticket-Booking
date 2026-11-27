@@ -7,17 +7,25 @@ every step, in the same commit.** Details live in `docs/` — read only the doc 
 ## Where we are (updated 2026-11-26)
 
 - Last commit: `89abd92` feat: cancel an event (pushed to `main`; CI green before it).
-- Tests: **383 server + 42 client**, all passing, 0 skipped. Migrations up to **015** (dev DB migrated).
+- Tests: **389 server + 50 client**, all passing, 0 skipped. Migrations up to **015** (dev DB migrated).
 - **Backend features are complete.** Done, in order: auth (+Google), holds (Redis Lua), orders +
   payments (fake + Razorpay test mode), background jobs (BullMQ), waiting room, protection (rate
   limits, cap, Turnstile, honeypot), lucky draw, support inbox, bot strikes, admin side, load test
   (10,000 users → exactly 300 sold), email (Resend), refunds, daily housekeeping, admin audit log,
   cancelling an event.
-- **Next step: deploy (step 5)** — Railway recommended (Dockerfile ready, guide in
+- **Backend phase (2026-11-27), agreed plan:** (1) train-error fixes DONE (proxy 502 API_UNREACHABLE, worker in
+  /api/health, lib/httpClient.js); (2) bus module; (3) train module (own inventory + provider interface, external
+  provider → 503 until a licensed partner is configured; no public IRCTC booking API); (4) payments for both.
+  Bookings confirm WITHOUT payment in steps 2–3. Seats: DB-enforced one active booking per seat per trip.
+- **Deploy (later):** — Railway recommended (Dockerfile ready, guide in
   `docs/21-deployment.md`). Needs the user's own accounts: Railway, Cloudflare Turnstile, Resend;
   then set the Razorpay webhook URL to the public site. Secrets go into Railway's settings, never into chat or git.
 - Later / optional: Phase 8 scale-out, metrics, email verification, names on accounts.
-- **Styling: NOT ours.** The user will style the site themselves. Keep the client minimal.
+- **Frontend (2026-11-27):** landing page with 4 categories, each opening with its own full-screen animation
+  (components/transitions/, lib/transitionRun.js, route /book/:category). Train + Bus bookable (events → booking);
+  Movie + Flight = full-screen ComingSoon (`available: false` in lib/categories.js). TrainLoader was removed.
+  Not committed yet. Browser checks: a CDP script driving headless Chrome (in the session scratchpad).
+  The user designs the rest of the UI; only build the UI they ask for.
 - `project.txt` (repo root) is the user's own notes file: never commit or edit it.
 
 ## How the user wants to work (always)
@@ -38,7 +46,7 @@ every step, in the same commit.** Details live in `docs/` — read only the doc 
 ```powershell
 docker compose up -d          # PostgreSQL 16 + Redis 7 (start Docker Desktop first)
 npm run migrate               # apply new migrations to the dev database (the server does NOT migrate on start)
-npm run dev                   # API :3000 + worker + website (Vite) together
+npm run dev                   # API :5000 (PORT in server/.env) + worker + website :5173 (proxies /api → 5000)
 npm test                      # server (node:test, real DB) then client (Vitest)
 npm run lint ; npm run build  # client lint + production build
 npm run set-role -- you@example.com admin   # make an admin (then log out and in)
@@ -63,6 +71,9 @@ The user usually runs the app in a window titled "TicketBooking - npm run dev". 
 - Test files that create admins take `holdWhileCreatingAdmins()` (test-support/admin-lock.js).
 - Razorpay test mode: card `4111…` is refused (international). Use UPI `success@razorpay` or the
   Indian card `4100 2800 0000 1007` (any future date, any CVV, OTP 4–10 digits).
+- The API runs under `node --watch`: ANY server-file edit restarts it (a few seconds of 502 API_UNREACHABLE).
+  `/api/health` → `services.worker` shows whether the background worker is running.
+- NEVER put backticks inside a bash `node -e "…"` string: bash runs them as commands. Use a script file.
 - Lock order in payments: **order row, then event row**. Anything new that locks both must do the same (deadlock otherwise — measured).
 
 ## Map of the code

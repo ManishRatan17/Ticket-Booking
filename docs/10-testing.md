@@ -5,7 +5,7 @@ docker compose up -d     # the server tests use the real PostgreSQL and Redis
 npm test                 # server (node:test) then client (Vitest)
 ```
 
-Today: **383 server tests + 42 client tests**, all passing, none skipped.
+Today: **389 server tests + 50 client tests**, all passing, none skipped.
 
 ## Their own database, and CI
 
@@ -94,6 +94,7 @@ Kept outside `test/` because Node runs every file inside `test/` as a test.
 | `refunds.test.js` | money that bought no tickets goes back: recorded with the payment, refunded, emailed, shown in the order; one refund per payment; a wrong amount → the paid amount back; admin list and Retry |
 | `audit.test.js` | the admin audit log: a role change (which admin, their email, whom, the role), creating + editing an event (the new event's id as the target), failed actions and reads NOT recorded, a set-role change recorded as "command line", **the database refuses UPDATE and DELETE**, admins read it (newest first, filter), normal users → 403 |
 | `cancel-event.test.js` | cancelling an event: paid orders cancelled + refunded + emailed, unpaid ones ended, holds / orders / the queue → 409, the shop and admin show it; twice, unknown, short reason, no edits, admins only, audited; a payment for an order that slipped in → refunded; **8 payments racing the cancel (3 rounds)** → one refund each, nothing paid, no deadlock; the waiting room emptied |
+| `http-client.test.js` | the shared client for outside services against a local HTTP server: 2xx/4xx returned (a 404 never retried), a slow service → 504 at the timeout (never hangs), a GET failing with 5xx retried until it works, a POST never retried (it may have booked) unless marked idempotent, 429 → 503, nothing listening → 502, HTML instead of JSON → 502 |
 | `housekeeping.test.js` | the daily cleanup removes long-dead sessions (and their refresh tokens), stale reset links and old webhook records, and keeps living sessions, recently logged-out ones, fresh links and recent webhooks |
 | `holds-http.test.js` | the holds API: every status code, IDOR, CSRF, lazy release on read, **300 users × 100 tickets over HTTP** |
 

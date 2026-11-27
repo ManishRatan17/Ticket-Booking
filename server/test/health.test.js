@@ -24,6 +24,8 @@ test('GET /api/health reports Postgres and Redis as up', async () => {
   assert.equal(body.status, 'ok');
   assert.equal(body.services.postgres.status, 'up');
   assert.equal(body.services.redis.status, 'up');
+  // jobs are off in tests, so the worker is reported as such (never as a reason for 503)
+  assert.equal(body.services.worker.status, 'disabled');
 });
 
 test('unknown route returns 404', async () => {

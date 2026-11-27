@@ -51,6 +51,8 @@ const MESSAGES = {
   LOTTERY_NEEDS_ROOM: 'This event has a lucky draw, which needs its waiting room.',
   EVENT_CANCELLED: 'This event has been cancelled. Anyone who paid gets their money back automatically.',
   ALREADY_CANCELLED: 'This event is already cancelled.',
+  // Development: the website can't reach the API (stopped, or restarting after a file change)
+  API_UNREACHABLE: 'The server is not answering right now (it may be restarting). Please try again in a few seconds.',
   // Admin
   FORBIDDEN: 'You do not have permission to do this.',
   LAST_ADMIN: 'This is the only admin left. Make someone else an admin first.',

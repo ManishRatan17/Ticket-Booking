@@ -42,8 +42,10 @@ Base URL in development: `http://localhost:5173/api` (through Vite) or `http://l
 ## Health
 
 ### `GET /api/health`
-`200 { "status": "ok", "uptime": 12.3, "services": { "postgres": { "status": "up" }, "redis": { "status": "up" } } }`
-or `503` with `"status": "degraded"` and the failing service's `error`.
+`200 { "status": "ok", "uptime": 12.3, "services": { "postgres": { "status": "up" }, "redis": { "status": "up" }, "worker": { "status": "up", "count": 1 } } }`
+or `503` with `"status": "degraded"` and the failing service's `error`. `worker` is `up` / `down` (no background worker connected: holds aren't released, emails and refunds wait) / `disabled` (jobs off, e.g. in tests); it never causes the 503, because the API itself still answers.
+
+**In development,** the website (Vite, :5173) forwards `/api` to the API (:5000). If the API isn't running, or is restarting after a file change, Vite answers **`502 { "error": { "code": "API_UNREACHABLE" } }`** instead of a bare 500.
 
 ### `GET /api/config`
 Public settings for the page: `200 { "botCheck": { "siteKey": "…" | null } }` (`null` = the "are you a person?" check is off). Never contains secrets.

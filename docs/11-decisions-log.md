@@ -235,6 +235,19 @@ Every significant choice, the alternatives considered, and why. Newest at the bo
 | The payment re-checks `cancelled_at` under the event lock | trust that the cancel saw every order | an order created in the instant of the cancel would otherwise become tickets for a cancelled event |
 | A new order status `cancelled` | reuse `failed` | "the event was cancelled" isn't a failed payment; My orders says which |
 
+## Outside services (shared HTTP client)
+
+| Decision | Rejected | Why |
+|---|---|---|
+| One client for outside services ([httpClient.js](../server/src/lib/httpClient.js)): a timeout on every call, clear 502/503/504 codes | a bare `fetch` in each module | a provider that hangs must not hang our API; the page must be able to say *what* failed |
+| Retry only GET/HEAD (or a POST the caller marks idempotent), with exponential backoff and jitter | retry everything | a booking POST that timed out may have succeeded: retrying it could book twice |
+| Log one line per failed attempt, never headers or bodies | log the request | headers carry credentials, bodies carry passenger data |
+| A 4xx is returned to the caller, not thrown | treat every non-2xx as an error | "no such train" (404) is an answer the caller handles, not an outage |
+
+## "Train server errors" (investigated 2026-11-27)
+
+There was no train provider in the code: Train used the events API through Vite's proxy. Causes found: the API restarts on every server-file change (`node --watch`) and the proxy then answered a bare 500; Docker Desktop stopping (every database call fails); the background worker not running. Fixes: the proxy answers `502 API_UNREACHABLE` with a clear message, `/api/health` reports the worker, and the shared HTTP client for the coming train provider. **No public train-booking API exists:** IRCTC sells e-tickets only itself or through licensed agents/partners, so the train module will sell the platform's own inventory and plug in a licensed provider later, answering `503` until one is configured (never invented availability).
+
 ## Frontend
 
 | Decision | Alternatives | Why |
