@@ -18,6 +18,7 @@ The database structure lives in numbered SQL files in [server/migrations/](../se
 | `002_auth.sql` | users get `role`, `password_changed_at`, lowercase-email check; new `sessions`, `refresh_tokens`, `password_reset_tokens` |
 | `003_google_login.sql` | `password_hash` becomes optional; users get `email_verified_at`; new `user_identities`; new revoke reason `account_linked` |
 | `005_waiting_room.sql` | events get `admission_per_second` (NULL = no waiting room) |
+| `016_bus.sql` | bus booking ([23](23-bus-booking.md)): `bus_trips`, `bus_bookings` (UNIQUE user + idempotency key; one held per trip and person), `bus_booking_seats` (**unique (trip, seat) over active seats**: never two bookings on one seat) |
 | `015_event_cancellation.sql` | events get `cancelled_at` (NULL = not cancelled) and `cancel_reason`; orders get the status `cancelled` |
 | `014_audit_log.sql` | `admin_audit_log`: which admin (id + email, kept even if the account goes), action, target type + id, details (JSON), when. **Append-only**: a trigger refuses every UPDATE and DELETE |
 | `013_refunds.sql` | `refunds`: order, payment (UNIQUE: one refund per payment), amount, reason, status pending/refunded, the provider's refund id, last error, attempts |

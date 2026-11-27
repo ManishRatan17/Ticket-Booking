@@ -5,7 +5,7 @@ docker compose up -d     # the server tests use the real PostgreSQL and Redis
 npm test                 # server (node:test) then client (Vitest)
 ```
 
-Today: **389 server tests + 50 client tests**, all passing, none skipped.
+Today: **398 server tests + 50 client tests**, all passing, none skipped.
 
 ## Their own database, and CI
 
@@ -94,6 +94,7 @@ Kept outside `test/` because Node runs every file inside `test/` as a test.
 | `refunds.test.js` | money that bought no tickets goes back: recorded with the payment, refunded, emailed, shown in the order; one refund per payment; a wrong amount → the paid amount back; admin list and Retry |
 | `audit.test.js` | the admin audit log: a role change (which admin, their email, whom, the role), creating + editing an event (the new event's id as the target), failed actions and reads NOT recorded, a set-role change recorded as "command line", **the database refuses UPDATE and DELETE**, admins read it (newest first, filter), normal users → 403 |
 | `cancel-event.test.js` | cancelling an event: paid orders cancelled + refunded + emailed, unpaid ones ended, holds / orders / the queue → 409, the shop and admin show it; twice, unknown, short reason, no edits, admins only, audited; a payment for an order that slipped in → refunded; **8 payments racing the cancel (3 rounds)** → one refund each, nothing paid, no deadlock; the waiting room emptied |
+| `bus.test.js` | bus booking: admins create trips (seat map from rows × columns, bad input, audited); search by cities in any case and an Indian travel date; the seat map never shows who; hold → confirm with passengers → history; taken / unknown / repeated / too many seats; one hold per trip; key required; admins and guests refused; **10 identical retries at once → one booking**; **25 people, one seat → exactly one wins**; **30 people, overlapping pairs → no seat twice**; an expired hold frees its seats and can't be confirmed; cancel frees seats, twice → 409, after departure → 409 |
 | `http-client.test.js` | the shared client for outside services against a local HTTP server: 2xx/4xx returned (a 404 never retried), a slow service → 504 at the timeout (never hangs), a GET failing with 5xx retried until it works, a POST never retried (it may have booked) unless marked idempotent, 429 → 503, nothing listening → 502, HTML instead of JSON → 502 |
 | `housekeeping.test.js` | the daily cleanup removes long-dead sessions (and their refresh tokens), stale reset links and old webhook records, and keeps living sessions, recently logged-out ones, fresh links and recent webhooks |
 | `holds-http.test.js` | the holds API: every status code, IDOR, CSRF, lazy release on read, **300 users × 100 tickets over HTTP** |
@@ -162,6 +163,9 @@ A test only proves something once it has been seen to **fail for the right reaso
 | client createEvent sending only name/tickets/sale time (the old code) | the client createEvent test |
 | hold rate limiters (per user and per IP) removed | both hold rate-limit tests |
 | audit middleware removed from the admin mount | 3 audit tests (role change, event create/edit, reading the log) |
+| bus: no trip lock | seat races still pass (the unique index holds); the 10-retries test failed → a duplicate-key fallback added, after which it passes too |
+| bus: no trip lock AND the unique seat index dropped | both seat races (double bookings) |
+| bus: overdue holds never expired | the expiry test |
 | holds not checking whether the event was cancelled | the cancel test (a hold → 200) |
 | the payment ignoring a cancelled event | the slipped-in-order test (tickets for a cancelled event) |
 | the cancel locking the event row first (the opposite order to payments) | the race test: "deadlock detected", 3 of 3 runs |

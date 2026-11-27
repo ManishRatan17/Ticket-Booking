@@ -235,6 +235,16 @@ Every significant choice, the alternatives considered, and why. Newest at the bo
 | The payment re-checks `cancelled_at` under the event lock | trust that the cancel saw every order | an order created in the instant of the cancel would otherwise become tickets for a cancelled event |
 | A new order status `cancelled` | reuse `failed` | "the event was cancelled" isn't a failed payment; My orders says which |
 
+## Bus booking
+
+| Decision | Rejected | Why |
+|---|---|---|
+| Its own module and tables (modules/bus, migration 016) | reuse events/orders | buses have seats, routes, dates and passengers; events have a stock count. Separate, a change to one can't break the other |
+| Seats in PostgreSQL with a **unique index over active seats**, plus a trip-row lock | Redis Lua like the flash sale | a bus has ~40 seats and modest traffic: the database alone can guarantee it, simply. Measured: the index alone prevents double booking |
+| One lock order: trip, then booking | lock what you touch | the deadlock found in event cancellation (bug log #3) |
+| Expired holds freed by the next hold (and "taken" ignores run-out holds) | a background job | correct even when the worker isn't running |
+| Confirm without payment for now | payment in the same step | smaller steps; payment is its own step for bus and train |
+
 ## Outside services (shared HTTP client)
 
 | Decision | Rejected | Why |

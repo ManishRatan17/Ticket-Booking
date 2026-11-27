@@ -19,6 +19,7 @@ const ACTIONS = {
   'POST /restrictions/acknowledge': ['restrictions.acknowledge', 'restriction'],
   'POST /restrictions': ['restriction.create', 'restriction'],
   'POST /restrictions/:id/lift': ['restriction.lift', 'restriction'],
+  'POST /bus/trips': ['bus.trip.create', 'bus_trip'],
 };
 
 // Long texts (support messages) are shortened; the full text stays where it lives.
@@ -43,7 +44,9 @@ export function auditAdminActions(req, res, next) {
   // could lose an entry: acceptable for an admin log; never lost for a successful response.)
   res.on('finish', () => {
     if (res.statusCode >= 400 || !req.route) return;
-    const key = `${req.method} ${req.route.path}`;
+    // The route as written in its router, plus where that router is mounted inside /api/admin
+    // (e.g. /bus for modules/bus): "POST /bus/trips".
+    const key = `${req.method} ${req.baseUrl.replace(/^\/api\/admin/, '')}${req.route.path}`;
     const [action, targetType] = ACTIONS[key] ?? [key, null];
     const targetId = req.params?.id ?? res.locals.auditTargetId ?? null;
     const details = { ...(req.validated?.body ?? {}), ...(res.locals.auditDetails ?? {}) };

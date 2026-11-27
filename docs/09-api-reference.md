@@ -223,6 +223,10 @@ Orders carry `refund`: `null`, or `{ "status": "pending" | "refunded", "amountPa
 ### `GET /admin/refunds?status=pending|refunded` → `200 { "refunds": [ { "id", "orderId", "userEmail", "eventName", "amountPaise", "reason", "status", "provider", "paymentId", "providerRefundId", "error", "attempts", "createdAt", "refundedAt" } ] }` (pending first)
 ### `POST /admin/refunds/:id/retry` → `202 { "retried": true }` · `404 REFUND_NOT_FOUND` · `409 ALREADY_REFUNDED`
 
+## Bus booking — `/api/bus`
+
+Search, seat map, holds, confirm, cancel, history, and the admin trip endpoints (`/api/admin/bus/trips`): every endpoint with its answers is in [23 · Bus booking](23-bus-booking.md#endpoints).
+
 ## Cancelled events
 
 Every event carries `cancelledAt` (null = not cancelled) and `cancelReason`; a cancelled event has `onSale: false`. Then `POST /events/:id/holds`, `POST /orders`, `POST`/`GET /events/:id/queue` (and its live stream) → **`409 EVENT_CANCELLED`** with `details: { reason, cancelledAt }`. Its orders have the status `cancelled`; paid ones carry a `refund` with the reason `event_cancelled`.

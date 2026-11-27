@@ -6,15 +6,15 @@ every step, in the same commit.** Details live in `docs/` — read only the doc 
 
 ## Where we are (updated 2026-11-26)
 
-- Last commits: `fe88816` landing page + transitions, `7d559a2` train-error fixes (step 1). Next: step 2, bus module.
-- Tests: **389 server + 50 client**, all passing, 0 skipped. Migrations up to **015** (dev DB migrated).
+- Last step: bus module (step 2). Next: step 3, train module.
+- Tests: **398 server + 50 client**, all passing, 0 skipped. Migrations up to **016** (dev DB migrated).
 - **Backend features are complete.** Done, in order: auth (+Google), holds (Redis Lua), orders +
   payments (fake + Razorpay test mode), background jobs (BullMQ), waiting room, protection (rate
   limits, cap, Turnstile, honeypot), lucky draw, support inbox, bot strikes, admin side, load test
   (10,000 users → exactly 300 sold), email (Resend), refunds, daily housekeeping, admin audit log,
   cancelling an event.
 - **Backend phase (2026-11-27), agreed plan:** (1) train-error fixes DONE (proxy 502 API_UNREACHABLE, worker in
-  /api/health, lib/httpClient.js); (2) bus module; (3) train module (own inventory + provider interface, external
+  /api/health, lib/httpClient.js); (2) bus module DONE (modules/bus, docs/23); (3) train module (own inventory + provider interface, external
   provider → 503 until a licensed partner is configured; no public IRCTC booking API); (4) payments for both.
   Bookings confirm WITHOUT payment in steps 2–3. Seats: DB-enforced one active booking per seat per trip.
 - **Deploy (later):** — Railway recommended (Dockerfile ready, guide in
@@ -81,7 +81,7 @@ The user usually runs the app in a window titled "TicketBooking - npm run dev". 
 - `server/src/modules/` — auth, events (+ `events.cancel.js`), reservation (Redis Lua holds/stock),
   orders, payments (fake, razorpay, refunds), waiting-room, lottery, support, moderation, admin.
 - `server/src/jobs/` — BullMQ queue, processors, housekeeping. `server/src/lib/` — audit, mailer, rate limits, shortCache.
-- `server/migrations/001–015` · `server/test/` (one file per feature) · `server/test-support/` (fakes, helpers).
+- `server/migrations/001–016` · `server/test/` (one file per feature) · `server/test-support/` (fakes, helpers).
 - `client/src/` — pages, api, components, hooks, lib (error texts, statuses). React 19 + Vite.
 - `loadtest/` — k6 in Docker. `.github/workflows/test.yml` — CI. `server/Dockerfile` — deploy image.
 
@@ -91,4 +91,4 @@ The user usually runs the app in a window titled "TicketBooking - npm run dev". 
 06 security · 07 tickets & holds · 08 frontend · 09 API reference · 10 testing (+ mutations, lessons) ·
 11 decisions log · 12 orders, payments, refunds, cancelling · 13 background jobs · 14 waiting room ·
 15 protection · 16 lucky draw · 17 support inbox · 18 bot strikes · 19 load testing · 20 admin side ·
-21 deployment · 22 demo script.
+21 deployment · 22 demo script · 23 bus booking.

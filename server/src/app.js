@@ -13,6 +13,7 @@ import ordersRouter from './modules/orders/orders.routes.js';
 import { paymentsRouter, webhooksRouter } from './modules/payments/payments.routes.js';
 import waitingRoomRouter from './modules/waiting-room/waiting-room.routes.js';
 import supportRouter from './modules/support/support.routes.js';
+import { busRouter } from './modules/bus/bus.routes.js';
 import { authenticate } from './middleware/authenticate.js';
 import { requireRole } from './middleware/authorize.js';
 import { rejectCrossSiteRequests } from './middleware/csrf.js';
@@ -62,6 +63,7 @@ export function createApp() {
   app.use('/api', paymentsRouter); // /api/payments/fake/…
   app.use('/api', waitingRoomRouter); // /api/events/:id/queue
   app.use('/api', supportRouter); // /api/support/requests…
+  app.use('/api/bus', busRouter); // bus booking: its own module (modules/bus/)
 
   // The website (production): the built React app, from the same server and address as the API.
   // Any other GET that isn't /api is a page of the app (React Router decides which): send index.html.

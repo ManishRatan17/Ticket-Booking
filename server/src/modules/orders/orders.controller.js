@@ -1,18 +1,8 @@
-import { AppError } from '../../lib/errors.js';
 import { redisNow } from '../reservation/holds.js';
-import { IDEMPOTENCY_KEY } from './orders.schemas.js';
 import * as ordersService from './orders.service.js';
 
-// POST endpoints that create things must be safe to retry. The client sends a random
-// Idempotency-Key header; the same key always gets the same result.
-export function requireIdempotencyKey(req, res, next) {
-  const key = req.get('idempotency-key');
-  if (!key || !IDEMPOTENCY_KEY.test(key)) {
-    throw new AppError(400, 'IDEMPOTENCY_KEY_REQUIRED', 'Send an Idempotency-Key header (8–128 letters, digits, - or _)');
-  }
-  req.idempotencyKey = key;
-  next();
-}
+// The Idempotency-Key check lives in middleware/idempotencyKey.js (shared with bus bookings).
+export { requireIdempotencyKey } from '../../middleware/idempotencyKey.js';
 
 export async function createOrder(req, res) {
   const { order, created } = await ordersService.createOrder({

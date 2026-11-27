@@ -8,5 +8,5 @@ export const orderIdParamsSchema = z.object({
   id: z.coerce.number().int().positive(),
 });
 
-// The Idempotency-Key header: any client-made random string (we suggest a UUID).
-export const IDEMPOTENCY_KEY = /^[A-Za-z0-9_-]{8,128}$/;
+// The Idempotency-Key header format: middleware/idempotencyKey.js.
+export { IDEMPOTENCY_KEY } from '../../middleware/idempotencyKey.js';
