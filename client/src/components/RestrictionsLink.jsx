@@ -5,7 +5,7 @@ import { useEffect, useState } from 'react'
 import { NavLink } from 'react-router-dom'
 import { getNotifications } from '../api/admin.js'
 
-export function RestrictionsLink() {
+export function RestrictionsLink({ icon }) {
   const [count, setCount] = useState(0)
 
   useEffect(() => {
@@ -23,7 +23,7 @@ export function RestrictionsLink() {
 
   return (
     <NavLink to="/admin/restrictions" title={count ? `${count} new bot strike${count > 1 ? 's' : ''}` : undefined}>
-      Restrictions{count > 0 && <span className="badge badge-alert">{count} new</span>}
+      {icon && <span aria-hidden="true">{icon}</span>} Restrictions{count > 0 && <span className="badge badge-alert">{count} new</span>}
     </NavLink>
   )
 }
