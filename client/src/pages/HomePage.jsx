@@ -9,6 +9,7 @@ import { CategoryTransition } from '../components/transitions/CategoryTransition
 import { useCategoryTransition } from '../hooks/useCategoryTransition.js'
 import { useMinimumLoading } from '../hooks/useMinimumLoading.js'
 import { CATEGORIES } from '../lib/categories.js'
+import { EventCard } from '../components/EventCard.jsx'
 
 export function HomePage() {
   const { status, user } = useAuth()
@@ -82,22 +83,22 @@ export function HomePage() {
         />
       )}
 
-      <h2>On sale now</h2>
+      <div className="section-head">
+        <h2>On sale now</h2>
+        <Link to="/events">All events →</Link>
+      </div>
       {isLoadingEvents ? (
-        <p className="muted">Loading events…</p>
+        <div className="event-grid" aria-label="Loading events">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="skeleton event-card--skeleton" />
+          ))}
+        </div>
       ) : (
         <>
           {events?.length > 0 && (
-            <ul>
-              {events.map((event) => (
-                <li key={event.id}>
-                  <Link to={`/events/${event.id}`}>{event.name}</Link> —{' '}
-                  {event.cancelledAt
-                    ? 'cancelled'
-                    : event.onSale
-                      ? `${event.available} of ${event.totalTickets} left`
-                      : 'not on sale yet'}
-                </li>
+            <ul className="event-grid">
+              {events.slice(0, 6).map((event) => (
+                <EventCard key={event.id} event={event} />
               ))}
             </ul>
           )}

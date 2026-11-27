@@ -1,11 +1,10 @@
-// All events, with tickets left. Anyone can see this page.
+// All events, as cards. Anyone can see this page.
 import { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
 import { listEvents } from '../api/events.js'
 import { Alert } from '../components/Alert.jsx'
+import { EventCard } from '../components/EventCard.jsx'
 import { errorMessage } from '../lib/errorMessages.js'
-import { clockOffset, formatCountdown, secondsUntil } from '../lib/serverClock.js'
-import { formatMoney } from '../lib/format.js'
+import { clockOffset } from '../lib/serverClock.js'
 
 export function EventsPage() {
   const [data, setData] = useState(null) // { events, offset }
@@ -24,21 +23,33 @@ export function EventsPage() {
 
   return (
     <section>
-      <h1>Events</h1>
+      <header className="page-header">
+        <div>
+          <h1>Events</h1>
+          <p>Concerts, shows and more. Fair queues and a lucky draw for the busiest sales.</p>
+        </div>
+      </header>
       <Alert>{error}</Alert>
-      {!data && !error && <p className="muted">Loading…</p>}
-      {data && data.events.length === 0 && <p className="muted">No events yet.</p>}
+      {!data && !error && (
+        <div className="event-grid" aria-label="Loading events">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="skeleton event-card--skeleton" />
+          ))}
+        </div>
+      )}
+      {data && data.events.length === 0 && (
+        <div className="empty-state">
+          <span className="empty-state__icon" aria-hidden="true">
+            🎟
+          </span>
+          <strong>No events yet</strong>
+          <p>New sales appear here as soon as they're announced.</p>
+        </div>
+      )}
       {data && data.events.length > 0 && (
-        <ul>
+        <ul className="event-grid">
           {data.events.map((event) => (
-            <li key={event.id}>
-              <Link to={`/events/${event.id}`}>{event.name}</Link> — {formatMoney(event.pricePaise)} —{' '}
-              {event.cancelledAt
-                ? 'cancelled'
-                : event.onSale
-                ? `${event.available} of ${event.totalTickets} tickets left`
-                : `on sale in ${formatCountdown(secondsUntil(event.saleStartsAt, data.offset))}`}
-            </li>
+            <EventCard key={event.id} event={event} offset={data.offset} />
           ))}
         </ul>
       )}

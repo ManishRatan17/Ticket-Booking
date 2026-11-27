@@ -46,9 +46,9 @@ export function OrdersPage() {
           No orders yet. <Link to="/events">Find an event</Link>.
         </p>
       )}
-      <ul>
+      <ul className="booking-list">
         {orders?.map((order) => (
-          <li key={order.id}>
+          <li key={order.id} className="booking-list__item">
             <strong>{order.eventName}</strong> — {order.quantity} ticket{order.quantity > 1 ? 's' : ''},{' '}
             {formatMoney(order.amountPaise)} — {STATUS_TEXT[order.status] ?? order.status}
             {order.pool === 'lottery' && ' · 🎟 lucky draw'}

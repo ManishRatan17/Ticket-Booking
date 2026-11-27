@@ -14,6 +14,7 @@ import { useQueueStatus } from '../hooks/useQueueStatus.js'
 import { WaitingRoom } from '../components/WaitingRoom.jsx'
 import { useHumanCheck } from '../hooks/useHumanCheck.js'
 import { LuckyDrawPanel } from '../components/LuckyDrawPanel.jsx'
+import { eventStatus } from '../lib/eventStatus.js'
 
 // Loads the event, plus my hold if I'm signed in. Returns everything the page shows.
 async function loadPage(eventId, signedIn) {
@@ -167,21 +168,34 @@ export function EventPage() {
   // A lucky-draw winner buys from the draw's own tickets, up to the per-winner limit.
   const ticketsOnOffer = luckyWin ? draw.ticketsLeft : event.available
   const maxChoice = Math.min(luckyWin ? draw.perWinner : MAX_TICKETS_PER_HOLD, ticketsOnOffer, canStillBuy)
+  const leftPercent = event.totalTickets ? Math.round((event.available / event.totalTickets) * 100) : 0
+  const saleStatus = eventStatus(event)
 
   return (
-    <section>
+    <section className="event-page">
       <p>
         <Link to="/events">← All events</Link>
       </p>
-      <h1>{event.name}</h1>
-      <p>
-        {formatMoney(event.pricePaise)} per ticket · {event.available} of {event.totalTickets} left
-      </p>
+      <header className="event-hero">
+        <span className={`pill pill--${saleStatus.tone}`}>{saleStatus.text}</span>
+        <h1>{event.name}</h1>
+        <p className="event-hero__meta">
+          <span>
+            <strong>{formatMoney(event.pricePaise)}</strong> per ticket
+          </span>
+          <span>
+            {event.available} of {event.totalTickets} left
+          </span>
+          {hasRoom && !cancelled && <span>Waiting room · {event.admissionPerSecond} people/s</span>}
+        </p>
+        <div className="availability" aria-hidden="true">
+          <span style={{ width: `${leftPercent}%` }} />
+        </div>
+      </header>
 
       <Alert>{error}</Alert>
       <Alert kind="info">{notice}</Alert>
 
-      {hasRoom && !cancelled && <p className="muted">This sale has a waiting room ({event.admissionPerSecond} people let in per second).</p>}
       {draw ? (
         <LuckyDrawPanel draw={draw} eventId={event.id} userId={user?.id} />
       ) : (
@@ -194,8 +208,9 @@ export function EventPage() {
         )
       )}
 
+      <div className="panel purchase-card">
       {cancelled ? (
-        <div className="panel">
+        <div>
           <p>
             <strong>This event has been cancelled.</strong> {event.cancelReason}
           </p>
@@ -210,15 +225,15 @@ export function EventPage() {
             You're holding <strong>{page.hold.quantity}</strong> ticket{page.hold.quantity > 1 ? 's' : ''}. Hold
             expires in <strong>{formatCountdown(holdSecondsLeft)}</strong>.
           </p>
-          <button type="button" onClick={handleCheckout} disabled={busy}>
+          <button type="button" className="button" onClick={handleCheckout} disabled={busy}>
             Checkout — {formatMoney(event.pricePaise * page.hold.quantity)}
           </button>{' '}
-          <button type="button" onClick={handleRelease} disabled={busy}>
+          <button type="button" className="button button-secondary" onClick={handleRelease} disabled={busy}>
             Release tickets
           </button>
         </div>
       ) : isAdmin ? (
-        <div className="panel">
+        <div>
           <p>
             You're signed in as an <strong>admin</strong>. Admin accounts can't buy tickets: the people who run the
             sale don't compete with fans for it. To buy, use a normal account.
@@ -274,7 +289,7 @@ export function EventPage() {
               </option>
             ))}
           </select>{' '}
-          <button type="submit" disabled={busy}>
+          <button type="submit" className="button" disabled={busy}>
             {busy ? 'Holding…' : 'Hold tickets'}
           </button>
           <p className="muted">
@@ -283,6 +298,7 @@ export function EventPage() {
           </p>
         </form>
       )}
+      </div>
     </section>
   )
 }
